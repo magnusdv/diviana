@@ -414,7 +414,8 @@ server = function(input, output, session) {  print("starting")
 
   output$amdata = gt::render_gt({ print("Rendering AM data")
     tab = as.data.frame(req(genoTable$am))
-    rownames(tab) = currentAlias$am[rownames(tab)]
+    hasAlias = rownames(tab) %in% names(currentAlias)
+    rownames(tab)[hasAlias] = currentAlias$am[rownames(tab)[hasAlias]]
     formatGenoTable(tab)
   })
 
@@ -440,8 +441,6 @@ server = function(input, output, session) {  print("starting")
 
   output$pmdata = gt::render_gt({  print("Rendering PM data")
     tab = as.data.frame(req(genoTable$pm))
-    tt <<- tab
-    al <<- currentAlias$pm
     rownames(tab) = currentAlias$pm[rownames(tab)]
     formatGenoTable(tab)
   })
@@ -587,7 +586,9 @@ server = function(input, output, session) {  print("starting")
   observeEvent(input$newped, { print("newped-click")
     isNewPed(TRUE)
     uniqueID = uniquify("quickpedModule")
-    refs = currentAlias$am[rownames(genoTable$am)]
+    refs = rownames(genoTable$am)
+    hasAlias = refs %in% names(currentAlias$am)
+    refs[hasAlias] = currentAlias$am[refs[hasAlias]]
     pedigreeServer(uniqueID, resultVar = pedFromModule, initialDat = NULL,
                    famid = paste0("F", pedNr$total + 1), references = refs)
   })
@@ -596,7 +597,9 @@ server = function(input, output, session) {  print("starting")
     isNewPed(FALSE)
     curr = req(pedigrees()[[pedNr$current]])
     uniqueID = uniquify("quickpedModule")
-    refs = currentAlias$am[rownames(genoTable$am)]
+    refs = rownames(genoTable$am)
+    hasAlias = refs %in% names(currentAlias$am)
+    refs[hasAlias] = currentAlias$am[refs[hasAlias]]
     pedigreeServer(uniqueID, resultVar = pedFromModule, initialDat = curr,
                    famid = paste0("F", pedNr$current), references = refs)
   })
@@ -615,8 +618,14 @@ server = function(input, output, session) {  print("starting")
     newdat$ped = setMarkers(newdat$ped, alleleMatrix = g, locusAttributes = DB())
 
     peds = pedigrees()
-    idx = if(isNewPed()) pedNr$total + 1 else pedNr$current
-    peds[[idx]] = newdat
+    if(isNewPed()) {
+      idx = pedNr$total + 1
+      peds[[paste0("F", idx)]] = newdat
+    }
+    else {
+      idx = pedNr$current
+      peds[[idx]] = newdat
+    }
     pedigrees(peds)
     pedNr$current = idx
 

@@ -151,35 +151,37 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1", refere
       updatePedData(miss = newmiss)
     })
 
+    observeEvent(input$untyped, {
+      ids = req(sel())
+      oldped = currData$ped
+      ids = sortIds(oldped, ids) |> intersect(currData$refs) |> req()
+
+      newids = nextLab(oldped, n = length(ids),
+                       avoid = references, prefix = famid)
+      newped = relabel(oldped, old = ids, new = newids)
+      newrefs = setdiff(currData$refs, ids)
+      updatePedData(ped = newped, refs = newrefs)
+    })
+
     observeEvent(input$setref, { print("setref")
       id = req(sel())
       ref = req(input$setref)
-      oldped = currData$ped
 
       if(length(id) > 1)
         showErr("Please select a single individual")
       if(id %in% currData$miss)
         showErr("A missing person cannot be a reference")
 
-      if(ref == "UNTYPED") {
-        if(!ref %in% currData$refs)
-        newid = pedtools:::generateLabs(oldped, avoid = references)
-        newped = relabel(oldped, old = id, new = newid)
-        newrefs = setdiff(currData$refs, ref)
-      } else {
-        req(!ref %in% currData$refs)
-        newped = relabel(oldped, old = id, new = ref)
-        newrefs = c(currData$refs, ref)
-      }
+      req(!ref %in% currData$refs)
+      newped = relabel(currData$ped, old = id, new = ref)
+      newrefs = c(currData$refs, ref)
+
       updatePedData(ped = newped, refs = newrefs)
     })
 
     observe({ print("ref list")
       remainingRefs = setdiff(references, currData$refs)
-      id = sel()
-      isref = (length(id) == 1) && (id %in% currData$refs)
-      choices = c("Select" = "", if(isref) "UNTYPED" else remainingRefs)
-      updateSelectInput(session, "setref", choices = choices)
+      updateSelectInput(session, "setref", choices = c("Select" = "", remainingRefs))
     })
 
     # Undo/reset --------------------------------------------------------------

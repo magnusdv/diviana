@@ -100,7 +100,7 @@ nextLab = function(x, n, avoid = NULL, prefix) {
     fa = father(x, id); mo = mother(x, id); child = newids[1]
   }
 
-  addChildren(x, father = fa, mother = mo, id = child, sex = sex, verbose = FALSE)
+  addChildren(x, father = fa, mother = mo, ids = child, sex = sex, verbose = FALSE)
 }
 
 
