@@ -7,11 +7,12 @@ plotSolutionDIVIANA = function(dvi, summary, ...) { # summaryAM
 
   miss = summary$Missing
   conc = summary$Conclusion
-  #vics = summary$Sample
 
   groups = lapply(names(COLS_BG), function(g)
     miss[conc == g])
   names(groups) = names(COLS_BG)
+
+  groups$noconc = miss[conc == ""]
 
   fill = list()
   for(i in seq_along(COLS_BG)) {
@@ -20,7 +21,7 @@ plotSolutionDIVIANA = function(dvi, summary, ...) { # summaryAM
   }
 
   excl = groups$Excluded
-  stillmiss = c(groups$Inconclusive, groups$`No match`, miss[conc == ""])
+  stillmiss = unlist(groups[c("Inconclusive", "Inconclusive GLR", "No match", "noconc")])
 
   linecol = list("red" = c(groups$Excluded, stillmiss))
   carrier = stillmiss
