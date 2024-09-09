@@ -166,12 +166,12 @@ ui = bs4DashPage(
         conditionalPanel(
           condition = "input.dbtype == 'custom'",
           fileInput("dbcustom", NULL, accept = c("text/tab-separated-values", "text/plain", ".txt"))
-        ),
+        )
 
-        pickerInput("freqmarker", label = "Marker", choices = NULL,
-                    options = pickerOptions(title = "Select marker",
-                                            style = "btn-outline-secondary")),
-        plotOutput("freqhist", height = "220")
+        # pickerInput("freqmarker", label = "Marker", choices = NULL,
+        #             options = pickerOptions(title = "Select marker",
+        #                                     style = "btn-outline-secondary")),
+        # plotOutput("freqhist", height = "220")
       ),
     ),
 
@@ -313,7 +313,7 @@ server = function(input, output, session) {  print("starting")
     trianglePlot$am = NULL; trianglePlot$pm = NULL
     solutionTable$AM = NULL; solutionTable$PM = NULL
     datapathAM(NULL)
-    #origLabs$am = origLabs$pm = NULL
+    logMessage(NULL)
   }, ignoreInit = TRUE)
 
 
@@ -330,6 +330,7 @@ server = function(input, output, session) {  print("starting")
       dvir:::consolidateDVI(dedup = TRUE)
 
     resetTrigger(resetTrigger() + 1)
+    shinyjs::reset("amfile")
 
     mainDvi$am = am = dat$am
     mainDvi$pm = pm = dat$pm
@@ -357,7 +358,9 @@ server = function(input, output, session) {  print("starting")
 
   observeEvent(datapathAM(), {
     fil = req(datapathAM())
+
     resetTrigger(resetTrigger() + 1)
+    updateSelectInput(session, "example", selected = "")
 
     dvi = NULL
     tryCatch(switch(input$filetypeAM,
@@ -611,8 +614,15 @@ server = function(input, output, session) {  print("starting")
     g = NULL
     if(length(newdat$refs)) {
       aliasAm = currentAlias$am
-      refsOrig = setnames(names(aliasAm), aliasAm)[newdat$refs]
-      g = genoTable$am[refsOrig, , drop = FALSE]
+      aliasRev = setnames(names(aliasAm), aliasAm)
+
+      # Get original ref names
+      refs = newdat$refs
+      isAlias = refs %in% aliasAm
+      refs[isAlias] = aliasRev[refs[isAlias]]
+
+      # Extract genotypes
+      g = genoTable$am[refs, , drop = FALSE]
     }
 
     newdat$ped = setMarkers(newdat$ped, alleleMatrix = g, locusAttributes = DB())
@@ -641,13 +651,13 @@ server = function(input, output, session) {  print("starting")
   },
   execOnResize = TRUE, res = 72, height = 440)
 
-  output$freqhist = renderPlot({ print("freqhist-data")
-    db = req(DB())
-    marker = req(input$freqmarker)
-    fr = db[[marker]]
-    par(mar = c(3,0,0,0))
-    barplot(fr)
-  })
+  # output$freqhist = renderPlot({ print("freqhist-data")
+  #   db = req(DB())
+  #   marker = req(input$freqmarker)
+  #   fr = db[[marker]]
+  #   par(mar = c(3,0,0,0))
+  #   barplot(fr)
+  # })
 
   output$dvisummary = renderInfoBox({ print("summary-data")
     s = NULL

@@ -22,7 +22,8 @@ COLS_BG = c(
   "Excluded"        = "plum1",
   "Nonidentifiable" = "lightgray",
   "No match"        = NA,
-  "Inconclusive"    = NA
+  "Inconclusive"    = NA,
+  "Inconclusive GLR"= NA
 )
 
 # Text colour + carrier symbols in plot
