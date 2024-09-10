@@ -78,7 +78,7 @@ ui = bs4DashPage(
    tabItem("data",
     fluidRow(column(width = 5, class = "col-xs-12 col-lg-4",
 
-      bs4Card(width = 12,
+      bs4Card(width = 12, collapsed = TRUE,
         title = "AM data",
         fluidRow(
           column(4,
@@ -201,7 +201,7 @@ ui = bs4DashPage(
     ),
 
     column(width = 2, id = "labcol", class = "col-xs-12 col-lg-4",
-      bs4Card(width = 12, id = "labels-card",
+      bs4Card(width = 12, id = "labels-card", collapsed = TRUE,
         title = "Labels",
         fluidRow(
           column(9, style = "line-height: 1.2rem",
