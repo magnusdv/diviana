@@ -264,6 +264,8 @@ ui = bs4DashPage(
              br(),hr(),br(),
              h4("Settings"),
              numericInput("LRthresh", "LR threshold", value = 10000,min = 1),
+             br(),
+             checkboxInput("ignoresex", "Ignore Sex", value = FALSE),
              br(), hr(), br(),
              downloadButton('downloadTables', "Download", class = "btn btn-warning",
                             style = "width:100%")
@@ -869,7 +871,7 @@ server = function(input, output, session) {  print("starting")
     dvi = dviData(am = req(mainDvi$am), pm = req(mainDvi$pm), missing = req(mainDvi$missing))
 
     res = tryCatch(
-      captureOutput(dviSolve, dvi, threshold = input$LRthresh),
+      captureOutput(dviSolve, dvi, threshold = input$LRthresh, ignoreSex = input$ignoresex),
       error = errModal)
 
     solutionTable$AM = res$result$AM
