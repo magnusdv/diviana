@@ -177,8 +177,7 @@ ui = bs4DashPage(
 
     column(width = 5, id = "pedcol", class = "col-xs-12 col-lg-4",
 
-      bs4Card(
-        width = NULL,
+      bs4Card(width = NULL,
         title = div("Pedigrees", style = "display: flex; align-items: center;",
                     div(style = "margin-left: 50px;",
                         actionButton("plotdviButton", "Overview", class = "btn-sm"))),
@@ -589,6 +588,10 @@ server = function(input, output, session) {  print("starting")
   })
 
   observeEvent(input$newped, { print("newped-click")
+    if(is.null(genoTable$am))
+      showErr("Reference data must be loaded before creating pedigrees.")
+    req(genoTable$am)
+
     isNewPed(TRUE)
     uniqueID = uniquify("quickpedModule")
     refs = rownames(genoTable$am)
@@ -599,6 +602,10 @@ server = function(input, output, session) {  print("starting")
   })
 
   observeEvent(input$editped, { print("editped-click")
+    if(pedNr$total == 0)
+      showErr("No pedigrees to show.")
+    req(pedNr$total > 0)
+
     isNewPed(FALSE)
     curr = req(pedigrees()[[pedNr$current]])
     uniqueID = uniquify("quickpedModule")
@@ -692,6 +699,9 @@ server = function(input, output, session) {  print("starting")
   # Overview plot -----------------------------------------------------------
 
   observeEvent(input$plotdviButton, {
+    if(pedNr$total == 0)
+      showErr("No pedigrees to show")
+    req(pedNr$total > 0)
     showModal(modalDialog(style = "width: fit-content !important; height: 600px",
       title = "Main DVI plot",
       plotOutput("plotdvi"),
