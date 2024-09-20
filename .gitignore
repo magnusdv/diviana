@@ -4,3 +4,9 @@
 .httr-oauth
 .DS_Store
 .quarto
+inst/shiny/rsconnect
+CRAN-SUBMISSION
+cran-comments.md
+notes-private
+Rprof.out
+
