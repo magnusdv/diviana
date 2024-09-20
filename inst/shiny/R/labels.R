@@ -11,13 +11,21 @@ quickAction = function(id, label)
   actionButton(id, label, size = "sm", status = "warning", width = "100%",
                style = "padding-left:0; padding-right:0; font-weight: bolder;")
 
-slimTextInput = function(id, label = NULL, height = 25, value = "", ...) {
+slimTextInput = function(id, label = NULL, value = "", height = 25, style = NULL, labelStyle = NULL,
+                         textStyle = NULL, ...) {
   if(is.null(value) || length(value) != 1 || is.na(value))
     value = ""
   w = textInput(id, label = label, value = value, ...)
-  w$attribs$style = "margin:0"
-  w$children[[2]]$attribs$style = sprintf(
-    "height: %dpx; line-height: %dpx; padding: 0 1px 0 5px", height, height)
+  w$attribs$style = paste("margin:0;", style)
+
+  # Label
+  w$children[[1]]$attribs$style = labelStyle
+
+  # Text field
+  textStyle = paste(textStyle, sprintf(
+    "height: %dpx; line-height: %dpx; padding: 0 1px 0 5px", height, height))
+  w$children[[2]]$attribs$style = textStyle
+
   w
 }
 
@@ -37,10 +45,11 @@ slimCheck = function(id, height = 25) {
 }
 
 # p() for single line of given height
-simplePar = function(text, height) {
+simplePar = function(text, height, style = NULL) {
   w = p(text)
-  w$attribs$style = sprintf(
-    "height: %dpx; line-height: %dpx; margin:0; padding: 0 3px;", height, height)
+  style1 = sprintf("height: %dpx; line-height: %dpx; margin:0; padding: 0 3px;",
+                   height, height)
+  w$attribs$style = paste(style1, style)
   w
 }
 

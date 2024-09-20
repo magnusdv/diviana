@@ -27,12 +27,10 @@ COLS_BG = c(
 )
 
 # Text colour + carrier symbols in plot
-COLS_FG = c(
-  "No match"        = "red",
-  "Inconclusive"    = "red"
-)
+redText = c("Nonidentifiable", "No match", "Inconclusive")
 
-formatResultTable = function(x, style = 6) {
+
+formatResultTable = function(x, style = 6, exp_style = "E") {
   gt(x) |>
     opt_stylize(style = style) |>
     opt_row_striping() |>
@@ -44,16 +42,17 @@ formatResultTable = function(x, style = 6) {
       table.align = "left",
     ) |>
     sub_missing(missing_text = "") |>
-    fmt_scientific(c("LR", "GLR"), n_sigfig = 3) |>
+    fmt_scientific(c("LR", "GLR"), n_sigfig = 3, exp_style = exp_style,
+                   force_sign_n = exp_style == "E") |>
     cols_add(colour = COLS_BG[Conclusion]) |>
     cols_hide("colour") |>
     tab_style(
-      style = cell_fill(color = from_column(column = "colour", na_value = "white")),
+      style = cell_fill(color = from_column(column = "colour")),
       locations = cells_body(columns = "Conclusion", rows = !is.na(colour))
     ) |>
     tab_style(
       style = cell_text(color = "red"),
-      locations = cells_body(columns = "Conclusion", rows = is.na(colour))
+      locations = cells_body(columns = "Conclusion", rows = Conclusion %in% redText)
     ) |>
     tab_style(style = cell_text(whitespace = "nowrap"),
               locations = cells_body(columns = c("LR", "GLR", "Conclusion", "Comment")))

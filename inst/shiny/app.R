@@ -3,6 +3,7 @@ suppressMessages(suppressPackageStartupMessages({
   library(bs4Dash)
   library(shinyWidgets)
   library(shinyjs)
+  #library(shinyBS)
   library(gt)
   library(pedtools)
   library(pedmut)
@@ -29,7 +30,7 @@ suppressMessages(suppressPackageStartupMessages({
 # -------------------------------------------------------------------------
 
 
-DEVMODE = FALSE
+DEVMODE = F
 
 DATASETS = c("example1", "example2", "exclusionExample", "fire", "grave", "icmp", "planecrash")
 
@@ -56,7 +57,10 @@ ui = bs4DashPage(
     rightUi = tagList(tags$li(
       class = "nav-item dropdown",
       style = "margin-right: 20px; width: 200px",
-      selectInput("example", NULL, choices = c("Load example" = "", DATASETS))))
+      selectInput("example", NULL, choices = c("Load example" = "", DATASETS)))
+    ),
+  div(id = "debugdiv", style = "position:absolute; right:0; top:0",
+      checkboxInput("debug", NULL, value = TRUE))
   ),
 
   # Sidebar
@@ -195,34 +199,39 @@ ui = bs4DashPage(
         ),
         plotOutput("pedplot", width = "auto", height = "auto")
       ),
-
       bs4InfoBoxOutput("dvisummary", width = 12)
     ),
 
     column(width = 2, id = "labcol", class = "col-xs-12 col-lg-4",
-      bs4Card(width = 12, id = "labels-card", collapsed = TRUE,
-        title = "Labels",
-        fluidRow(
-          column(9, style = "line-height: 1.2rem",
-            p("Edit names manually below or use Quick Action buttons.
-              Original labels are retained and included in downloads.")),
-          column(3,
-            actionButton("saveAlias", "Save", status = "info", size = "lg", width = "100%"))
-        ),
-        fluidRow(
-          column(3, quickAction("labels_restore", "Original")),
-          column(3, quickAction("labels_simple", "Simple M/R/V")),
-          column(3, quickAction("labels_remove", "Delete part:")),
-          column(3, slimTextInput("labels_substr", NULL, value = "", height = 30, placeholder = "<part>")),
-          ),
-        hr(style = "margin-top: 10px; margin-bottom: 0px"),
-        fluidRow(
-          column(6,  tags$strong("AM", style = "display: block; text-align: center;"),
-            fluidRow(column(7, "Original"), column(5, "Alias"))),
-          column(6, tags$strong("PM", style = "display: block; text-align: center;"),
-            fluidRow(column(7, "Original"), column(5, "Alias")))
-        ),
-        uiOutput("lab_rows")
+      # bs4Card(width = 12, id = "labels-card", collapsed = TRUE,
+      #   title = "Labels",
+      #   fluidRow(
+      #     column(9, style = "line-height: 1.2rem",
+      #       p("Edit names manually below or use Quick Action buttons.
+      #         Original labels are retained and included in downloads.")),
+      #     column(3,
+      #       actionButton("saveAlias", "Save", status = "info", size = "lg", width = "100%"))
+      #   ),
+      #   fluidRow(
+      #     column(3, quickAction("labels_restore", "Original")),
+      #     column(3, quickAction("labels_simple", "Simple M/R/V")),
+      #     column(3, quickAction("labels_remove", "Delete part:")),
+      #     column(3, slimTextInput("labels_substr", NULL, height = 30, placeholder = "<part>")),
+      #     ),
+      #   hr(style = "margin-top: 10px; margin-bottom: 0px"),
+      #   fluidRow(
+      #     column(6,  tags$strong("AM", style = "display: block; text-align: center;"),
+      #       fluidRow(column(7, "Original"), column(5, "Alias"))),
+      #     column(6, tags$strong("PM", style = "display: block; text-align: center;"),
+      #       fluidRow(column(7, "Original"), column(5, "Alias")))
+      #   ),
+      #   uiOutput("lab_rows")
+      # ),
+      conditionalPanel(condition = "input.debug",
+        div(style = "font-size:smaller; line-height:normal; background-color:white; height:300px; overflow-y:auto; border: 1px solid #ccc",
+          verbatimTextOutput("debugOutput")),
+        div(style = "font-size:smaller; line-height:normal;",
+            verbatimTextOutput("debugElements"))
       )
     )
   )
@@ -265,7 +274,12 @@ ui = bs4DashPage(
              numericInput("LRthresh", "LR threshold", value = 10000,min = 1),
              br(),
              checkboxInput("ignoresex", "Ignore Sex", value = FALSE),
-             br(), hr(), br(),
+             br(),
+             radioButtons("exp_style", "Number format",
+                          choiceNames = c("1.23e4", "1.23E+04", "1.23 x 10^4"),
+                          choiceValues = c("e1", "E", "x10n"),
+                          selected = "E", inline = TRUE),
+             hr(), br(),
              downloadButton('downloadTables', "Download", class = "btn btn-warning",
                             style = "width:100%")
       ),
@@ -296,10 +310,25 @@ ui = bs4DashPage(
 # SERVER ------------------------------------------------------------------
 
 
-server = function(input, output, session) {  print("starting")
+server = function(input, output, session) {
+  addTooltips(session)
 
   # Close app when browser closes
   observeEvent(input$browserClosed, stopApp())
+
+  # Debugging
+  debuglog = reactiveVal("")
+
+  # Reset when debug is toggled
+  observeEvent(input$debug, debuglog("### DEBUG LOG ###"))
+
+  .debug = function(...) {
+    if(!input$debug) return()
+    mess = paste(..., collapse = " ")
+    isolate(debuglog(paste(debuglog(), mess, sep = "\n")))
+  }
+
+  output$debugOutput = renderText(debuglog())
 
   # Main reactive variables -------------------------------------------------
   mainDvi = reactiveValues(pm = NULL, am = NULL, missing = NULL)
@@ -309,7 +338,7 @@ server = function(input, output, session) {  print("starting")
   DB = reactiveVal(NULL)
   resetTrigger = reactiveVal(0)
 
-  observeEvent(resetTrigger(), { print("resetting")
+  observeEvent(resetTrigger(), { .debug("reset all")
     kappa$am = NULL; kappa$pm = NULL
     trianglePlot$am = NULL; trianglePlot$pm = NULL
     solutionTable$AM = NULL; solutionTable$PM = NULL
@@ -319,23 +348,25 @@ server = function(input, output, session) {  print("starting")
 
 
   observe({
-    if(DEVMODE) { print("devmode!")
+    if(DEVMODE) { .debug("devmode!")
       updateSelectInput(session, "example", selected = "icmp")
     }
   })
 
   # Load example ------------------------------------------------------------
 
-  observeEvent(input$example, { print("loading example")
+  observeEvent(input$example, { .debug("load example:", input$example)
     dat = get(req(input$example)) |>
       dvir:::consolidateDVI(dedup = TRUE)
 
     resetTrigger(resetTrigger() + 1)
     shinyjs::reset("amfile")
 
-    mainDvi$am = am = dat$am
+    #mainDvi$am = am = dat$am
+    #mainDvi$missing = miss = dat$missing
+    am = dat$am
+    miss = dat$missing
     mainDvi$pm = pm = dat$pm
-    mainDvi$missing = miss = dat$missing
     origLabs$am = labels(am)
     origLabs$pm = labels(pm)
     markernames$all = name(am)
@@ -350,14 +381,16 @@ server = function(input, output, session) {  print("starting")
 
     updateRadioButtons(session, "dbtype", selected = "data")
     DB(getFreqDatabase(am))
-  })
+  }, ignoreInit = T)
 
   # AM data -----------------------------------------------------------------
 
   datapathAM = reactiveVal()
-  observeEvent(input$amfile, datapathAM(input$amfile$datapath))
+  observeEvent(input$amfile, { .debug("AM file selected")
+    datapathAM(input$amfile$datapath)
+  })
 
-  observeEvent(datapathAM(), {
+  observeEvent(datapathAM(), { .debug("datapathAM changed: ", datapathAM())
     fil = req(datapathAM())
 
     resetTrigger(resetTrigger() + 1)
@@ -365,16 +398,16 @@ server = function(input, output, session) {  print("starting")
 
     dvi = NULL
     tryCatch(switch(input$filetypeAM,
-      Familias = {  print("loading Familias AM file")
+      Familias = {  .debug("-> loading Familias AM file")
         dvi = dvir::familias2dvir(fil, missingFormat = "M[FAM]-[IDX]")
       },
-      Genemapper = {   print("loading Genemapper file")
+      Genemapper = {   .debug("-> loading Genemapper file")
         g = readGenemapper(fil)
         genoTable$am = g
         #origLabs$am = rownames(g)
         pedigrees(NULL)
       },
-      "dviData (.RData/.rds)" = { print("loading dviData")
+      "dviData (.RData/.rds)" = { .debug("-> loading .RData/.rds")
         switch(tolower(tools::file_ext(fil)),
           rds = {
             dvi = readRDS(fil)
@@ -395,7 +428,7 @@ server = function(input, output, session) {  print("starting")
     ), error = errModal, warning = errModal)
 
     # If complete data is loaded: Attach everywhere
-    if(!is.null(dvi)) { print("dvi loaded")
+    if(!is.null(dvi)) { .debug("dvi loaded; update everything")
       dvi = dvir:::consolidateDVI(dvi, dedup = TRUE)
       tryCatch({
         genoTable$am = getGenotypes(dvi$am, ids = typedMembers(dvi$am))
@@ -416,7 +449,7 @@ server = function(input, output, session) {  print("starting")
     }
   })
 
-  output$amdata = gt::render_gt({ print("Rendering AM data")
+  output$amdata = gt::render_gt({ .debug("render AM table")
     tab = as.data.frame(req(genoTable$am))
     hasAlias = rownames(tab) %in% names(currentAlias)
     rownames(tab)[hasAlias] = currentAlias$am[rownames(tab)[hasAlias]]
@@ -425,7 +458,7 @@ server = function(input, output, session) {  print("starting")
 
   # PM data -----------------------------------------------------------------
 
-  observeEvent(input$pmfile, {
+  observeEvent(input$pmfile, { .debug("PM file selected")
     fil = req(input$pmfile$datapath)
     tryCatch({
       switch(input$filetypePM,
@@ -443,7 +476,7 @@ server = function(input, output, session) {  print("starting")
     }, error = errModal, warning = errModal)
   })
 
-  output$pmdata = gt::render_gt({  print("Rendering PM data")
+  output$pmdata = gt::render_gt({  .debug("render PM table")
     tab = as.data.frame(req(genoTable$pm))
     rownames(tab) = currentAlias$pm[rownames(tab)]
     formatGenoTable(tab)
@@ -454,15 +487,15 @@ server = function(input, output, session) {  print("starting")
 
   markernames = reactiveValues(all = NULL, currIdx = 0)
 
-  observeEvent(input$prevmark, {
+  observeEvent(input$prevmark, { .debug("mutation frame: prev marker")
     markernames$currIdx = (markernames$currIdx - 2) %% length(markernames$all) + 1
   })
 
-  observeEvent(input$nextmark, {
+  observeEvent(input$nextmark, { .debug("mutation frame: next marker")
     markernames$currIdx = markernames$currIdx %% length(markernames$all) + 1
   })
 
-  output$markName = renderUI({ print("Update marker name")
+  output$markName = renderUI({ .debug("mutation frame: update marker name")
     idx = markernames$currIdx
     req(idx > 0, length(markernames$all))
     nam = markernames$all[idx]
@@ -473,20 +506,20 @@ server = function(input, output, session) {  print("starting")
 
   markersForMutEdit = reactiveVal(NULL)
 
-  observeEvent(input$mutApplyAll, { print("confirm apply mut all")
+  observeEvent(input$mutApplyAll, { .debug("mutation frame: confirm all")
     ask_confirmation("confirmMutApply", type = "warning",
       title = "Click 'Confirm' to apply this mutation model to all markers")
     markersForMutEdit(NULL)
   })
 
-  observeEvent(input$mutApply1, { print("confirm apply mut 1")
+  observeEvent(input$mutApply1, { .debug("mutation frame: confirm 1")
     m = markernames$all[markernames$currIdx]
     ask_confirmation("confirmMutApply", type = "warning",
       title = sprintf("Click 'Confirm' to apply this mutation model to %s", m))
     markersForMutEdit(m)
   })
 
-  observeEvent(req(input$confirmMutApply), { print("apply mut model to all")
+  observeEvent(req(input$confirmMutApply), { .debug("mutation frame: apply!")
     am = req(mainDvi$am)
     model = if(input$mutmodel == "none") NULL else input$mutmodel
     markers = markersForMutEdit()
@@ -501,7 +534,7 @@ server = function(input, output, session) {  print("starting")
     show_alert(title = "Mutation model applied!", type = "success")
   })
 
-  observeEvent(input$mutmodel, { print("update mutmodel fields")
+  observeEvent(input$mutmodel, { .debug("mutation frame: update parameter fields")
     mut = mutmod(req(mainDvi$am), markernames$currIdx)
     params = getParams(mut, format = 1)
     if(is.null(mut))
@@ -511,12 +544,12 @@ server = function(input, output, session) {  print("starting")
                        stepwise = c("rate", "rate2", "range"))
     disfields = setdiff(c("rate", "rate2", "range"), setfields)
 
-    for(p in setfields) { #print(paste("set", p))
+    for(p in setfields) {
       shinyjs::enable(paste0(p, "F")); shinyjs::enable(paste0(p, "M"))
       updateNumericInput(session, paste0(p, "F"), value = params[[p]][1])
       updateNumericInput(session, paste0(p, "M"), value = params[[p]][2])
     }
-    for(p in disfields) { #print(paste("disable", p))
+    for(p in disfields) {
       updateNumericInput(session, paste0(p, "F"), value = NA)
       updateNumericInput(session, paste0(p, "M"), value = NA)
       shinyjs::disable(paste0(p, "F")); shinyjs::disable(paste0(p, "M"))
@@ -524,24 +557,23 @@ server = function(input, output, session) {  print("starting")
   })
 
   # Update model name when marker changes
-  observeEvent(markernames$currIdx , { print("update model name")
+  observeEvent(markernames$currIdx , { .debug("mutation frame: update model name")
     mut = mutmod(req(mainDvi$am), markernames$currIdx)
     model = if(is.null(mut)) "none" else getParams(mut, params = "model")$model[1]
     updateNumericInput(session, "mutmodel", value = model)
-  })
+  }, ignoreInit = TRUE)
 
   # Frequency database ------------------------------------------------------
 
-  observeEvent(input$dbselect, { print("dbselect")
+  observeEvent(input$dbselect, { .debug("database: selected", input$dbselect)
     if(input$dbselect == "")
       newdb = NULL
-    else if(input$dbselect == "NorwegianFrequencies")
+    if(input$dbselect == "NorwegianFrequencies")
       newdb = forrel::NorwegianFrequencies
-
     DB(newdb)
   })
 
-  observeEvent(DB(), { print("update marker names")
+  observeEvent(DB(), { .debug("database: update freqmarker selector")
     m = names(req(DB()))
     updatePickerInput(session, "freqmarker", choices = m)
   })
@@ -553,13 +585,13 @@ server = function(input, output, session) {  print("starting")
   isNewPed = reactiveVal(FALSE)
   pedNr = reactiveValues(current = 0, total = 0)
 
-  observeEvent(pedigrees(), { print("pedigrees modified")
+  observeEvent(pedigrees(), { .debug("react to modified pedigree list")
     nped = length(pedigrees())
     if(pedNr$current == 0 || pedNr$current > nped)
       pedNr$current = 1
     pedNr$total = nped
     mainDvi$am = lapply(pedigrees(), `[[`, "ped")
-    mainDvi$missing = unlist(lapply(pedigrees(), `[[`, "miss"))
+    mainDvi$missing = as.character(unlist(lapply(pedigrees(), `[[`, "miss")))
 
     # Labels
     aliases = currentAlias$am
@@ -571,15 +603,17 @@ server = function(input, output, session) {  print("starting")
     origLabs$am = unname(neworig)
   })
 
-  observeEvent(input$prevped, {
+  observeEvent(input$prevped, { .debug("go to previous pedigree")
+    req(pedNr$total > 0)
     pedNr$current = (pedNr$current - 2) %% pedNr$total + 1
   })
 
-  observeEvent(input$nextped, {
+  observeEvent(input$nextped, { .debug("go to next pedigree")
+    req(pedNr$total > 0)
     pedNr$current = pedNr$current %% pedNr$total + 1
   })
 
-  output$pedTitle = renderUI({ print("Update ped title")
+  output$pedTitle = renderUI({ .debug("update ped title")
     nms = names(req(pedigrees()))
     nr = pedNr$current
     req(nr > 0)
@@ -587,21 +621,29 @@ server = function(input, output, session) {  print("starting")
     tit
   })
 
-  observeEvent(input$newped, { print("newped-click")
-    if(is.null(genoTable$am))
+  observeEvent(input$newped, { .debug("new pedigree")
+    if(is.null(genoTable$am)) {
       showErr("Reference data must be loaded before creating pedigrees.")
-    req(genoTable$am)
+      return()
+    }
 
     isNewPed(TRUE)
     uniqueID = uniquify("quickpedModule")
     refs = rownames(genoTable$am)
     hasAlias = refs %in% names(currentAlias$am)
     refs[hasAlias] = currentAlias$am[refs[hasAlias]]
+    avoidLabs = list(vics = names(mainDvi$pm),
+                     refs = if(pedNr$total > 0) typedMembers(mainDvi$am) else NULL,
+                     miss = mainDvi$missing,
+                     labs = labels(mainDvi$am))
+
+
     pedigreeServer(uniqueID, resultVar = pedFromModule, initialDat = NULL,
-                   famid = paste0("F", pedNr$total + 1), references = refs)
+                   famid = paste0("F", pedNr$total + 1),
+                   allrefs = refs, avoidLabs = avoidLabs, .debug = .debug)
   })
 
-  observeEvent(input$editped, { print("editped-click")
+  observeEvent(input$editped, { .debug("edit current pedigree")
     if(pedNr$total == 0)
       showErr("No pedigrees to show.")
     req(pedNr$total > 0)
@@ -612,11 +654,18 @@ server = function(input, output, session) {  print("starting")
     refs = rownames(genoTable$am)
     hasAlias = refs %in% names(currentAlias$am)
     refs[hasAlias] = currentAlias$am[refs[hasAlias]]
+
+    avoidLabs = list(vics = names(mainDvi$pm),
+                     refs = if(pedNr$total > 1) typedMembers(mainDvi$am[-pedNr$current]) else NULL,
+                     miss = setdiff(mainDvi$missing, curr$ped$ID),
+                     labs = labels(mainDvi$am[-pedNr$current]))
+
     pedigreeServer(uniqueID, resultVar = pedFromModule, initialDat = curr,
-                   famid = paste0("F", pedNr$current), references = refs)
+                   famid = paste0("F", pedNr$current),
+                   allrefs = refs, avoidLabs = avoidLabs, .debug = .debug)
   })
 
-  observeEvent(pedFromModule(), { print("pedmodule-result")
+  observeEvent(pedFromModule(), { .debug("pedigree returned from module")
     newdat = req(pedFromModule())
 
     # Transfer marker data
@@ -650,7 +699,7 @@ server = function(input, output, session) {  print("starting")
 
   })
 
-  output$pedplot = renderPlot({ print("pedplot-data");
+  output$pedplot = renderPlot({ .debug("plot current pedigree:", pedNr$current);
     req(pedNr$current > 0)
     peddat = pedigrees()[[pedNr$current]]
     plot(peddat$ped, hatched = peddat$refs, cex = 1.2,
@@ -660,7 +709,7 @@ server = function(input, output, session) {  print("starting")
   },
   execOnResize = TRUE, res = 72, height = 440)
 
-  # output$freqhist = renderPlot({ print("freqhist-data")
+  # output$freqhist = renderPlot({ .debug("freqhist-data")
   #   db = req(DB())
   #   marker = req(input$freqmarker)
   #   fr = db[[marker]]
@@ -668,7 +717,7 @@ server = function(input, output, session) {  print("starting")
   #   barplot(fr)
   # })
 
-  output$dvisummary = renderInfoBox({ print("summary-data")
+  output$dvisummary = renderInfoBox({ .debug("update summary info box")
     s = NULL
     col = "warning"
     if(!length(mainDvi$am))
@@ -698,7 +747,7 @@ server = function(input, output, session) {  print("starting")
 
   # Overview plot -----------------------------------------------------------
 
-  observeEvent(input$plotdviButton, {
+  observeEvent(input$plotdviButton, { .debug("click Overview button")
     if(pedNr$total == 0)
       showErr("No pedigrees to show")
     req(pedNr$total > 0)
@@ -712,7 +761,7 @@ server = function(input, output, session) {  print("starting")
 
   plotdims = reactive(dvir:::findPlotDims(mainDvi$am, npm = length(mainDvi$pm)))
 
-  output$plotdvi = renderPlot({  # print(plotdims())
+  output$plotdvi = renderPlot({ .debug("render Overview plot")
     dvi = dviData(am = mainDvi$am, pm = mainDvi$pm, missing = mainDvi$missing, generatePairings = FALSE)
     plotDVI(dvi, style = 2)
   }, res = 96,
@@ -771,18 +820,18 @@ server = function(input, output, session) {  print("starting")
   })
 
   # Restore originals
-  observeEvent(input$labels_restore, {print("restore labels")
+  observeEvent(input$labels_restore, { .debug("restore labels")
     updateAlias(session, am = origLabs$am, pm = origLabs$pm)
   })
 
   # Simple labels
-  observeEvent(input$labels_simple, {print("simple labels")
+  observeEvent(input$labels_simple, { .debug("simple labels")
     dvi = dviData(am = mainDvi$am, pm = mainDvi$pm, missing = mainDvi$missing, generatePairings = FALSE)
     newdvi = relabelDVI(dvi, victimPrefix = "V", missingPrefix = "M", refPrefix = "R", othersPrefix = "")
     updateAlias(session, am = labels(newdvi$am), pm = labels(newdvi$pm))
   })
 
-  observeEvent(input$saveAlias, { print("save alias")
+  observeEvent(input$saveAlias, { .debug("save alias")
     # New aliases read from the input fields
     newAliasAm = sapply(seq_along(origLabs$am), function(i) input[[paste0("alias_am", i)]])
     newAliasPm = sapply(seq_along(origLabs$pm), function(i) input[[paste0("alias_pm", i)]])
@@ -822,7 +871,7 @@ server = function(input, output, session) {  print("starting")
     trianglePlot$am = forrel::checkPairwise(am, plotType = "plotly", verbose = FALSE)
   })
 
-  output$amtriangle = renderPlotly({ print("amtriangle");
+  output$amtriangle = renderPlotly({ .debug("amtriangle");
     p = trianglePlot$am %||% ribd::ibdTriangle(plotType = "plotly")
     p$x$source = "amtriangle"
     p
@@ -830,7 +879,7 @@ server = function(input, output, session) {  print("starting")
 
   lastClick = reactiveVal(NULL)
 
-  output$ampairped = renderPlot({ print("am-pedigree")
+  output$ampairped = renderPlot({ .debug("am-pedigree")
     p = req(event_data("plotly_click", source = "amtriangle"))
     if(identical(p, isolate(lastClick())))
       return(NULL)
@@ -867,7 +916,7 @@ server = function(input, output, session) {  print("starting")
     trianglePlot$pm = forrel::checkPairwise(pm, plotType = "plotly", verbose = FALSE)
   })
 
-  output$pmtriangle = renderPlotly({ print("pmtriangle");
+  output$pmtriangle = renderPlotly({ .debug("pmtriangle");
     trianglePlot$pm %||% ribd::ibdTriangle(plotType = "plotly")
   })
 
@@ -877,7 +926,7 @@ server = function(input, output, session) {  print("starting")
   logMessage = reactiveVal("")
 
 
-  observeEvent(input$solve, { print("solve")
+  observeEvent(input$solve, { .debug("solve")
     dvi = dviData(am = req(mainDvi$am), pm = req(mainDvi$pm), missing = req(mainDvi$missing))
 
     res = tryCatch(
@@ -889,7 +938,7 @@ server = function(input, output, session) {  print("starting")
     logMessage(res$log)
   })
 
-  observeEvent(mainDvi$am, {  print("reset result tables")
+  observeEvent(mainDvi$am, {  .debug("reset result tables")
     dvi = dviData(am = mainDvi$am, pm = mainDvi$pm, missing = mainDvi$missing)
     miss = dvi$missing
     fams = getFamily(dvi, miss)
@@ -899,19 +948,19 @@ server = function(input, output, session) {  print("starting")
     solutionTable$PM = data.frame(Sample = vics, Missing = "", Family = "", LR = "", GLR = "", Conclusion = "", Comment = "")
   })
 
-  output$amcentric = gt::render_gt({  print("render result table AM")
-    formatResultTable(req(solutionTable$AM))
+  output$amcentric = gt::render_gt({  .debug("render result AM")
+    formatResultTable(req(solutionTable$AM), exp_style = input$exp_style)
   })
 
-  output$pmcentric = gt::render_gt({  print("render result table PM")
-    formatResultTable(req(solutionTable$PM))
+  output$pmcentric = gt::render_gt({  .debug("render result PM")
+    formatResultTable(req(solutionTable$PM), exp_style = input$exp_style)
   })
 
-  output$solvelog = renderText({ print("render log")
+  output$solvelog = renderText({ .debug("render result log")
     logMessage()[-1] |> paste0(collapse = "\n") |> sub("\n\n\n", "\n\n", x = _)
   })
 
-  output$solutionplot = renderPlot({ print("solutionsplot")
+  output$solutionplot = renderPlot({ .debug("plot solution")
     req(mainDvi$am)
     dvi = dviData(am = mainDvi$am, pm = mainDvi$pm, missing = mainDvi$missing)
     plotSolutionDIVIANA(dvi, solutionTable$AM)
@@ -923,11 +972,24 @@ server = function(input, output, session) {  print("starting")
 
   output$downloadTables = downloadHandler(
     filename = function() sprintf("foo_%s.xlsx", Sys.Date()),
-    content = function(file) { print("download")
+    content = function(file) { .debug("download")
       downloadTables(req(solutionTable$AM), solutionTable$PM, currentAlias$am, currentAlias$pm, file)
     },
     contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )
+
+  output$debugElements = renderPrint({
+    req(input$debug)
+    cat("### CURRENT OBJECTS ###\n")
+    print(mainDvi$am, verbose = F)
+    print(mainDvi$pm, verbose = F)
+    print(mainDvi$missing, verbose = F)
+    cat("\n")
+    print(abbrMat(genoTable$am))
+    cat("\n")
+    print(abbrMat(genoTable$pm))
+  })
+
 }
 
 shinyApp(ui = ui, server = server, options = list(launch.browser = TRUE))

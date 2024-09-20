@@ -59,17 +59,10 @@ textInput2 = function(inputId, value) {
   w
 }
 
-# Version of pedtools::generateLabs that allows for a prefix in existing labels
-nextLab = function(x, n, avoid = NULL, prefix) {
-  if(is.ped(x))
-    x = x$ID
-  y = sub(sprintf("^%s-", prefix), "", x)
-  new = pedtools:::generateLabs(y, n, avoid = avoid)
-  paste(prefix, new, sep = "-")
-}
+.generateLabs = pedtools:::generateLabs
 
-.addChild = function(x, ids, sex, prefix) {
-  newids = nextLab(x, 2, prefix = prefix)
+.addChild = function(x, ids, sex, avoid = NULL) {
+  newids = .generateLabs(x, 2, avoid = avoid)
   if(length(ids) == 1) {
     ids = c(ids, newids[1])
     child = newids[2]
@@ -80,17 +73,17 @@ nextLab = function(x, n, avoid = NULL, prefix) {
   addChild(x, parents = ids, id = child, sex = sex, verbose = FALSE)
 }
 
-.addParents = function(x, id, prefix) {
-  newids = nextLab(x, 2, prefix = prefix)
+.addParents = function(x, id, avoid = NULL) {
+  newids = .generateLabs(x, 2, avoid = avoid)
   addParents(x, id, father = newids[1], mother = newids[2], verbose = FALSE)
 }
 
-.addSib = function(x, id, sex, prefix) {
-  newids = nextLab(x, 3, prefix = prefix)
-
+.addSib = function(x, id, sex, avoid = NULL) {
   if(length(id) > 1)
     stop2("Too many individuals are selected. Current selection: ", sortIds(x, id), "<br><br>",
           "To add a sibling, please select exactly one individual.")
+
+  newids = .generateLabs(x, 3, avoid = avoid)
 
   if(id %in% founders(x)) {
     fa = newids[1]; mo = newids[2]; child = newids[3]
@@ -159,3 +152,6 @@ naReplace = function(v, repl = 0) {
   v[is.na(v)] = repl
   v
 }
+
+abbrMat = function(x)
+  x[, seq_len(min(3, ncol(x))), drop = FALSE]

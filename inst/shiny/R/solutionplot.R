@@ -21,7 +21,7 @@ plotSolutionDIVIANA = function(dvi, summary, ...) { # summaryAM
   }
 
   excl = groups$Excluded
-  stillmiss = unlist(groups[c("Inconclusive", "Inconclusive GLR", "No match", "noconc")])
+  stillmiss = unlist(groups[c("Nonidentifiable", "Inconclusive", "Inconclusive GLR", "No match", "noconc")])
 
   linecol = list("red" = c(groups$Excluded, stillmiss))
   carrier = stillmiss
