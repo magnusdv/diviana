@@ -203,35 +203,14 @@ ui = bs4DashPage(
     ),
 
     column(width = 2, id = "labcol", class = "col-xs-12 col-lg-4",
-      # bs4Card(width = 12, id = "labels-card", collapsed = TRUE,
-      #   title = "Labels",
-      #   fluidRow(
-      #     column(9, style = "line-height: 1.2rem",
-      #       p("Edit names manually below or use Quick Action buttons.
-      #         Original labels are retained and included in downloads.")),
-      #     column(3,
-      #       actionButton("saveAlias", "Save", status = "info", size = "lg", width = "100%"))
-      #   ),
-      #   fluidRow(
-      #     column(3, quickAction("labels_restore", "Original")),
-      #     column(3, quickAction("labels_simple", "Simple M/R/V")),
-      #     column(3, quickAction("labels_remove", "Delete part:")),
-      #     column(3, slimTextInput("labels_substr", NULL, height = 30, placeholder = "<part>")),
-      #     ),
-      #   hr(style = "margin-top: 10px; margin-bottom: 0px"),
-      #   fluidRow(
-      #     column(6,  tags$strong("AM", style = "display: block; text-align: center;"),
-      #       fluidRow(column(7, "Original"), column(5, "Alias"))),
-      #     column(6, tags$strong("PM", style = "display: block; text-align: center;"),
-      #       fluidRow(column(7, "Original"), column(5, "Alias")))
-      #   ),
-      #   uiOutput("lab_rows")
-      # ),
       conditionalPanel(condition = "input.debug",
         div(style = "font-size:smaller; line-height:normal; background-color:white; height:300px; overflow-y:auto; border: 1px solid #ccc",
           verbatimTextOutput("debugOutput")),
-        div(style = "font-size:smaller; line-height:normal;",
-            verbatimTextOutput("debugElements"))
+        div(style = "font-size:smaller; line-height:normal; border: 1px solid #ccc; margin-top: 5px; position:relative;",
+            div(downloadButton("downloaddata", label = "dviData", width = "100%", class = "btn btn-primary btn-sm", style = "background-color: lightblue;"),
+                style = "position:absolute; top: 5px; right: 5px;"),
+            verbatimTextOutput("debugElements")
+            ),
       )
     )
   )
@@ -990,6 +969,13 @@ server = function(input, output, session) {
     print(abbrMat(genoTable$pm))
   })
 
+  output$downloaddata = downloadHandler(
+    filename = function() "dviData.rds",
+    content = function(file) { .debug("download data")
+      dvi = dviData(pm = req(mainDvi$pm), am = mainDvi$am, missing = mainDvi$missing)
+      saveRDS(dvi, file)
+    }
+  )
 }
 
 shinyApp(ui = ui, server = server, options = list(launch.browser = TRUE))
