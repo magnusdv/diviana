@@ -463,7 +463,6 @@ server = function(input, output, session) {
     formatGenoTable(tab)
   })
 
-
   # Mutation frame --------------------------------------------------------
 
   markernames = reactiveValues(all = NULL, currIdx = 0)
@@ -562,11 +561,10 @@ server = function(input, output, session) {
   # Pedigrees -----------------------------------------------------------
 
   pedFromModule = reactiveVal()
-  currentPed = reactiveVal()
   isNewPed = reactiveVal(FALSE)
   pedNr = reactiveValues(current = 0, total = 0)
 
-  observeEvent(pedigrees(), { .debug("react to modified pedigree list")
+  observeEvent(pedigrees(), { .debug("pedigree list")
     nped = length(pedigrees())
     if(pedNr$current == 0 || pedNr$current > nped)
       pedNr$current = 1
@@ -626,7 +624,7 @@ server = function(input, output, session) {
 
   observeEvent(input$editped, { .debug("edit current pedigree")
     if(pedNr$total == 0)
-      showErr("No pedigrees to show.")
+      showErr("No pedigree to edit.")
     req(pedNr$total > 0)
 
     isNewPed(FALSE)
@@ -755,7 +753,7 @@ server = function(input, output, session) {
 
   currentAlias = reactiveValues(am = NULL, pm = NULL)
 
-  observeEvent(origLabs$am, {currentAlias$am = setnames(origLabs$am)})
+  observeEvent(origLabs$am, {.debug("origLabs$am"); currentAlias$am = setnames(origLabs$am)})
   observeEvent(origLabs$pm, {currentAlias$pm = setnames(origLabs$pm)})
 
   output$lab_rows = renderUI({
@@ -791,7 +789,7 @@ server = function(input, output, session) {
   }))
 
   # Remove substrings
-  observeEvent(input$labels_remove, {
+  observeEvent(input$labels_remove, { .debug("labels: remove substrings")
     alias_am = sapply(seq_along(origLabs$am), function(i) input[[paste0("alias_am", i)]])
     alias_pm = sapply(seq_along(origLabs$pm), function(i) input[[paste0("alias_pm", i)]])
     substr = input$labels_substr
@@ -801,18 +799,18 @@ server = function(input, output, session) {
   })
 
   # Restore originals
-  observeEvent(input$labels_restore, { .debug("restore labels")
+  observeEvent(input$labels_restore, { .debug("labels: restore")
     updateAlias(session, am = origLabs$am, pm = origLabs$pm)
   })
 
   # Simple labels
-  observeEvent(input$labels_simple, { .debug("simple labels")
+  observeEvent(input$labels_simple, { .debug("labels: simple")
     dvi = dviData(am = mainDvi$am, pm = mainDvi$pm, missing = mainDvi$missing, generatePairings = FALSE)
     newdvi = relabelDVI(dvi, victimPrefix = "V", missingPrefix = "M", refPrefix = "R", othersPrefix = "")
     updateAlias(session, am = labels(newdvi$am), pm = labels(newdvi$pm))
   })
 
-  observeEvent(input$saveAlias, { .debug("save alias")
+  observeEvent(input$saveAlias, { .debug("labels: save")
     # New aliases read from the input fields
     newAliasAm = sapply(seq_along(origLabs$am), function(i) input[[paste0("alias_am", i)]])
     newAliasPm = sapply(seq_along(origLabs$pm), function(i) input[[paste0("alias_pm", i)]])
@@ -846,13 +844,13 @@ server = function(input, output, session) {
   kappa = reactiveValues(am = NULL, pm = NULL)
   trianglePlot = reactiveValues(am = NULL, pm = NULL)
 
-  observeEvent(input$amkappa, { # button click
+  observeEvent(input$amkappa, { .debug("am-kappa")
     am = req(mainDvi$am)
     kappa$am = forrel::checkPairwise(am, plotType = "none", verbose = FALSE)
     trianglePlot$am = forrel::checkPairwise(am, plotType = "plotly", verbose = FALSE)
   })
 
-  output$amtriangle = renderPlotly({ .debug("amtriangle");
+  output$amtriangle = renderPlotly({ .debug("amt-riangle");
     p = trianglePlot$am %||% ribd::ibdTriangle(plotType = "plotly")
     p$x$source = "amtriangle"
     p
@@ -860,7 +858,7 @@ server = function(input, output, session) {
 
   lastClick = reactiveVal(NULL)
 
-  output$ampairped = renderPlot({ .debug("am-pedigree")
+  output$ampairped = renderPlot({ .debug("am-triangle-pedigree")
     p = req(event_data("plotly_click", source = "amtriangle"))
     if(identical(p, isolate(lastClick())))
       return(NULL)
@@ -891,13 +889,13 @@ server = function(input, output, session) {
   },
   execOnResize = TRUE, res = 72)
 
-  observeEvent(input$pmkappa, { # button click
+  observeEvent(input$pmkappa, { .debug("pm-kappa")
     pm = req(mainDvi$pm)
     kappa$pm = forrel::checkPairwise(pm, plotType = "none", verbose = FALSE)
     trianglePlot$pm = forrel::checkPairwise(pm, plotType = "plotly", verbose = FALSE)
   })
 
-  output$pmtriangle = renderPlotly({ .debug("pmtriangle");
+  output$pmtriangle = renderPlotly({ .debug("pm-triangle");
     trianglePlot$pm %||% ribd::ibdTriangle(plotType = "plotly")
   })
 
