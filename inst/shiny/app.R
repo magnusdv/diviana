@@ -415,6 +415,8 @@ server = function(input, output, session) {
         origLabs$am = labels(dvi$am, unlist = TRUE)
         origLabs$pm = labels(dvi$pm, unlist = TRUE)
         updateCheckboxInput(session, "pm_in_am", value = TRUE)
+        DB(getFreqDatabase(dvi$am))
+        updateRadioButtons(session, "dbtype", selected = "data")
         peds = lapply(dvi$am, function(a)
           list(ped = a, miss = intersect(labels(a), dvi$missing),
                refs = typedMembers(a)))
