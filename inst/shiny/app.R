@@ -926,8 +926,17 @@ server = function(input, output, session) {
     fams = getFamily(dvi, miss)
     vics = names(dvi$pm)
 
-    solutionTable$AM = data.frame(Family = fams, Missing = miss, Sample = "", LR = "", GLR = "", Conclusion = "", Comment = "")
-    solutionTable$PM = data.frame(Sample = vics, Missing = "", Family = "", LR = "", GLR = "", Conclusion = "", Comment = "")
+    if(length(miss))
+      amTab = data.frame(Family = fams, Missing = miss, Sample = "", LR = "", GLR = "", Conclusion = "", Comment = "")
+    else
+      amTab = "No missing persons in dataset"
+
+    if(length(vics))
+      pmTab = data.frame(Sample = vics, Missing = "", Family = "", LR = "", GLR = "", Conclusion = "", Comment = "")
+    else
+      pmTab = "No victim samples in dataset"
+    solutionTable$AM = amTab
+    solutionTable$PM = pmTab
   })
 
   output$amcentric = gt::render_gt({  .debug("render result AM")
