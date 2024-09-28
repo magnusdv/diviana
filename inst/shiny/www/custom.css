@@ -65,3 +65,5 @@
 /* Analysis tab -----------------------------------*/
 
 #solve {width: 100%}
+
+#lrmatrix { overflow: auto; white-space: nowrap; }

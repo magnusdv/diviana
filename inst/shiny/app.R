@@ -270,6 +270,7 @@ ui = bs4DashPage(
                     collapsible = FALSE,
                     tabPanel(title = "AM", gt::gt_output("amcentric")),
                     tabPanel(title = "PM", gt::gt_output("pmcentric")),
+                    tabPanel(title = "LR matrix", div(tableOutput("lrmatrix"), id = "lrmatrix")),
                     tabPanel(title = "log", verbatimTextOutput("solvelog"))
          )
       ),
@@ -322,6 +323,7 @@ server = function(input, output, session) {
     kappa$am = NULL; kappa$pm = NULL
     trianglePlot$am = NULL; trianglePlot$pm = NULL
     solutionTable$AM = NULL; solutionTable$PM = NULL
+    LRmatrix(NULL)
     datapathAM(NULL)
     logMessage(NULL)
   }, ignoreInit = TRUE)
@@ -356,7 +358,7 @@ server = function(input, output, session) {
     genoTable$pm = getGenotypes(pm)
 
     peds = lapply(am, function(a)
-      list(ped = a, miss = intersect(labels(a), miss), refs = typedMembers(a)))
+      list(ped = a, miss = intersect(miss, labels(a)), refs = typedMembers(a)))
     pedigrees(peds)
 
     updateRadioButtons(session, "dbtype", selected = "data")
@@ -904,7 +906,7 @@ server = function(input, output, session) {
 
   solutionTable = reactiveValues(AM = NULL, PM = NULL)
   logMessage = reactiveVal("")
-
+  LRmatrix = reactiveVal(NULL)
 
   observeEvent(input$solve, { .debug("solve")
     dvi = dviData(am = req(mainDvi$am), pm = req(mainDvi$pm), missing = req(mainDvi$missing))
@@ -917,6 +919,7 @@ server = function(input, output, session) {
 
     solutionTable$AM = res$result$AM
     solutionTable$PM = res$result$PM
+    LRmatrix(res$result$LRmatrix)
     logMessage(res$log)
   })
 
@@ -948,8 +951,15 @@ server = function(input, output, session) {
   })
 
   output$solvelog = renderText({ .debug("render result log")
-    logMessage()[-1] |> paste0(collapse = "\n") |> sub("\n\n\n", "\n\n", x = _)
+    logMessage()[-1] |> paste0(collapse = "\n")
   })
+
+  output$lrmatrix = renderTable({ .debug("render LR matrix")
+    lrm = req(LRmatrix())
+    lrm[!is.na(lrm)] = sprintf("%.3g", lrm[!is.na(lrm)])
+    rownames(lrm) = paste0("<b>", rownames(lrm), "</b>")
+    lrm
+  }, rownames = TRUE, spacing = "xs", na = "-", sanitize.text.function = identity)
 
   output$solutionplot = renderPlot({ .debug("plot solution")
     req(mainDvi$am)
@@ -964,10 +974,14 @@ server = function(input, output, session) {
   output$downloadTables = downloadHandler(
     filename = function() sprintf("foo_%s.xlsx", Sys.Date()),
     content = function(file) { .debug("download")
-      downloadTables(req(solutionTable$AM), solutionTable$PM, currentAlias$am, currentAlias$pm, file)
+      downloadTables(req(solutionTable$AM), solutionTable$PM,
+                     currentAlias$am, currentAlias$pm, file)
     },
     contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )
+
+
+  # Debug -------------------------------------------------------------------
 
   output$debugElements = renderPrint({
     req(input$debug)
