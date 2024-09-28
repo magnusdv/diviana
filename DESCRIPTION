@@ -12,7 +12,7 @@ Depends:
 Imports:
     shiny
 Suggests:
-    dvir (>= 3.3.1),
+    dvir (>= 3.3.2),
     pedtools (>= 2.7.1),
     bs4Dash,
     openxlsx,
