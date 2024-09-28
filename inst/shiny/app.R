@@ -251,6 +251,7 @@ ui = bs4DashPage(
              br(),hr(),br(),
              h4("Settings"),
              numericInput("LRthresh", "LR threshold", value = 10000,min = 1),
+             numericInput("maxIncomp", "Exclusion limit", min = 0, step = 1, value = 2),
              br(),
              checkboxInput("ignoresex", "Ignore Sex", value = FALSE),
              br(),
@@ -909,7 +910,9 @@ server = function(input, output, session) {
     dvi = dviData(am = req(mainDvi$am), pm = req(mainDvi$pm), missing = req(mainDvi$missing))
 
     res = tryCatch(
-      captureOutput(dviSolve, dvi, threshold = input$LRthresh, ignoreSex = input$ignoresex),
+      captureOutput(dviSolve, dvi, threshold = input$LRthresh, maxIncomp = input$maxIncomp,
+                    ignoreSex = input$ignoresex, verbose = TRUE, debug = input$debug,
+                    detailedOutput = TRUE),
       error = errModal)
 
     solutionTable$AM = res$result$AM
