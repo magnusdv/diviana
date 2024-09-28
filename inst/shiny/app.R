@@ -319,6 +319,13 @@ server = function(input, output, session) {
   DB = reactiveVal(NULL)
   resetTrigger = reactiveVal(0)
 
+  currentDviData = reactive({
+    am = mainDvi$am; pm = mainDvi$pm; missing = mainDvi$missing
+    if(is.null(am) || is.null(pm))
+      return(NULL)
+    dviData(am = am, pm = pm, missing = missing)
+  })
+
   observeEvent(resetTrigger(), { .debug("reset all")
     kappa$am = NULL; kappa$pm = NULL
     trianglePlot$am = NULL; trianglePlot$pm = NULL
@@ -344,8 +351,6 @@ server = function(input, output, session) {
     resetTrigger(resetTrigger() + 1)
     shinyjs::reset("amfile")
 
-    #mainDvi$am = am = dat$am
-    #mainDvi$missing = miss = dat$missing
     am = dat$am
     miss = dat$missing
     mainDvi$pm = pm = dat$pm
@@ -909,7 +914,7 @@ server = function(input, output, session) {
   LRmatrix = reactiveVal(NULL)
 
   observeEvent(input$solve, { .debug("solve")
-    dvi = dviData(am = req(mainDvi$am), pm = req(mainDvi$pm), missing = req(mainDvi$missing))
+    dvi = dviData(am = req(mainDvi$am), pm = mainDvi$pm, missing = mainDvi$missing)
 
     res = tryCatch(
       captureOutput(dviSolve, dvi, threshold = input$LRthresh, maxIncomp = input$maxIncomp,
