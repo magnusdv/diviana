@@ -60,7 +60,7 @@ ui = bs4DashPage(
       selectInput("example", NULL, choices = c("Load example" = "", DATASETS)))
     ),
   div(id = "debugdiv", style = "position:absolute; right:0; top:0",
-      checkboxInput("debug", NULL, value = TRUE))
+      checkboxInput("debug", NULL, value = DEVMODE))
   ),
 
   # Sidebar
@@ -218,25 +218,31 @@ ui = bs4DashPage(
 
   # Tab: Relatedness ---------------------------------------------------------
 
-  tabItem("relatedness",
-    fluidRow(bs4Card(
-      width = 8,
+  tabItem("relatedness", fluidRow(
+    bs4Card(width = 4,
       title = div(style = "display: flex; align-items: center;",
-                  "Reference individuals",
+                  "AM - AM",
                   div(style = "margin-left: 30px;",
-                      actionButton("amkappa", "Check pairwise", class = "btn-sm"))),
-      fluidRow(
-        column(width = 6, plotlyOutput("amtriangle", width = "100%", height = "400px")),
-        column(width = 6, plotOutput("ampairped", width = "auto", height = "400px"))
-      )
+                      actionButton("amkappa", "Calculate", class = "btn-sm"))),
+      plotlyOutput("amtriangle", width = "100%", height = "400px"),
+      tableOutput("amtable")
+      #plotOutput("ampairped", width = "auto", height = "400px") # TODO
     ),
-    bs4Card(
-      width = 4,
+    bs4Card(width = 4,
       title = div(style = "display: flex; align-items: center;",
-                  "PM samples",
+                  "AM - PM",
                   div(style = "margin-left: 30px;",
-                      actionButton("pmkappa", "Check pairwise", class = "btn-sm"))),
-      plotlyOutput("pmtriangle", width = "100%", height = "400px")
+                      actionButton("ampmkappa", "Calculate", class = "btn-sm"))),
+      plotlyOutput("ampmtriangle", width = "100%", height = "400px"),
+      tableOutput("ampmtable")
+    ),
+    bs4Card(width = 4,
+      title = div(style = "display: flex; align-items: center;",
+                  "PM - PM",
+                  div(style = "margin-left: 30px;",
+                      actionButton("pmkappa", "Calculate", class = "btn-sm"))),
+      plotlyOutput("pmtriangle", width = "100%", height = "400px"),
+      tableOutput("pmtable")
     ),
   )),
 
@@ -248,17 +254,13 @@ ui = bs4DashPage(
       # Buttons: Solve! --------------------------------------------
       column(width = 2, class = "col-xl-1",
              actionBttn("solve", label = "SOLVE", icon = icon("calculator"), color = "primary", style = "jelly", ),
-             br(),hr(),br(),
+             br(),hr(),
              h4("Settings"),
              numericInput("LRthresh", "LR threshold", value = 10000,min = 1),
+             br(),
              numericInput("maxIncomp", "Exclusion limit", min = 0, step = 1, value = 2),
              br(),
              checkboxInput("ignoresex", "Ignore Sex", value = FALSE),
-             br(),
-             radioButtons("exp_style", "Number format",
-                          choiceNames = c("1.23e4", "1.23E+04", "1.23 x 10^4"),
-                          choiceValues = c("e1", "E", "x10n"),
-                          selected = "E", inline = TRUE),
              hr(), br(),
              downloadButton('downloadTables', "Download", class = "btn btn-warning",
                             style = "width:100%")
@@ -304,6 +306,7 @@ server = function(input, output, session) {
   observeEvent(input$debug, debuglog("### DEBUG LOG ###"))
 
   .debug = function(...) {
+    if(DEVMODE) print(paste(..., collapse = " "))
     if(!input$debug) return()
     mess = paste(..., collapse = " ")
     isolate(debuglog(paste(debuglog(), mess, sep = "\n")))
@@ -327,8 +330,7 @@ server = function(input, output, session) {
   })
 
   observeEvent(resetTrigger(), { .debug("reset all")
-    kappa$am = NULL; kappa$pm = NULL
-    trianglePlot$am = NULL; trianglePlot$pm = NULL
+    kappa$am = kappa$pm = kappa$ampm = NULL
     solutionTable$AM = NULL; solutionTable$PM = NULL
     LRmatrix(NULL)
     datapathAM(NULL)
@@ -389,6 +391,7 @@ server = function(input, output, session) {
         dvi = dvir::familias2dvir(fil, missingFormat = "M[FAM]-[IDX]")
       },
       Genemapper = {   .debug("-> loading Genemapper file")
+        stop2("Genemapper import not yet implemented")
         g = readGenemapper(fil)
         genoTable$am = g
         #origLabs$am = rownames(g)
@@ -397,9 +400,10 @@ server = function(input, output, session) {
       "dviData (.RData/.rds)" = { .debug("-> loading .RData/.rds")
         switch(tolower(tools::file_ext(fil)),
           rds = {
-            dvi = readRDS(fil)
-            if(!inherits(dvi, "dviData"))
+            content = readRDS(fil)
+            if(!inherits(content, "dviData"))
               stop2("File does not contain a `dviData` object")
+            dvi = content
           },
           rdata = {
             load(fil, envir = (env <- new.env()))
@@ -849,23 +853,22 @@ server = function(input, output, session) {
 
   # Tab: Triangle plots ----------------------------------------------------------
 
-  kappa = reactiveValues(am = NULL, pm = NULL)
-  trianglePlot = reactiveValues(am = NULL, pm = NULL)
+  kappa = reactiveValues(am = NULL, pm = NULL, ampm = NULL)
 
+  # TODO: settings button with 'across comps'
   observeEvent(input$amkappa, { .debug("am-kappa")
-    am = req(mainDvi$am)
-    kappa$am = forrel::checkPairwise(am, plotType = "none", verbose = FALSE)
-    trianglePlot$am = forrel::checkPairwise(am, plotType = "plotly", verbose = FALSE)
+    kappa$am = CPnoplot(req(mainDvi$am), acrossComps = FALSE)
   })
 
-  output$amtriangle = renderPlotly({ .debug("amt-riangle");
-    p = trianglePlot$am %||% ribd::ibdTriangle(plotType = "plotly")
+  output$amtriangle = renderPlotly({ .debug("am triangle");
+    p = forrel::plotCP(kappa$am, plotType = "plotly", xlab = "", ylab = "")
     p$x$source = "amtriangle"
     p
   })
 
   lastClick = reactiveVal(NULL)
 
+  # TODO: show peds in modal!
   output$ampairped = renderPlot({ .debug("am-triangle-pedigree")
     p = req(event_data("plotly_click", source = "amtriangle"))
     if(identical(p, isolate(lastClick())))
@@ -897,15 +900,35 @@ server = function(input, output, session) {
   },
   execOnResize = TRUE, res = 72)
 
+  observeEvent(input$ampmkappa, { .debug("ampm-kappa")
+    am = req(mainDvi$am)
+    pm = mainDvi$pm
+    idMatr = pedtools:::fast.grid(list(typedMembers(am), names(pm)))
+    commonMarkers = intersect(name(am), name(pm))
+    allcmps = c(selectMarkers(am, commonMarkers), selectMarkers(pm, commonMarkers))
+    kappa$ampm = forrel::ibdEstimate(allcmps, ids = idMatr, verbose = FALSE)
+  })
+
   observeEvent(input$pmkappa, { .debug("pm-kappa")
-    pm = req(mainDvi$pm)
-    kappa$pm = forrel::checkPairwise(pm, plotType = "none", verbose = FALSE)
-    trianglePlot$pm = forrel::checkPairwise(pm, plotType = "plotly", verbose = FALSE)
+    kappa$pm = CPnoplot(req(mainDvi$pm))
+  })
+
+  output$ampmtriangle = renderPlotly({ .debug("ampm-triangle");
+    # NB: results come from ibdEstimate()
+    forrel::showInTriangle(kappa$ampm, plotType = "plotly", xlab = "", ylab = "",
+                           pch = 16, col = "pink", cex = 1.2)
   })
 
   output$pmtriangle = renderPlotly({ .debug("pm-triangle");
-    trianglePlot$pm %||% ribd::ibdTriangle(plotType = "plotly")
+    forrel::plotCP(kappa$pm, plotType = "plotly", xlab = "", ylab = "",
+                   errtxt = "Potential relationship")
   })
+
+  output$amtable = renderTable(formatCP(req(kappa$am)), width = "100%", spacing = "xs")
+
+  output$ampmtable = renderTable(formatCP(req(kappa$ampm)), width = "100%", spacing = "xs")
+
+  output$pmtable = renderTable(formatCP(req(kappa$pm)), width = "100%", spacing = "xs")
 
   # Tab: Analysis ---------------------------------------------------------------
 
@@ -948,11 +971,11 @@ server = function(input, output, session) {
   })
 
   output$amcentric = gt::render_gt({  .debug("render result AM")
-    formatResultTable(req(solutionTable$AM), exp_style = input$exp_style)
+    formatResultTable(req(solutionTable$AM), inter = input$debug)
   })
 
   output$pmcentric = gt::render_gt({  .debug("render result PM")
-    formatResultTable(req(solutionTable$PM), exp_style = input$exp_style)
+    formatResultTable(req(solutionTable$PM))
   })
 
   output$solvelog = renderText({ .debug("render result log")

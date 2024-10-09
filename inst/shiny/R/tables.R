@@ -30,20 +30,24 @@ COLS_BG = c(
 redText = c("Nonidentifiable", "No match", "Inconclusive")
 
 
-formatResultTable = function(x, style = 6, exp_style = "E") {
-  gt(x) |>
-    opt_stylize(style = style) |>
-    opt_row_striping() |>
+formatResultTable = function(x, style = 6, inter = FALSE) {
+  tab = gt(x) |>
+    #opt_interactive(use_sorting = T, use_compact_mode = T, use_resizers = T,
+    #                             use_text_wrapping = F) |>
+    opt_stylize(style = style,
+                add_row_striping = TRUE) |>
     tab_options(
-      #table.font.size = px(12),
       data_row.padding = px(2),
       container.overflow.x = TRUE,
       container.overflow.y = TRUE,
       table.align = "left",
+      container.width = pct(100),
+      table.width = pct(100),
     ) |>
     sub_missing(missing_text = "") |>
-    fmt_scientific(c("LR", "GLR"), n_sigfig = 3, exp_style = exp_style,
-                   force_sign_n = exp_style == "E") |>
+    fmt_scientific(c("LR", "GLR"), n_sigfig = 3, exp_style = "e",
+                   force_sign_n = TRUE) |>
+    #sub_missing(columns = "GLR", missing_text = "-") |>
     cols_add(colour = COLS_BG[Conclusion]) |>
     cols_hide("colour") |>
     tab_style(
@@ -57,4 +61,25 @@ formatResultTable = function(x, style = 6, exp_style = "E") {
     tab_style(style = cell_text(whitespace = "nowrap"),
               locations = cells_body(columns = c("LR", "GLR", "Conclusion", "Comment")))
 
+  tab
+}
+
+
+CPnoplot = function(x, ...) {
+  forrel::checkPairwise(x, plotType = "none", verbose = FALSE, ...)
+}
+
+
+formatCP = function(tab, sortby = NULL) {
+  # TODO: implement this
+  if(is.null(tab) || nrow(tab) == 0)
+    return(data.frame("No results to display" = character(0), check.names = FALSE))
+
+  if(ncol(tab) > 1) {
+    sortby = if("GLR" %in% names(tab)) tab$GLR else (tab$k1/4 + tab$k2/2)
+    tab = tab[order(sortby, decreasing = TRUE), ]
+  }
+
+  skipcols = c("N", "kappa0", "kappa1", "kappa2", "relgroup", "pval", "err")
+  tab[!names(tab) %in% skipcols]
 }
