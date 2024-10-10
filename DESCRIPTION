@@ -13,6 +13,7 @@ Imports:
     shiny
 Suggests:
     dvir (>= 3.3.2),
+    forrel (>= 1.7.1),
     pedtools (>= 2.7.1),
     bs4Dash,
     openxlsx,

@@ -7,6 +7,7 @@ suppressMessages(suppressPackageStartupMessages({
   library(gt)
   library(pedtools)
   library(pedmut)
+  library(forrel)
   library(dvir)
   library(verbalisr)
   library(plotly)
