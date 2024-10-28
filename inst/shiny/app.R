@@ -18,10 +18,16 @@ suppressMessages(suppressPackageStartupMessages({
 # --------------------------------------------------------------------
 #'
 #' DATA
-#' *
-#' * Save (as RData) button
+#' * Reset all button
 #' * Genemapper tall import (gives plot errors)
 #' * Genemapper wide + Relationship
+#' * Download dviData (not only debug)
+#' * Plot fires twice!!!
+#'
+#' PED
+#' * Select references: no line wrap
+#' * DELETE ped!
+#'
 #'
 #' TRIANGLES
 #' * Triangle plots: Latex labels
@@ -54,6 +60,12 @@ ui = bs4DashPage(
          navbarTab(tabName = "data", text = "Data"),
          navbarTab(tabName = "relatedness", text = "Relatedness"),
          navbarTab(tabName = "analysis", text = "Analysis")
+    ),
+    div(actionBttn("resetall", "Reset all", size = "sm", style = "simple", color = "danger"),
+        style = "margin-left:100px; padding:0; white-space:nowrap;"),
+    div(
+      HTML("⚠️ This app is under development.<br>Do not upload sensitive data. ⚠️"),
+      style = "color: black; background-color: lightyellow; margin-left: 100px; padding: 10px; text-align: center; font-weight: bold;"
     ),
     rightUi = tagList(tags$li(
       class = "nav-item dropdown",
@@ -323,14 +335,19 @@ server = function(input, output, session) {
   DB = reactiveVal(NULL)
   resetTrigger = reactiveVal(0)
 
-  currentDviData = reactive({
-    am = mainDvi$am; pm = mainDvi$pm; missing = mainDvi$missing
-    if(is.null(am) || is.null(pm))
-      return(NULL)
-    dviData(am = am, pm = pm, missing = missing)
+  observeEvent(input$resetall, { .debug("reset all")
+    mainDvi$am = mainDvi$pm = mainDvi$missing = NULL
+    genoTable$am = genoTable$pm = NULL
+    origLabs$am = origLabs$pm = NULL
+    pedigrees(NULL)
+    isolate(updateSelectInput(session, "example", selected = ""))
+    updateNumericInput(session, "LRthresh", value = 10000)
+    updateNumericInput(session, "maxIncomp", value = 2)
+    updateCheckboxInput(session, "ignoresex", value = FALSE)
+    resetTrigger(resetTrigger() + 1)
   })
 
-  observeEvent(resetTrigger(), { .debug("reset all")
+  observeEvent(resetTrigger(), { .debug("reset downstream")
     kappa$am = kappa$pm = kappa$ampm = NULL
     solutionTable$AM = NULL; solutionTable$PM = NULL
     LRmatrix(NULL)
@@ -343,6 +360,13 @@ server = function(input, output, session) {
     if(DEVMODE) { .debug("devmode!")
       updateSelectInput(session, "example", selected = "icmp")
     }
+  })
+
+  currentDviData = reactive({ .debug("update currentDviData")
+    am = mainDvi$am; pm = mainDvi$pm; missing = mainDvi$missing
+    if(is.null(am) || is.null(pm))
+      return(NULL)
+    dviData(am = am, pm = pm, missing = missing)
   })
 
   # Load example ------------------------------------------------------------
@@ -380,11 +404,11 @@ server = function(input, output, session) {
     datapathAM(input$amfile$datapath)
   })
 
-  observeEvent(datapathAM(), { .debug("datapathAM changed: ", datapathAM())
+  observeEvent(datapathAM(), { .debug("AM datapath: ", datapathAM())
     fil = req(datapathAM())
 
     resetTrigger(resetTrigger() + 1)
-    updateSelectInput(session, "example", selected = "")
+    isolate(updateSelectInput(session, "example", selected = ""))
 
     dvi = NULL
     tryCatch(switch(input$filetypeAM,
@@ -445,8 +469,8 @@ server = function(input, output, session) {
 
   output$amdata = gt::render_gt({ .debug("render AM table")
     tab = as.data.frame(req(genoTable$am))
-    hasAlias = rownames(tab) %in% names(currentAlias)
-    rownames(tab)[hasAlias] = currentAlias$am[rownames(tab)[hasAlias]]
+    #hasAlias = rownames(tab) %in% names(currentAlias)
+    #rownames(tab)[hasAlias] = currentAlias$am[rownames(tab)[hasAlias]]
     formatGenoTable(tab)
   })
 
@@ -463,8 +487,27 @@ server = function(input, output, session) {
       },
       Genemapper = {
         genoTable$pm = g = readGenemapper(fil)
-        mainDvi$pm = rownames(g) |> singletons() |>
-          setMarkers(alleleMatrix = g, locusAttributes = DB())
+        ids = rownames(g)
+        mnames = colnames(g)
+
+        if("AMEL" %in% mnames)
+          sex = match(g$AMEL, c("X/Y", "X/X"), nomatch = 0L)
+        else
+          sex = 0
+
+        pm = singletons(rownames(g), sex = sex) |> setMarkers(alleleMatrix = g)
+        names(pm) = rownames(g)
+
+        typ = typedMembers(pm)
+        if(!length(typ))
+          stop2("No genotypes found in PM data")
+        if(length(setdiff(names(pm), typ))) {
+          showErr("Ignoring untyped PM individuals:", setdiff(names(pm), typ))
+          pm = pm[typ]
+        }
+
+        pm = tryCatch(.setDB(pm, DB()), warning = showErr)
+        mainDvi$pm = pm
       })
       origLabs$pm = labels(mainDvi$pm)
     }, error = errModal, warning = errModal)
@@ -472,7 +515,7 @@ server = function(input, output, session) {
 
   output$pmdata = gt::render_gt({  .debug("render PM table")
     tab = as.data.frame(req(genoTable$pm))
-    rownames(tab) = currentAlias$pm[rownames(tab)]
+    #rownames(tab) = currentAlias$pm[rownames(tab)]
     formatGenoTable(tab)
   })
 
@@ -575,14 +618,23 @@ server = function(input, output, session) {
 
   pedFromModule = reactiveVal()
   isNewPed = reactiveVal(FALSE)
-  pedNr = reactiveValues(current = 0, total = 0)
+  nPed = reactive(length(pedigrees()))
+  curPed = reactiveVal(0)
+
+  observeEvent(nPed(), { .debug("nPed changed to:", nPed())
+    n = nPed()
+    cur = curPed()
+    if(n == 0)
+      curPed(0)
+    else if(cur == 0 || cur > n)
+      curPed(1)
+  })
+
+  observeEvent(curPed(), .debug("curped triggered:", curPed()), ignoreInit = F, ignoreNULL = F)
 
   observeEvent(pedigrees(), { .debug("pedigree list")
-    nped = length(pedigrees())
-    if(pedNr$current == 0 || pedNr$current > nped)
-      pedNr$current = 1
-    pedNr$total = nped
-    mainDvi$am = lapply(pedigrees(), `[[`, "ped")
+    #isolate({
+      mainDvi$am = lapply(pedigrees(), `[[`, "ped")
     mainDvi$missing = as.character(unlist(lapply(pedigrees(), `[[`, "miss")))
 
     # Labels
@@ -593,24 +645,23 @@ server = function(input, output, session) {
     neworig = aliasRev[newalias] # may have missing values
     neworig[is.na(neworig)] = newalias[is.na(neworig)]
     origLabs$am = unname(neworig)
+    #})
   })
 
   observeEvent(input$prevped, { .debug("go to previous pedigree")
-    req(pedNr$total > 0)
-    pedNr$current = (pedNr$current - 2) %% pedNr$total + 1
+    req(nPed() > 0)
+    curPed((curPed() - 2) %% nPed() + 1)
   })
 
   observeEvent(input$nextped, { .debug("go to next pedigree")
-    req(pedNr$total > 0)
-    pedNr$current = pedNr$current %% pedNr$total + 1
+    req(nPed() > 0)
+    curPed(curPed() %% nPed() + 1)
   })
 
   output$pedTitle = renderUI({ .debug("update ped title")
-    nms = names(req(pedigrees()))
-    nr = pedNr$current
-    req(nr > 0)
-    tit = sprintf("Family %d/%d", nr, pedNr$total)
-    tit
+    # nms = names(req(pedigrees()))
+    req(nPed() > 0, curPed() > 0)
+    sprintf("Family %d/%d", curPed(), nPed())
   })
 
   observeEvent(input$newped, { .debug("new pedigree")
@@ -624,36 +675,39 @@ server = function(input, output, session) {
     refs = rownames(genoTable$am)
     hasAlias = refs %in% names(currentAlias$am)
     refs[hasAlias] = currentAlias$am[refs[hasAlias]]
+
     avoidLabs = list(vics = names(mainDvi$pm),
-                     refs = if(pedNr$total > 0) typedMembers(mainDvi$am) else NULL,
+                     refs = if(nPed() > 0) typedMembers(mainDvi$am) else NULL,
                      miss = mainDvi$missing,
                      labs = labels(mainDvi$am))
 
-
     pedigreeServer(uniqueID, resultVar = pedFromModule, initialDat = NULL,
-                   famid = paste0("F", pedNr$total + 1),
+                   famid = paste0("F", nPed() + 1),
                    allrefs = refs, avoidLabs = avoidLabs, .debug = .debug)
   })
 
   observeEvent(input$editped, { .debug("edit current pedigree")
-    if(pedNr$total == 0)
+    nped = nPed()
+    curped = curPed()
+
+    if(nped == 0)
       showErr("No pedigree to edit.")
-    req(pedNr$total > 0)
+    req(nped > 0)
 
     isNewPed(FALSE)
-    curr = req(pedigrees()[[pedNr$current]])
+    curr = req(pedigrees()[[curped]])
     uniqueID = uniquify("quickpedModule")
     refs = rownames(genoTable$am)
     hasAlias = refs %in% names(currentAlias$am)
     refs[hasAlias] = currentAlias$am[refs[hasAlias]]
 
     avoidLabs = list(vics = names(mainDvi$pm),
-                     refs = if(pedNr$total > 1) typedMembers(mainDvi$am[-pedNr$current]) else NULL,
+                     refs = if(nped > 1) typedMembers(mainDvi$am[-curped]) else NULL,
                      miss = setdiff(mainDvi$missing, curr$ped$ID),
-                     labs = labels(mainDvi$am[-pedNr$current]))
+                     labs = labels(mainDvi$am[-curped]))
 
     pedigreeServer(uniqueID, resultVar = pedFromModule, initialDat = curr,
-                   famid = paste0("F", pedNr$current),
+                   famid = paste0("F", curped),
                    allrefs = refs, avoidLabs = avoidLabs, .debug = .debug)
   })
 
@@ -673,27 +727,33 @@ server = function(input, output, session) {
 
       # Extract genotypes
       g = genoTable$am[refs, , drop = FALSE]
-    }
+      newdat$ped = setMarkers(newdat$ped, alleleMatrix = g)
 
-    newdat$ped = setMarkers(newdat$ped, alleleMatrix = g, locusAttributes = DB())
+      tryCatch({newdat$ped = .setDB(newdat$ped, DB())}, error = showErr, warning = showErr)
+    }
+    else
+      newdat$ped = setMarkers(newdat$ped, locusAttributes = DB())
+
 
     peds = pedigrees()
     if(isNewPed()) {
-      idx = pedNr$total + 1
+      idx = nPed() + 1
       peds[[paste0("F", idx)]] = newdat
     }
     else {
-      idx = pedNr$current
+      idx = curPed()
       peds[[idx]] = newdat
     }
     pedigrees(peds)
-    pedNr$current = idx
-
+    curPed(idx)
+    isolate(updateSelectInput(session, "example", selected = ""))
   })
 
-  output$pedplot = renderPlot({ .debug("plot current pedigree:", pedNr$current);
-    req(pedNr$current > 0)
-    peddat = pedigrees()[[pedNr$current]]
+  output$pedplot = renderPlot({ .debug("plot current pedigree:", curPed());
+    req(pedigrees(), curPed() > 0)
+
+    peddat = pedigrees()[[curPed()]]
+
     plot(peddat$ped, hatched = peddat$refs, cex = 1.2,
          col = list("red" = peddat$miss), carrier = peddat$miss,
          lwd = list("1.2" = peddat$miss), foldLabs = 10, margins = 2)
@@ -740,9 +800,9 @@ server = function(input, output, session) {
   # Overview plot -----------------------------------------------------------
 
   observeEvent(input$plotdviButton, { .debug("click Overview button")
-    if(pedNr$total == 0)
+    if(nPed() == 0)
       showErr("No pedigrees to show")
-    req(pedNr$total > 0)
+    req(nPed() > 0)
     showModal(modalDialog(style = "width: fit-content !important; height: 600px",
       title = "Main DVI plot",
       plotOutput("plotdvi"),
@@ -905,6 +965,7 @@ server = function(input, output, session) {
     am = req(mainDvi$am)
     pm = mainDvi$pm
     idMatr = pedtools:::fast.grid(list(typedMembers(am), names(pm)))
+    #print(idMatr); print(is(idMatr))
     commonMarkers = intersect(name(am), name(pm))
     allcmps = c(selectMarkers(am, commonMarkers), selectMarkers(pm, commonMarkers))
     kappa$ampm = forrel::ibdEstimate(allcmps, ids = idMatr, verbose = FALSE)
@@ -938,8 +999,8 @@ server = function(input, output, session) {
   LRmatrix = reactiveVal(NULL)
 
   observeEvent(input$solve, { .debug("solve")
-    dvi = dviData(am = req(mainDvi$am), pm = mainDvi$pm, missing = mainDvi$missing)
-
+    dvi = req(currentDviData())
+    req(length(dvi$am) > 0, length(dvi$pm) > 0, length(dvi$missing) > 0)
     res = tryCatch(
       captureOutput(dviSolve, dvi, threshold = input$LRthresh, maxIncomp = input$maxIncomp,
                     ignoreSex = input$ignoresex, verbose = TRUE, debug = input$debug,
@@ -958,17 +1019,13 @@ server = function(input, output, session) {
     fams = getFamily(dvi, miss)
     vics = names(dvi$pm)
 
-    if(length(miss))
-      amTab = data.frame(Family = fams, Missing = miss, Sample = "", LR = "", GLR = "", Conclusion = "", Comment = "")
-    else
-      amTab = "No missing persons in dataset"
+    empt1 = rep("", length(miss))
+    solutionTable$AM = data.frame(Family = fams, Missing = miss, Sample = empt1,
+                                  LR = empt1, GLR = empt1, Conclusion = empt1, Comment = empt1)
 
-    if(length(vics))
-      pmTab = data.frame(Sample = vics, Missing = "", Family = "", LR = "", GLR = "", Conclusion = "", Comment = "")
-    else
-      pmTab = "No victim samples in dataset"
-    solutionTable$AM = amTab
-    solutionTable$PM = pmTab
+    empt2 = rep("", length(vics))
+    solutionTable$PM = data.frame(Sample = vics, Missing = empt2, Family = empt2,
+                                  LR = empt2, GLR = empt2, Conclusion = empt2, Comment = empt2)
   })
 
   output$amcentric = gt::render_gt({  .debug("render result AM")

@@ -31,6 +31,14 @@ redText = c("Nonidentifiable", "No match", "Inconclusive")
 
 
 formatResultTable = function(x, style = 6, inter = FALSE) {
+
+  if(is.character(x))
+    return(gt(data.frame(Message = x)) |>
+             tab_options(
+               column_labels.hidden = TRUE,
+               table.width = pct(100),
+               table.align = "left"))
+
   tab = gt(x) |>
     #opt_interactive(use_sorting = T, use_compact_mode = T, use_resizers = T,
     #                             use_text_wrapping = F) |>
@@ -43,10 +51,19 @@ formatResultTable = function(x, style = 6, inter = FALSE) {
       table.align = "left",
       container.width = pct(100),
       table.width = pct(100),
-    ) |>
+    )
+
+  if(!nrow(x))
+    return(tab)
+
+  tab = tab |>
     sub_missing(missing_text = "") |>
     fmt_scientific(c("LR", "GLR"), n_sigfig = 3, exp_style = "e",
                    force_sign_n = TRUE) |>
+    fmt_number("LR", decimals = 2,
+               rows = LR >= 0.1 & LR < 1000) |>
+    fmt_number("GLR", decimals = 2,
+               rows = GLR >= 0.1 & GLR < 1000) |>
     #sub_missing(columns = "GLR", missing_text = "-") |>
     cols_add(colour = COLS_BG[Conclusion]) |>
     cols_hide("colour") |>
@@ -66,7 +83,7 @@ formatResultTable = function(x, style = 6, inter = FALSE) {
 
 
 CPnoplot = function(x, ...) {
-  forrel::checkPairwise(x, plotType = "none", verbose = FALSE, ...)
+  forrel::checkPairwise(x, plotType = "none", verbose = FALSE, nsim = 1000, pvalThreshold = 0.05, ...)
 }
 
 
@@ -80,6 +97,6 @@ formatCP = function(tab, sortby = NULL) {
     tab = tab[order(sortby, decreasing = TRUE), ]
   }
 
-  skipcols = c("N", "kappa0", "kappa1", "kappa2", "relgroup", "pval", "err")
+  skipcols = c("N", "kappa0", "kappa1", "kappa2", "relgroup", "err")
   tab[!names(tab) %in% skipcols]
 }
