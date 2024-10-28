@@ -965,7 +965,6 @@ server = function(input, output, session) {
     am = req(mainDvi$am)
     pm = mainDvi$pm
     idMatr = pedtools:::fast.grid(list(typedMembers(am), names(pm)))
-    #print(idMatr); print(is(idMatr))
     commonMarkers = intersect(name(am), name(pm))
     allcmps = c(selectMarkers(am, commonMarkers), selectMarkers(pm, commonMarkers))
     kappa$ampm = forrel::ibdEstimate(allcmps, ids = idMatr, verbose = FALSE)
