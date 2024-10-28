@@ -1,4 +1,4 @@
-readGenemapper = function(file, format) {
+readGenemapper = function(file, format = NULL) {
   line1 = readLines(file, n = 1) |> strsplit("\t")
   line1 = line1[[1]]
   if(!"Marker" %in% line1)
