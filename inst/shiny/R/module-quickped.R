@@ -173,7 +173,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
 
       ids = sortIds(oldped, ids) |> intersect(refs) |> req()
 
-      newids = character(length(ids)) |> setnames(ids)
+      newids = character(length(ids)) |> .setnames(ids)
       orig = ids[ids %in% names(ron)]
       orig = orig[!ron[orig] %in% oldped$ID]
       newids[orig] = ron[orig]

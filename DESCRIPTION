@@ -1,7 +1,7 @@
 Type: Package
 Package: diviana
 Title: Shiny App for Disaster Victim Identification
-Version: 0.2.0
+Version: 0.2.9000
 Authors@R: 
     person("Magnus Dehli", "Vigeland", , "m.d.vigeland@medisin.uio.no", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-9134-4962"))
@@ -10,12 +10,12 @@ License: GPL (>= 3)
 Depends: 
     R (>= 4.1)
 Imports:
-    shiny
+    shiny,
+    bs4Dash
 Suggests:
     dvir (>= 3.3.2),
     forrel (>= 1.7.1),
     pedtools (>= 2.7.1),
-    bs4Dash,
     openxlsx,
     pedFamilias,
     pedmut (>= 0.7.1),

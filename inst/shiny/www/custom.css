@@ -1,20 +1,15 @@
 
-#appname {
-  margin-left: 5px;
-  vertical-align: middle;
-  font-family: 'Montserrat', sans-serif;
-}
+.navbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: nowrap; }
+.navbar .nav-item {font-size: large; white-space: nowrap}
 
-.nav-item {font-size: large}
+.modal-title, .modal-footer {width: 100%}
+.tab-pane {padding: 0}
 
 #debugdiv .shiny-input-container {width:fit-content;}
 #debugdiv .checkbox {margin:0; line-height:0rem}
 
 .progress.shiny-file-input-progress {display: none !important;}
 
-#dbtype .radio-inline {
-  margin-right: 10px;
-}
 
 #dvisummary .info-box-content { line-height: 1;}
 #dvisummary { padding: 0;}
@@ -27,16 +22,20 @@
 .overlay {position: relative;}
 .top-right { position: absolute; top:0;  right:0; z-index: 100;}
 
+/* REMOVED interferred with import modal
 .modal-dialog .modal-content {
   width: fit-content !important;
   height: fit-content !important;
 }
+*/
 
- /* Mutation model inputs -----------------------------------*/
+.radio, .radio-inline {font-weight: normal !important;}
+.radio-inline:not(:last-child) { padding-right: 10px; }
 
+/*
 #mutmodel .radio-inline { font-weight:normal; }
 #mutmodel .radio-inline:not(:last-child) { padding-right: 20px; }
-
+*/
 .amcheck label { margin-bottom: 0}
 
 .mutation-inputs .shiny-input-container {
@@ -66,4 +65,4 @@
 
 #solve {width: 100%}
 
-#lrmatrix { overflow: auto; white-space: nowrap; }
+.card-title { width: 100%; }

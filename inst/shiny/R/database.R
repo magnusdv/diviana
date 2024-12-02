@@ -3,14 +3,23 @@
     stop2("No database given")
 
   m = name(x)
-  not_in_db = !m %in% names(db)
-  if(any(not_in_db)) {
-    warning("Ignoring markers not found in database:", m[not_in_db])
-    x = selectMarkers(x, !not_in_db)
+
+  if(length(m) == 0)
+    stop2("No markers in object")
+
+  idx = match(normaliseName(m), normaliseName(names(db)), nomatch = 0)
+
+  if(all(idx == 0))
+    stop2("None of the markers found in database")
+
+  if(any(idx == 0)) {
+    warning("Ignoring markers not found in database:", m[idx == 0])
+    x = selectMarkers(x, idx > 0)
   }
 
-  if(nMarkers(x) == 0) {
-    stop2("No marker")
-  }
-  setFreqDatabase(x, db)
+  setFreqDatabase(x, db[idx])
+}
+
+normaliseName = function(x) {
+  tolower(gsub("[-._ ]", "", x))
 }

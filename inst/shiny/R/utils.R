@@ -10,7 +10,9 @@ stop2 = function (...) {
   if(is.null(x)) y else x
 }
 
-setnames = function(x, nms = x) {
+.setnames = function(x, nms = x) {
+  if(is.null(x))
+    return(x)
   names(x) = nms
   x
 }
@@ -155,3 +157,40 @@ naReplace = function(v, repl = 0) {
 
 abbrMat = function(x)
   x[, seq_len(min(3, ncol(x))), drop = FALSE]
+
+amel2sex = function(amel) {
+  sex = integer(length(amel))
+  sex[amel == "X/Y"] = 1L
+  sex[amel == "X/X"] = 2L
+  sex
+}
+
+getSexFromAMEL = function(g) {
+  sex = integer(nrow(g))
+  if(!is.null(g$AMEL)) {
+    sex[g$AMEL == "X/Y"] = 1L
+    sex[g$AMEL == "X/X"] = 2L
+  }
+  sex
+}
+
+# Wrapper for the three triangle cards
+triangleCard = function(title, idpref) {
+  id = paste0(idpref, c("kappa", "triangle", "table"))
+  bs4Dash::bs4Card(
+    width = 4,
+    collapsible = FALSE,
+    title = div(style = "display: flex; justify-contents:space-between; width: 100%; align-items: center;",
+      title, div(actionButton(id[1], "Calculate", class = "btn-sm"), style = "margin-left: 30px;")),
+    plotlyOutput(id[2], width = "100%", height = "400px"),
+    tableOutput(id[3]))
+}
+
+rbindSafe = function(df1, df2) {
+  if(is.null(df1))
+    return(df2)
+  cols = union(names(df1), names(df2))
+  df1[setdiff(cols, names(df1))] = NA
+  df2[setdiff(cols, names(df2))] = NA
+  rbind(df1[, cols], df2[, cols])
+}

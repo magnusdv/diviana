@@ -1,6 +1,9 @@
 
 # Temporary name waiting for better solution in dvir
-plotSolutionDIVIANA = function(dvi, summary, ...) { # summaryAM
+plotSolutionDIVIANA = function(dvi, summary, pednrs = NULL, ...) { # summaryAM
+
+  if(is.null(pednrs))
+    pednrs = seq_along(dvi$am)
 
   # Ensure proper dviData object
   refs = typedMembers(dvi$am)
@@ -26,7 +29,12 @@ plotSolutionDIVIANA = function(dvi, summary, ...) { # summaryAM
   linecol = list("red" = c(groups$Excluded, stillmiss))
   carrier = stillmiss
 
-  plotDVI(dvi, style = 0, pm = FALSE, titles = NULL,
-          fill = fill, hatched = refs, deceased = excl,
-          col = linecol, carrier = carrier, lwd = list("1.5" = c(excl)), ...)
+  tryCatch(
+    plotDVI(dvi, style = 0, pm = FALSE, am = pednrs, titles = NULL,
+            fill = fill, hatched = refs, deceased = excl,
+            col = linecol, carrier = carrier, lwd = list("1.5" = c(excl)), ...),
+    error = function(e) {
+      msg = conditionMessage(e)
+      stop2(if(grepl("cex", msg)) "Cannot fit graph" else msg)
+    })
 }

@@ -12,7 +12,7 @@ updateLabelsData = function(currData, old = NULL, new, .alignment = NULL) {
   }
   else {
     newped = relabel(ped, old = old, new = new, reorder = FALSE)
-    idMap = setNames(newped$ID, ped$ID)
+    idMap = .setnames(newped$ID, ped$ID)
   }
 
   newtw = currData$twins
