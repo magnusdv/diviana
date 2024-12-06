@@ -2,17 +2,12 @@
 cardNavigation = function(id, title, ...) {
   ns = NS(id)
   tagList(
-    tags$style("
-      .nav-card-title .bttn-jelly.bttn-sm {padding-top: 0;padding-bottom: 0;}
-      .nav-card-title .shiny-text-output {font-weight: bold;}
-    "),
-    div(class = "nav-card-title",
-      style = "display: flex; justify-content: space-between; align-items: center",
+    div(class = "aligned-row-wide",
       title,
       ...,
-      div(style = "display: flex; flex-wrap: nowrap;",
+      div(class = "aligned-row",
         actionBttn(ns("prev"), label = NULL, style = "jelly", size = "s", icon = icon("backward-step")),
-        textOutput(ns("counter"), inline = TRUE), # Direct text output for the counter
+        uiOutput(ns("counter")),
         actionBttn(ns("nxt"), label = NULL, style = "jelly", size = "s", icon = icon("forward-step"))
       )
     )
@@ -45,7 +40,7 @@ cardCounter = function(id, mod) {
     })
 
     # Render "current/total"
-    output$counter = renderText({paste(counter(), mod(), sep = "/")})
+    output$counter = renderUI(HTML(sprintf("<b>%d/%d</b>", counter(), mod())))
 
     # Return the counter for external use
     counter

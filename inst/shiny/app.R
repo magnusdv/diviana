@@ -3,6 +3,7 @@ suppressMessages(suppressPackageStartupMessages({
   library(bs4Dash)
   library(shinyWidgets)
   library(shinyjs)
+  library(DT)
   #library(shinyBS)
   library(gt)
   library(pedtools)
@@ -48,8 +49,7 @@ ui = bs4Dash::bs4DashPage(
   # Header
   bs4DashNavbar(
     status = "info",
-    title = div(
-      style = "display: flex; align-items: center; flex-wrap: nowrap;",
+    title = div(class = "aligned-row",
       img(src = "diviana-moth-logo.png", style = "height: 80px; padding:5px 10px"),
       h2("DIVIANA", style = "font-family: 'Montserrat', sans-serif; margin: 0")
     ),
@@ -60,19 +60,14 @@ ui = bs4Dash::bs4DashPage(
          navbarTab(tabName = "relatedness", text = "RELATEDNESS"),
          navbarTab(tabName = "analysis", text = "ANALYSIS")
     ),
-    rightUi = tagList(
-      tags$li(
-        class = "nav-item dropdown",
-        actionBttn("resetall", "Reset all", size = "sm", style = "simple", color = "danger")
-      ),
-      tags$li(
-        class = "nav-item dropdown",
-        style = "margin: 0 22.5px 0 10px; width: 200px",
-        selectInput("example", NULL, choices = c("Load example" = "", DATASETS))
+    rightUi = tagList(tags$li(class = "nav-item dropdown",
+      div(class = "aligned-row", style = "margin-right: 22.5px; gap: 15px;",
+        awesomeCheckbox("usealias", "Alias", value = TRUE, width = "auto", status = "success"),
+        actionBttn("download", icon("download"), style = "jelly", color = "warning", size = "s"),
+        actionBttn("resetall", icon("redo"), style = "jelly", color = "danger", size = "s"),
+        selectInput("example", NULL, choices = c("Load example" = "", DATASETS), width = "200px")
       )
-    ) #,
-    #div(id = "debugdiv", style = "position:absolute; right:0; top:0",
-    #    checkboxInput("debug", NULL, value = DEVMODE))
+    ))
   ),
 
   # Sidebar
@@ -92,11 +87,11 @@ ui = bs4Dash::bs4DashPage(
    # Tab: PM data (and other input) -------------------------------------------
 
    tabItem("pmdata",
-      fluidRow(column(width = 6, importUI("PM")),
+      fluidRow(column(width = 7, dataUI("PM")),
 
       # Data tab - right column -----------------------------------------------
 
-      column(width = 6,
+      column(width = 5,
 
         bs4Card(width = 12, collapsible = FALSE,
                 title = "Frequency database",
@@ -122,17 +117,7 @@ ui = bs4Dash::bs4DashPage(
         ),
         bs4Card(width = 12, collapsible = FALSE, class = "mutation-inputs", style = "padding-top:0",
           title = cardNavigation("mutcard", "Mutation model"),
-          fluidRow(style = "margin-top: 10px; margin-bottom: 10px",
-            column(3, align = "right",
-              actionBttn("prevmark", label = NULL, style = "jelly", size = "xs", icon = icon("backward-step")),
-            ),
-            column(6, align = "middle", uiOutput("markName"),
-                   style = "font-size: bigger; background-color: lightyellow; border: 1px solid #dee2e6; border-radius: 0.25rem;"),
-            column(3, align = "left",
-              actionBttn("nextmark", label = NULL, style = "jelly", size = "xs", icon = icon("forward-step")),
-            )
-          ),
-
+          uiOutput("markName"),
           radioButtons("mutmodel", NULL, inline = TRUE, width = "100%", selected = character(0),
                        choices = c("No model" = "none", Equal = "equal", Prop = "proportional",
                                    Stepwise = "stepwise")),
@@ -153,9 +138,9 @@ ui = bs4Dash::bs4DashPage(
             column(3, numericInput("rate2M", label = NULL, value = NA, max = 1)),
             column(3, numericInput("rangeM", label = NULL, value = NA, max = 1))
           ),
-          fluidRow(style = "margin-top: 10px;",
-            column(6, actionButton("mutApply1", "Apply to this marker", status = "info", size = "sm")),
-            column(6, actionButton("mutApplyAll", "Apply to all markers", status = "info", size = "sm", style="float:right"))
+          footer = tags$div(class = "btn-group",
+            actionButton("mutApply1", label = tagList(icon("check-circle"), "Apply Here")),
+            actionButton("mutApplyAll", label = tagList(icon("globe"), "Apply All"))
           )
         ),
       ),
@@ -165,13 +150,13 @@ ui = bs4Dash::bs4DashPage(
 
    tabItem("amdata",
       fluidRow(
-        column(width = 6, importUI("AM")),
+        column(width = 7, dataUI("AM")),
         column(
-          width = 6, id = "pedcol",
+          width = 5, id = "pedcol",
           bs4Card(width = NULL, collapsible = FALSE,
             title = cardNavigation("pedcard", "Pedigrees"),
             plotOutput("pedplot", width = "auto", height = "auto"),
-            footer = div(style = "display: flex; justify-content: space-between;",
+            footer = div(class = "aligned-row-wide",
               div(class = "btn-group",
                 actionButton("newped", label = tagList(icon("plus"), "New")),
                 actionButton("editped", label = tagList(icon("edit"), "Edit")),
@@ -257,6 +242,7 @@ ui = bs4Dash::bs4DashPage(
 
 server = function(input, output, session) {
   addTooltips(session)
+  .debug = function(...) if(DEVMODE) print(paste(..., collapse = " "))
 
   # Close app when browser closes
   observeEvent(input$browserClosed, stopApp())
@@ -271,22 +257,36 @@ server = function(input, output, session) {
   externalPM = reactiveVal(NULL)
   externalAM = reactiveVal(NULL)
 
-  importPM = importServer("PM", externalPM)
-  importAM = importServer("AM", externalAM)
+  dataServerPM = dataServer("PM", externalPM, .debug = .debug)
+  dataServerAM = dataServer("AM", externalAM, .debug = .debug)
 
-  genoPM = reactive({g = importPM$data(); g$Alias = g$AMEL = g$Sex = NULL; g})
-  genoAM = reactive({g = importAM$data(); g$Alias = g$AMEL = g$Sex = NULL; g})
+  genoPM = reactive({ .debug("genoPM")
+    g = dataServerPM$main(); g$Alias = g$AMEL = g$Sex = NULL; g})
+  genoAM = reactive({ .debug("genoAM")
+    g = dataServerAM$main(); g$Alias = g$AMEL = g$Sex = NULL; g})
 
-  sexPM = reactive(match(importPM$data()$Sex, c("M", "F"), nomatch = 0L))
-  sexAM = reactive(match(importAM$data()$Sex, c("M", "F"), nomatch = 0L))
+  sexPM = reactive(match(dataServerPM$main()$Sex, c("M", "F"), nomatch = 0L))
+  sexAM = reactive(match(dataServerAM$main()$Sex, c("M", "F"), nomatch = 0L))
+
+  aliasPM = reactive({g = dataServerPM$main(); .setnames(g$Alias, rownames(g))})
+  aliasAM = reactive({g = dataServerAM$main(); .setnames(g$Alias, rownames(g))})
+
+  #aliasRevPM = reactive(.setnames(names(aliasPM()), aliasPM()))
+  #aliasRevAM = reactive(.setnames(names(aliasAM()), aliasAM()))
+
+  alleleSepPM = reactive(getAlleleSep(req(genoPM())))
+  alleleSepAM = reactive(getAlleleSep(req(genoAM())))
 
   mainPM = reactive({ .debug("mainPM")
     if(is.null(g <- genoPM()))
       return(NULL)
 
     s = pedtools::singletons(rownames(g), sex = sexPM())
+    names(s) = rownames(g)
+
     pm = tryCatch(
-      s |> setMarkers(alleleMatrix = g) |> .setDB(DB()),
+      s |> setMarkers(alleleMatrix = g, sep = alleleSepPM()) |>
+        .setDB(DB()),
       warning = showErr, error = showErr)
 
     if(is.character(pm)) return(NULL)
@@ -298,11 +298,17 @@ server = function(input, output, session) {
       return(NULL)
 
     peds = lapply(peddata, `[[`, "ped")
-    am = tryCatch(
-      peds |> setMarkers(alleleMatrix = g) |> .setDB(DB()),
-      warning = showErr, error = showErr)
 
-    if(is.character(am)) return(NULL)
+    am = #tryCatch({
+      peds |>
+        setMarkers(alleleMatrix = g, sep = alleleSepAM()) |>
+        .setDB(DB()) |>
+        .setMuts(markers = colnames(g), params = mutParams())
+    #}, warning = showErr, error = showErr)
+
+    req(!is.character(am))
+    if(is.character(am))
+      return(NULL)
     am
   })
 
@@ -316,131 +322,119 @@ server = function(input, output, session) {
     dviData(am = mainAM(), pm = mainPM(), missing = mainMissing())
   })
 
-  #----------------------
-  observeEvent(src <- c(importAM$source, importPM$source), { .debug("source changed")
-    if(!all(c(importAM$source, importPM$source) == "Example"))
-      isolate(updateSelectInput(session, "example", selected = ""))
-  })
+  # Set complete DVI --------------------------------------------------------
 
-  # If complete data is loaded: Attach everywhere
-    if(!is.null(NULL)) { .debug("dvi loaded; update everything")
-      dvi = dvir:::consolidateDVI(dvi, dedup = TRUE)
-      tryCatch({
-        updateCheckboxInput(session, "pm_in_am", value = TRUE)
-        DB(getFreqDatabase(dvi$am))
-        updateRadioButtons(session, "dbtype", selected = "data")
-        peds = lapply(dvi$am, function(a)
-          list(ped = a, miss = intersect(labels(a), dvi$missing),
-               refs = typedMembers(a)))
-        pedigrees(peds)
-        #markernames$all = name(dvi$am)
-        #markernames$currIdx = 1
-      },
-      error = errModal, warning = errModal)
-    }
+  setCompleteDVI = reactiveVal(NULL)
 
-  # Load example ------------------------------------------------------------
+  observeEvent(dataServerAM$completeDvi(), { .debug("AM complete dvi")
+    setCompleteDVI(dataServerAM$completeDvi())}, ignoreNULL = TRUE)
+  observeEvent(dataServerPM$completeDvi(), { .debug("PM complete dvi")
+    setCompleteDVI(dataServerPM$completeDvi())}, ignoreNULL = TRUE)
 
-  observeEvent(input$example, { .debug("load example:", input$example)
-    dat = get(req(input$example)) |>
-      dvir:::consolidateDVI(dedup = TRUE)
+  observeEvent(setCompleteDVI(), { .debug("set complete dvi")
+    #print(setCompleteDVI())
+    dvi = setCompleteDVI() |> dvir:::consolidateDVI(dedup = TRUE)
     resetTrigger(resetTrigger() + 1)
 
-    amdat = getGenotypes(dat$am, ids = typedMembers) |> as.data.frame()
-    amdat$Sex = getSex(dat$am, rownames(amdat))
-    externalAM(amdat)
+    externalAM(getGenotypesAndSex(dvi$am))
+    externalPM(getGenotypesAndSex(dvi$pm))
 
-    pmdat = getGenotypes(dat$pm) |> as.data.frame()
-    pmdat$Sex = getSex(dat$pm, rownames(pmdat))
-    externalPM(pmdat)
-
-    peds = lapply(dat$am, function(a)
-      list(ped = a, miss = .myintersect(dat$missing, a$ID), refs = typedMembers(a)))
+    peds = lapply(dvi$am, function(a)
+      list(ped = a, miss = .myintersect(dvi$missing, a$ID), refs = typedMembers(a)))
     pedigrees(peds)
 
     updateRadioButtons(session, "dbtype", selected = "data")
-    DB(getFreqDatabase(dat$am))
-  }, ignoreInit = T)
+    DB(getFreqDatabase(dvi$am))
 
-  # Mutation frame --------------------------------------------------------
+    mutParams(.getAllMutParams(dvi$am))
+  }, ignoreNULL = TRUE)
 
-  markernames = reactiveValues(all = NULL, currIdx = 0)
+  # Load example
+  observeEvent(input$example, { .debug("load example:", input$example)
+    dvi = get(req(input$example))
+    setCompleteDVI(dvi)
+  }, ignoreInit = TRUE)
 
-  observeEvent(input$prevmark, { .debug("mutation frame: prev marker")
-    markernames$currIdx = (markernames$currIdx - 2) %% length(markernames$all) + 1
+  # Empty example when other data is loaded
+  observeEvent(c(dataServerAM$sources(), dataServerPM$sources()), { .debug("source changed")
+    src = c(dataServerAM$sources(), dataServerPM$sources())
+    if(!all(src == "Example"))
+      isolate(updateSelectInput(session, "example", selected = ""))
   })
 
-  observeEvent(input$nextmark, { .debug("mutation frame: next marker")
-    markernames$currIdx = markernames$currIdx %% length(markernames$all) + 1
+  # Mutation models --------------------------------------------------------
+
+  # Main storage for mutation parameters (list of lists)
+  mutParams = reactiveVal(NULL)
+mutModels = reactiveVal(NULL)
+
+  markernames = reactive(colnames(genoAM()))
+  currentMutIdx = cardCounter("mutcard", reactive(length(markernames())))
+  currentMutMarker = reactive(markernames()[currentMutIdx()])
+  output$markName = renderUI(HTML(sprintf("<b>%s</b>", currentMutMarker())))
+
+  inputParams = reactive({
+    list(
+      model = input$mutmodel,
+      rate  = list(female = input$rateF,  male = input$rateM),
+      rate2 = list(female = input$rate2F, male = input$rate2M),
+      range = list(female = input$rangeF, male = input$rangeM))
   })
 
-  output$markName = renderUI({ .debug("mutation frame: update marker name")
-    idx = markernames$currIdx
-    req(idx > 0, length(markernames$all))
-    nam = markernames$all[idx]
-    HTML(sprintf("Marker %d/%d: &nbsp; <b>%s</b>", idx, length(markernames$all), nam))
+  observeEvent(input$mutApply1, { .debug("mutations: apply 1")
+    m = req(currentMutMarker())
+    mods = mutModels()
+    if(input$mutmodel == "none")
+      mods[m] = list(NULL)
+    else {
+      args = c(list(afreq = req(DB()[[m]]), validate = TRUE), inputParams())
+      mut = tryCatch(do.call(mutationModel, args), error = errModal)
+      if(is.character(mut)) {
+        cur = currentMutIdx()
+        currentMutIdx(0)
+        currentMutIdx(cur)
+        return()
+      }
+      mods[[m]] = mut
+    }
   })
 
-  # Apply mutation model ----------------------------------------------------
-
-  markersForMutEdit = reactiveVal(NULL)
-
-  observeEvent(input$mutApplyAll, { .debug("mutation frame: confirm all")
-    ask_confirmation("confirmMutApply", type = "warning",
-      title = "Click 'Confirm' to apply this mutation model to all markers")
-    markersForMutEdit(NULL)
+  observeEvent(input$mutApplyAll, { .debug("mutations: apply all")
+    #ask_confirmation("confirmMutApply", type = "warning",
+    #  title = "Click 'Confirm' to apply this mutation model to all markers")
+    mnames = markernames()
+    mutParams(.setnames(rep(list(inputParams()), length(mnames)), mnames))
   })
 
-  observeEvent(input$mutApply1, { .debug("mutation frame: confirm 1")
-    m = markernames$all[markernames$currIdx]
-    ask_confirmation("confirmMutApply", type = "warning",
-      title = sprintf("Click 'Confirm' to apply this mutation model to %s", m))
-    markersForMutEdit(m)
+  observeEvent(currentMutIdx(), {  .debug("mutations: update input fields")
+    idx = currentMutIdx()
+    params = mutParams()[[idx]] # may be NULL[0] or similar; rescued by next line
+    model = params$model %||% "none"
+
+    for(p in c("rate", "rate2", "range")) {
+      shinyjs::enable(paste0(p, "F")); shinyjs::enable(paste0(p, "M"))
+      updateNumericInput(session, paste0(p, "F"), value = params[[p]]$female)
+      updateNumericInput(session, paste0(p, "M"), value = params[[p]]$male)
+    }
+
+    updateRadioButtons(session, "mutmodel", selected = model)
   })
 
-  observeEvent(req(input$confirmMutApply), { .debug("mutation frame: apply!")
-    am = req(mainAM())
-    model = if(input$mutmodel == "none") NULL else input$mutmodel
-    markers = markersForMutEdit()
-
-    #TODO!!
-    # tryCatch({
-    #   mainDvi$am = setMutmod(am, markers = markers, model = model,
-    #     rate = list(female = input$rateF, male = input$rateM),
-    #     rate2 = list(female = input$rate2F, male = input$rate2M),
-    #     range = list(female = input$rangeF, male = input$rangeM))
-    # }, error = errModal)
-    #
-    # show_alert(title = "Mutation model applied!", type = "success")
-  })
-
-  observeEvent(input$mutmodel, { .debug("mutation frame: update parameter fields")
-    mut = mutmod(req(mainDvi$am), markernames$currIdx)
-    params = getParams(mut, format = 1)
-    if(is.null(mut))
-      params = list(rate = c(NA, NA), rate2 = c(NA, NA), range = c(NA, NA))
-
+  # Enable/disable mutation fields
+  observeEvent(input$mutmodel, { .debug("mutations: dis/enable fields")
     setfields = switch(input$mutmodel, none = character(), equal = , proportional = "rate",
                        stepwise = c("rate", "rate2", "range"))
     disfields = setdiff(c("rate", "rate2", "range"), setfields)
-
     for(p in setfields) {
-      shinyjs::enable(paste0(p, "F")); shinyjs::enable(paste0(p, "M"))
-      updateNumericInput(session, paste0(p, "F"), value = params[[p]][1])
-      updateNumericInput(session, paste0(p, "M"), value = params[[p]][2])
+      shinyjs::enable(paste0(p, "F"))
+      shinyjs::enable(paste0(p, "M"))
     }
     for(p in disfields) {
       updateNumericInput(session, paste0(p, "F"), value = NA)
       updateNumericInput(session, paste0(p, "M"), value = NA)
-      shinyjs::disable(paste0(p, "F")); shinyjs::disable(paste0(p, "M"))
+      shinyjs::disable(paste0(p, "F"))
+      shinyjs::disable(paste0(p, "M"))
     }
-  })
-
-  # Update model name when marker changes
-  observeEvent(markernames$currIdx , { .debug("mutation frame: update model name")
-    mut = mutmod(req(mainDvi$am), markernames$currIdx)
-    model = if(is.null(mut)) "none" else getParams(mut, params = "model")$model[1]
-    updateNumericInput(session, "mutmodel", value = model)
   }, ignoreInit = TRUE)
 
   # Frequency database ------------------------------------------------------
@@ -539,11 +533,16 @@ server = function(input, output, session) {
     req(curPed() > 0)
     peds = pedigrees()
     peddat = peds[[curPed()]]
+    title = names(peds)[curPed()]
+    miss = peddat$miss
+    refs = peddat$refs
+    labs = c(refs, miss)
+    if(input$usealias)
+      labs = useAlias(labs, aliasAM())
 
-    plot(peddat$ped, title = names(peds)[curPed()], hatched = peddat$refs,
-         cex = 1.2, cex.main = 1.5,
-         col = list("red" = peddat$miss), carrier = peddat$miss,
-         lwd = list("1.2" = peddat$miss), foldLabs = 10, margins = c(1,3,2,3))
+    plot(peddat$ped, title = title, hatched = refs, cex = 1.2, cex.main = 1.5,
+         margins = c(1,3,2,3), labs = labs, foldLabs = 8,
+         carrier = miss, col = list("red" = miss), lwd = list("1.2" = miss))
     box("outer", col = 1)
   },
   execOnResize = TRUE, res = 72, height = 440)
@@ -595,7 +594,11 @@ server = function(input, output, session) {
   output$plotdvi = renderPlot({ .debug("render Overview plot")
     dvi = currentDviData()
     req(length(dvi$am) > 0, length(dvi$pm) > 0, length(dvi$missing) > 0)
-    plotDVI(dvi, style = 2)
+    labs = c(rownames(genoAM()), rownames(genoPM()), dvi$missing)
+    if(input$usealias)
+      labs = useAlias(labs, c(aliasAM(), aliasPM()))
+
+    plotDVI(dvi, style = 2, labs = labs)
   }, res = 96,
   width = function() if(nPed() > 5) 1000 else 800,
   height = function() 600,
@@ -675,11 +678,9 @@ server = function(input, output, session) {
                    errtxt = "Potential relationship")
   })
 
-  output$amtable = renderTable(formatCP(kappa$am), width = "100%", spacing = "xs")
-
-  output$ampmtable = renderTable(formatCP(kappa$ampm), width = "100%", spacing = "xs")
-
-  output$pmtable = renderTable(formatCP(kappa$pm), width = "100%", spacing = "xs")
+  output$amtable = DT::renderDT(formatCP(kappa$am, alias1 = aliasAM()))
+  output$ampmtable = DT::renderDT(formatCP(kappa$ampm, alias1 = aliasAM(), alias2 = aliasPM()))
+  output$pmtable = DT::renderDT(formatCP(kappa$pm, alias1 = aliasPM()))
 
   # Tab: Analysis ---------------------------------------------------------------
 
@@ -731,23 +732,23 @@ server = function(input, output, session) {
   })
 
   output$amcentric = gt::render_gt({  .debug("render result AM")
-    formatResultTable(req(solutionTable$AM))
+    formatResultTable(req(solutionTable$AM), aliasPM = aliasPM())
   })
 
   output$pmcentric = gt::render_gt({  .debug("render result PM")
-    formatResultTable(req(solutionTable$PM))
+    formatResultTable(req(solutionTable$PM), aliasPM = aliasPM())
   })
 
   output$lrmatrix = gt::render_gt({ .debug("render LR matrix")
     dvi = currentDviData()
     m = completeMatrix(req(LRmatrix()), names(dvi$pm), dvi$missing)
-    formatLRmatrix(m, input$LRthresh)
+    formatLRmatrix(m, input$LRthresh, aliasPM = aliasPM())
   })
 
   output$exmatrix = gt::render_gt({ .debug("render exclusion matrix")
     dvi = currentDviData()
     m = completeMatrix(req(exclusionMatrix()), names(dvi$pm), dvi$missing)
-    formatExclusionMatrix(m, input$maxIncomp)
+    formatExclusionMatrix(m, input$maxIncomp, aliasPM = aliasPM())
   })
 
   output$solvelog = renderText({ .debug("render result log")
@@ -813,11 +814,11 @@ server = function(input, output, session) {
   # Reset when debug is toggled
   #observeEvent(input$debug, debuglog("### DEBUG LOG ###"))
 
-  .debug = function(...) {
-    if(DEVMODE) print(paste(..., collapse = " "))
+  #.debug = function(...) {
+  #  if(DEVMODE) print(paste(..., collapse = " "))
     #if(isTRUE(input$debug))
     #  isolate(debuglog(paste(debuglog(), paste(..., collapse = " "), sep = "\n")))
-  }
+  #}
 
   output$debugElements = renderPrint({
     req(input$debug)

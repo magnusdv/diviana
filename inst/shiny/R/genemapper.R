@@ -41,3 +41,21 @@ readGenemapper = function(file, format = NULL) {
   # Convert to data frame (?)
   as.data.frame(gmat)
 }
+
+
+readGenoFromTxt = function(file) {
+  x = read.table(file, header = TRUE, sep = "\t", colClasses = "character",
+                 check.names = FALSE, row.names = NULL)
+
+  # Use sample ID as rownames
+  idcol = grep("sample", tolower(names(x)))
+  if(length(idcol) == 0)
+    stop2("No column with 'sample' in the name")
+  rownames(x) = trimws(x[[idcol]])
+  x = x[, -idcol, drop = FALSE]
+
+  # Remove cols with all NA
+  x = x[, !apply(is.na(x) | x == "", 2, all), drop = FALSE]
+
+  x
+}

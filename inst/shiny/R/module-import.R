@@ -1,139 +1,215 @@
 
-importUI = function(id, title = paste(id, "data")) {
+dataUI = function(id, title = paste(id, "data")) {
   ns = NS(id)
   bs4Card(width = NULL, title = title, collapsible = FALSE,
-    DT::DTOutput(ns("mainTable"), height = "300px"),
+    DT::DTOutput(ns("mainTable"), width = "auto"),#height = "300px"),
+    br(),
     shiny::uiOutput(ns("sourcefield")),
     footer = div(class = "btn-group",
-      actionButton(ns("loadButton"), label = tagList(icon("file-upload"), "Import")),
+      actionButton(ns("importButton"), label = tagList(icon("file-upload"), "Import")),
       actionButton(ns("editButton"), label = tagList(icon("edit"), "Edit")),
       actionButton(ns("aliasButton"), label = tagList(icon("user-edit"), "Aliases"))
-)
-
+    )
   )
 }
 
-importServer = function(id, externalData = reactiveVal(NULL)) {
+dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
+  #if(is.null(.debug))
+  #  .debug = function(...) NULL
 
-  moduleServer(id, function(input, output, session) { # print(id)
+  moduleServer(id, function(input, output, session) { .debug("data server", id)
     ns = session$ns
 
-    # Reactives to be returned to main app
-    data = reactiveVal(NULL)
-    sources = reactiveVal(NULL)
+    # Main reactives
+    mainTable = reactiveValues(raw = NULL, main = NULL)
+    completeDvi = reactiveValues(raw = NULL, import = NULL)
+    sources = reactiveValues(current = NULL, all = NULL)
 
-    # In-module reactives
-    dfRaw = reactiveVal(NULL)
-    currentfile = reactiveVal(NULL)
-
-    dfFiltered = reactive({
-      df = req(dfRaw())
-      if(input$include_hidden)
-        return(df)
-
-      blanks = rowSums(df != "/", na.rm = TRUE) == 0
-      controls = grepl("C[+-]", rownames(df))
-      ladder = grepl("Ladder", rownames(df))
-
-      df[!(blanks | controls | ladder), , drop = FALSE]
-    })
-
-    observeEvent(externalData(), { #print("extern")
-      df = externalData() |> processData(id = id)
-      data(df)
-      sources("Example")
+    observeEvent(externalData(), { .debug("import module: external data")
+      mainTable$main = externalData() |> prepareGenoDf()
+      completeDvi$raw = completeDvi$import = NULL
       }, ignoreNULL = TRUE)
 
-    observeEvent(input$loadButton, {
-      dfRaw(NULL) # reset each time
+
+    # Import ------------------------------------------------------------------
+
+    observeEvent(input$importButton, {
+      # Reset each time (but not main table)
+      mainTable$raw = completeDvi$raw = completeDvi$import = NULL
+      fileError(NULL)
 
       showModal(modalDialog(
-        title = div("Data import", uiOutput(ns("banner")),
-                    style = "display: flex; justify-content: space-between; align-items: center;"),
+        title = div(class = "aligned-row-wide", paste("Data import:", id), uiOutput(ns("banner"))),
         size = "l",
         fluidRow(
           column(4,
-            pickerInput(ns("filetype"), label = NULL, width = "100%", selected = "Genemapper",
-                        choices = c("Familias", "Genemapper", "Text file", "dviData (.RData/.rds)"),
+            pickerInput(ns("filetype"), label = NULL, width = "100%", selected = "fam",
+                        choices = c(Familias = "fam", Genemapper = "gm",
+                                    `Text file` = "txt",
+                                    `dviData (.RData/.rds)` = "rdata"),
                         options = pickerOptions(style = "btn-outline-secondary"))),
           column(8,
             fileInput(ns("file"), NULL, width = "100%",
                       accept = c(".csv", ".tsv", ".txt", ".fam", ".rds", ".RData"))),
         ),
-        p("Select rows (or none to import all):",
-          style = "font-weight:bold; margin-bottom:0"),
-        DT::DTOutput(ns("previewTable"), height = "300px"),
-        checkboxInput(ns("include_hidden"), "Include blanks and control samples", width = "100%"),
-        selectizeInput(ns("exclude_cols"), "Columns to be excluded:", width = "100%",
-                       choices = character(), multiple = TRUE),
+        textOutput(ns("instructions")),
+        uiOutput(ns("fileError")),
 
-        footer = tagList(div(style = "width:100%; display:flex; align-items:center;justify-content: space-between; flex-wrap: nowrap;",
+        # Conditional panel showing complete DVI info
+        uiOutput(ns("dviContent")),
+
+        # Conditional panel showing raw sample genotypes
+        uiOutput(ns("tableContent")),
+
+        footer = tagList(div(class = "aligned-row-wide",
           radioButtons(ns("action"), NULL, inline = TRUE,
-                       choices = c("Add to existing data" = "add", "Replace all" = "replace")),
-          div(modalButton("Cancel"), actionButton(ns("save"), "Save"))))
+                       choices = c("Replace existing data" = "replace", "Add" = "add")),
+          div(modalButton("Cancel"), actionButton(ns("importSave"), "Save"))))
       ))
     })
 
-    observeEvent(input$file, {
+    observeEvent(input$filetype, { .debug("filetype", input$filetype)
+      mainTable$raw = completeDvi$raw = NULL
+      fileError(NULL)
+
+      instr = switch(input$filetype,
+        fam = "This import feature is designed for files exported from the DVI module of Familias.",
+        gm = "This supports Genemapper files in 'tall format', i.e., with one genotype per line.",
+        txt = "Tab-separated text files.",
+        rdata = "Use this to import `dviData` objects created in R (with the dvir package) saved as either Rdata or rds."
+      )
+      output$instructions = renderText(instr)
+    })
+
+    fileError = reactiveVal(NULL)
+    output$fileError = renderUI(
+      div(style = "color: red", HTML(paste("<b>Error:</b>", req(fileError())))))
+
+    # Conditional panel with DVI info
+    output$dviContent = renderUI({
+      req(completeDvi$raw)
+      tagList(
+        fluidRow(
+          column(6, uiOutput(ns("dviInfo"))),
+          column(6, style = "padding: 20px",
+                 radioButtons(ns("importWhat"), label = "What do you want to import?",
+                              choiceValues = c("everything", "samples"),
+                              choiceNames = c("Everything", paste(id, "only"))))
+        )
+      )
+    })
+
+    # conditional panel of raw sample genotypes
+    output$tableContent = renderUI({
+      req(mainTable$raw)
+      tagList(
+        em("If you only want to import some of the samples, select them before clicking Save."),
+        DT::DTOutput(ns("previewTable")),
+        if(input$filetype == "gm") {
+          div(style = "margin:5px 0;",
+              checkboxInput(ns("includeHidden"), width = "100%",
+                            "Include blanks, controls and ladder samples"))
+        },
+        div(class = "aligned-row-wide", style = "margin-top: 5px",
+            p("Exclude columns:",
+              style = "white-space: nowrap; font-weight: bolder; margin:0; padding-right:10px"),
+            selectizeInput(ns("excludeCols"), NULL, width = "100%",
+                           choices = character(), multiple = TRUE)))
+    })
+
+    output$dviInfo = renderUI({ .debug("dvi info")
+      raw = req(completeDvi$raw)
+      info = capture.output(print(raw, printMax = 0))
+      info[1] = "<b>Contents of DVI dataset</b>"
+      s = paste(info, collapse = "\n")
+      s = HTML(gsub("\n ", "\n &bull; ", s))
+      div(s, style = paste(
+        "white-space: pre-wrap; color: RoyalBlue; line-height: 1.2em; padding: 5px;",
+        "margin: 5px 0; background-color: #f9f9f9; border: 1px solid #ccc;"))
+    })
+
+    observeEvent(input$importWhat, { .debug("importWhat", input$importWhat)
+      if(input$importWhat == "samples") {
+        s = switch(id, AM = completeDvi$raw$am, PM = completeDvi$raw$pm)
+        mainTable$raw = getGenotypesAndSex(s)
+      }
+      else
+        mainTable$raw = NULL
+    })
+
+    observeEvent(input$file, { .debug("import file");
       req(input$file)
       path = input$file$datapath
+      fileError(NULL)
 
-      raw = NULL
+      rawdvi = rawtable = NULL
       tryCatch(switch(input$filetype,
-        Familias = { raw = dvir::familias2dvir(path, missingFormat = "M[FAM]-[IDX]")},
-        Genemapper =  { raw = readGenemapper(path)},
-        "Text file" = { raw = read.table(path, header=TRUE)},
-        "dviData (.RData/.rds)" = { raw = readRdvi(path) }
-      ), error = errModal, warning = errModal)
+        fam   = { rawdvi = dvir::familias2dvir(path, missingFormat = "M[FAM]-[IDX]")},
+        rdata = { rawdvi = readRdvi(path)},
+        gm    = { rawtable = readGenemapper(path)},
+        txt   = { rawtable = readGenoFromTxt(path)},
+      ),
+      # warning = showErr, TODO!
+      error = function(e) fileError(conditionMessage(e)))
 
-      currentfile(input$file$name)
+      if(!is.null(rawtable)) {
+        cls = names(rawtable)
+        if("AMEL" %in% cls)
+          rawtable = rawtable[c("AMEL", setdiff(cls, "AMEL"))]
+        mainTable$raw = rawtable
+      }
+      else if(!is.null(rawdvi))
+        completeDvi$raw = rawdvi
 
-      # Move AMEL to front
-      if("AMEL" %in% names(raw))
-        raw = raw[c("AMEL", setdiff(names(raw), "AMEL"))]
+      sources$current = input$file$name
+    })
 
-      dfRaw(raw)
+    # Update column exclusion list (default: Y stuff)
+    observeEvent(mainTable$raw, {
+      cls = names(mainTable$raw)
+      updateSelectizeInput(session, "excludeCols", choices = cls,
+                           selected = c("Yindel", grep("^DY", cls, value = TRUE)))
+    })
 
-      # Update column exclusion list
-      cls = names(raw)
-      deflt = c("Yindel", grep("^DY", cls, value = TRUE))
-      updateSelectizeInput(session, "exclude_cols", choices = cls, selected = deflt)
+    # Genemapper: Remove blanks, controls and ladder samples
+    dfFiltered = reactive({ .debug("import filter genemapper/text blanks")
+      df = req(mainTable$raw)
+      if(input$filetype == "gm" && !input$includeHidden) {
+        blanks = rowSums(df != "/", na.rm = TRUE) == 0
+        controls = grepl("C[+-]", rownames(df))
+        ladder = grepl("Ladder", rownames(df))
+        df = df[!(blanks | controls | ladder), , drop = FALSE]
+      }
+      df
     })
 
     output$previewTable = DT::renderDT(genoDT(dfFiltered(), sel = "multiple"))
 
-    observeEvent(input$save, {
-      df = dfFiltered()
-      rowsel = input$previewTable_rows_selected
-      excludeCols = input$exclude_cols
+    observeEvent(input$importSave, { .debug("import save")
+      if(!is.null(completeDvi$raw) && input$importWhat == "everything") {
+        mainTable$main = NULL
+        completeDvi$import = completeDvi$raw
+      }
+      else {
+        df = prepareGenoDf(dfFiltered(),
+                           selectRows = input$previewTable_rows_selected,
+                           excludeCols = input$excludeCols)
+        newdat = if(input$action == "replace") df else rbindSafe(mainTable$main, df)
+        mainTable$main = newdat
+        completeDvi$import = NULL
+      }
 
-      if(!is.null(rowsel))
-        df = df[sort(rowsel), , drop = FALSE]
-
-      if(length(excludeCols))
-        df = df[, !names(df) %in% excludeCols, drop = FALSE]
-
-      df = processData(df, id)
-
-      newdat = if(input$action == "replace") df else rbindSafe(data(), df)
-      data(newdat)
-
-      src = if(input$action == "Replace") currentfile() else c(sources(), currentfile())
-      sources(src)
-
+      sources$all = if(input$action == "replace") sources$current else c(sources$all, sources$current)
       removeModal()
     })
 
-    output$mainTable = DT::renderDT({
-      dat = req(data())
-      if(identical(dat$Alias, rownames(dat)))
-        dat$Alias = NULL
+    output$mainTable = DT::renderDT({ .debug("render main table", id)
+      dat = req(mainTable$main)
       genoDT(dat)
     })
 
     output$sourcefield = renderUI({
-      # if(is.null(sources()))        return()
-      src = unlist(lapply(req(sources()), function(s) as.character(em(s))))
+      src = unlist(lapply(req(sources$all), function(s) as.character(em(s))))
       HTML(paste0(c("Sources: ", src), collapse = if(length(src) == 1) " " else "<br/>"))
     })
 
@@ -142,7 +218,7 @@ importServer = function(id, externalData = reactiveVal(NULL)) {
     editdata = reactiveVal(NULL)
 
     observeEvent(input$editButton, {
-      editdata(req(data()))
+      editdata(req(mainTable$main))
       showModal(modalDialog(
         title = "Edit mode", size = "l",
         p("Edit the table by double clicking on the cells. Press 'Save' to confirm changes."),
@@ -157,7 +233,6 @@ importServer = function(id, externalData = reactiveVal(NULL)) {
     observeEvent(input$editTable_cell_edit, {
       dat = editdata()
       edit = input$editTable_cell_edit
-      print(edit)
       i = edit$row
       j = edit$col
       val = edit$value
@@ -170,18 +245,18 @@ importServer = function(id, externalData = reactiveVal(NULL)) {
     })
 
     observeEvent(input$editSave, {
-      data(editdata())
+      mainTable$main = editdata()
       removeModal()
     })
 
     # Alias -------------------------------------------------------------------
 
-    aliasInputs = reactiveValues(remove = "", keep = "", prefix = "")
     origs = reactiveVal(NULL)
+    aliasInputs = reactiveValues(remove = "", keep = "", prefix = "")
     aliasErrorMsg = reactiveVal("")
 
     observeEvent(input$aliasButton, {
-      origs(rownames(req(data())))
+      origs(rownames(req(mainTable$main)))
 
       showModal(modalDialog(
         title = "Generate Aliases",
@@ -208,7 +283,7 @@ importServer = function(id, externalData = reactiveVal(NULL)) {
       aliasDT(df)
     })
 
-    generateAliases = reactive({
+    generateAliases = reactive({ .debug("generate aliases")
       origs = req(origs())
       aliasErrorMsg("")
       method = input$aliasMethod
@@ -240,7 +315,7 @@ importServer = function(id, externalData = reactiveVal(NULL)) {
       res
     })
 
-    output$conditional_inputs = renderUI({
+    output$conditional_inputs = renderUI({ .debug("conditional alias input")
       ns = session$ns
       switch(input$aliasMethod,
              prefix = textInput(ns("prefix"), "Prefix:", value = switch(id, PM = "V", AM = "R", "ID")),
@@ -248,34 +323,27 @@ importServer = function(id, externalData = reactiveVal(NULL)) {
              extract = textInput(ns("extract"), "Regex pattern to match:"))
     })
 
-    output$aliasErrorUI = renderUI({
+    output$aliasErrorUI = renderUI({ .debug("alias error ui")
       msg = aliasErrorMsg()
       if (msg != "") tags$div(style = "color: red;", msg)
     })
 
-    observeEvent(input$aliasSave, {
-      dat = data()
+    observeEvent(input$aliasSave, { .debug("alias save")
+      dat = mainTable$main
       dat$Alias = generateAliases()
-      data(dat)
+      mainTable$main = dat
       removeModal()
     })
 
     # End alias ---------------------------------------------------------------
 
-    # Show banner with warning on shinyapps.io
-  output$banner = renderUI({
-    #isShinyAppsIO = grepl("shinyapps.io", session$clientData$url_hostname)
-    #if(!sShinyAppsIO) {
-      div(style = "display:flex; align-items: center; background-color: #fff3cd; border-radius: 10px; text-align: center; line-height: 90%; font-size:60%",
-          icon("circle-exclamation", style = "margin: 6px; color:red; font-size: 20px;"),
-          div(HTML("Avoid uploading<br>sensitive data online!")),
-          icon("circle-exclamation", style = "margin: 6px; color:red; font-size: 20px;")
-      )
-      #}
-    })
+    # Show warning banner. (Set session=session to restrict to shinyapps.io)
+    output$banner = renderUI(banner(session = NULL))
 
     # Return reactive variables to main app
-    list(data = reactive(data()), sources = reactive(sources()))
+    list(main = reactive(mainTable$main),
+         completeDvi = reactive(completeDvi$import),
+         sources = reactive(sources$all))
   })
 
 }
@@ -285,24 +353,29 @@ importServer = function(id, externalData = reactiveVal(NULL)) {
 
 
 # Format DT tables
-genoDT = function(dat, sel = "none", scrollY = "250px", editable = FALSE) {
+genoDT = function(dat, sel = "none", scrollY = "220px", editable = FALSE) {
 
-  dt = DT::datatable(
-    dat,
+  # Main view (not edit): Hide alias column if identical to rownames.
+  if(!editable && identical(dat$Alias, rownames(dat)))
+    dat$Alias = NULL
+
+  # Prepare DT
+  dt = DT::datatable(dat,
     class = "stripe hover nowrap compact",
     colnames = c("Sample" = 1),
     plugins = "natural",
     selection = sel,
     editable = editable,
     options = list(
-      dom = 't', scrollX = TRUE, scrollY = scrollY, paging = FALSE,
+      dom = 't', scrollX = TRUE, paging = FALSE,
+      scrollY = if(nrow(dat)>10) scrollY else NULL,
       columnDefs = list(list(type = "natural", targets = 0:1),
                         list(orderable = TRUE, targets = 0:1),
                         list(orderable = FALSE, targets = "_all"))
-    ))
+    )) |>
+    DT::formatStyle(names(dat), target = "row", lineHeight = "75%")
 
-    dt = DT::formatStyle(dt, names(dat), target = "row", lineHeight = "75%")
-
+    # Separate and colour Sex column if present
     if("Sex" %in% names(dat))
       dt = DT::formatStyle(dt, "Sex", borderRight = '1px solid #ccc',
                            color = DT::styleEqual(c("F", "M"), c("hotpink", "steelblue")))
@@ -322,7 +395,7 @@ aliasDT = function(dat, scrollY = "250px") {
   DT::formatStyle(res, "Alias", backgroundColor = DT::styleEqual(bad, cols))
 }
 
-# Check Sex column, or infer from AMEL
+# Check sex vector
 checkSex = function(x) {
   x[x %in% c("", NA, 0)] = "?"
   x[x == 1] = "M"
@@ -335,17 +408,15 @@ checkSex = function(x) {
   x
 }
 
-inferSex = function(df) {
-  if("AMEL" %in% names(df))
-    sx = c("?", "M", "F")[amel2sex(df$AMEL) + 1]
-  else
-    sx = rep("?", nrow(df))
-  sx
-}
-
-processData = function(df, id) {
+prepareGenoDf = function(df, selectRows = NULL, excludeCols = NULL) {
   if(is.matrix(df))
     df = as.data.frame(df)
+
+  if(!is.null(selectRows))
+    df = df[sort(selectRows), , drop = FALSE]
+
+  if(length(excludeCols))
+    df = df[, !names(df) %in% excludeCols, drop = FALSE]
 
   if(!"Alias" %in% names(df))
     df$Alias = rownames(df)
@@ -379,6 +450,22 @@ readRdvi = function(fil) {
     },
     stop2("Illegal file extension. Accepted types are .RData and .rds")
   )
+
+  dvi
+}
+
+
+banner = function(session) {
+  if(!is.null(session)) {
+    isShinyAppsIO = grepl("shinyapps.io", session$clientData$url_hostname)
+    if(!sShinyAppsIO) return()
+  }
+  div(class = "aligned-row",
+    style = "background-color: #fff3cd; border-radius: 10px; text-align: center; line-height: 90%; font-size:60%",
+    icon("circle-exclamation", style = "margin: 6px; color:red; font-size: 20px;"),
+    div(HTML("Avoid uploading<br>sensitive data online!")),
+    icon("circle-exclamation", style = "margin: 6px; color:red; font-size: 20px;")
+  )
 }
 
 # Test app ------------------------------------------------------------
@@ -389,14 +476,14 @@ if(!is.null(of) && basename(of) == "module-import.R") { cat("Test app for import
   ui = bs4DashPage(dark = NULL, help = NULL,
     bs4DashNavbar(status = "info", title = "test import"),
     bs4DashSidebar(disable = TRUE, minified = FALSE),
-    bs4DashBody(fluidRow(column(width = 6, importUI("PM")),
-                         column(width = 6, importUI("AM"))))
+    bs4DashBody(fluidRow(column(width = 6, dataUI("PM")),
+                         column(width = 6, dataUI("AM"))))
   )
 
   server = function(input, output, session) {
     externalData = reactiveVal(data.frame(a=1:3, b=4:6, row.names = c("A", "B", "C")))
-    importA = importServer("PM", externalData)
-    importB = importServer("AM")
+    importA = dataServer("PM", externalData)
+    importB = dataServer("AM")
   }
 
   shinyApp(ui = ui, server = server)

@@ -17,6 +17,10 @@ stop2 = function (...) {
   x
 }
 
+.flipnames = function(x) {
+  .setnames(names(x), x)
+}
+
 .myintersect = function(x, y)
   y[match(x, y, 0L)]
 
@@ -160,8 +164,8 @@ abbrMat = function(x)
 
 amel2sex = function(amel) {
   sex = integer(length(amel))
-  sex[amel == "X/Y"] = 1L
-  sex[amel == "X/X"] = 2L
+  sex[amel %in% c("X/Y", "X,Y", "XY")] = 1L
+  sex[amel %in% c("X/X", "X,X", "XX")] = 2L
   sex
 }
 
@@ -174,16 +178,30 @@ getSexFromAMEL = function(g) {
   sex
 }
 
+getAlleleSep = function(g) {
+  if(ncol(g) == 0) return()
+  if(any(grepl("/", g[[1]], fixed = TRUE))) return("/")
+  if(any(grepl(",", g[[1]], fixed = TRUE))) return(",")
+  return(" ")
+}
+
+useAlias = function(labs, alias) {
+  names(labs) = ifelse(labs %in% names(alias), alias[labs], "")
+  labs
+}
+
 # Wrapper for the three triangle cards
 triangleCard = function(title, idpref) {
   id = paste0(idpref, c("kappa", "triangle", "table"))
   bs4Dash::bs4Card(
     width = 4,
     collapsible = FALSE,
-    title = div(style = "display: flex; justify-contents:space-between; width: 100%; align-items: center;",
-      title, div(actionButton(id[1], "Calculate", class = "btn-sm"), style = "margin-left: 30px;")),
-    plotlyOutput(id[2], width = "100%", height = "400px"),
-    tableOutput(id[3]))
+    title = div(class = "aligned-row-wide", title,
+                div(actionButton(id[1], "Calculate", class = "btn-sm",
+                                 icon = icon("play")), style = "margin-left: 30px;")),
+    plotlyOutput(id[2], width = "100%", height = "350px"),
+    hr(),
+    DT::DTOutput(id[3]))
 }
 
 rbindSafe = function(df1, df2) {
@@ -193,4 +211,15 @@ rbindSafe = function(df1, df2) {
   df1[setdiff(cols, names(df1))] = NA
   df2[setdiff(cols, names(df2))] = NA
   rbind(df1[, cols], df2[, cols])
+}
+
+getGenotypesAndSex = function(x) {
+  df = x |> getGenotypes(ids = typedMembers) |> as.data.frame()
+  df$Sex = getSex(x, rownames(df))
+  df
+}
+
+inlineRadioButtons = function(inputId, label, ...) {
+  radios = radioButtons(inputId, label = NULL, inline = TRUE, ...)
+  div(class = "aligned-row", strong(label, style = "padding-right:20px"), radios)
 }

@@ -34,14 +34,19 @@ COLS_BG = c(
 redText = c("Nonidentifiable", "No match", "Inconclusive")
 
 
-formatResultTable = function(x, style = 6) {
+formatResultTable = function(x, aliasPM = NULL, style = 6) {
 
-  if(is.character(x))
-    return(gt(data.frame(Message = x)) |>
-             tab_options(
-               column_labels.hidden = TRUE,
-               table.width = pct(100),
-               table.align = "left"))
+  if(is.character(x)) {
+    emptyGT = gt(data.frame(Message = x)) |>
+      tab_options(
+        column_labels.hidden = TRUE,
+        table.width = pct(100),
+        table.align = "left")
+    return(emptyGT)
+  }
+
+  if(!is.null(aliasPM))
+    x$Sample = aliasPM[x$Sample]
 
   tab = gt(x) |>
     #opt_interactive(use_sorting = T, use_compact_mode = T, use_resizers = T,
@@ -97,23 +102,54 @@ CPnoplot = function(x, ...) {
 }
 
 
-formatCP = function(tab, sortby = NULL) {
+formatCP = function(tab, alias1 = NULL, alias2 = alias1, sortby = NULL) {
   # TODO: fix this. the problem is that CPnotplot returns NULL if less than 2 indivs
+  emptyMsg = NULL
   if(is.null(tab))
-    return(data.frame("No calculations to show yet" = character(0), check.names = FALSE))
+    emptyMsg = "No calculations to show yet"
   else if(nrow(tab) == 0)
-    return(data.frame("Less than 2 individuals" = character(0), check.names = FALSE))
+    emptyMsg = "Less than 2 individuals"
+
+  if(!is.null(emptyMsg)) {return(NULL)
+    df = as.data.frame(.setnames(list(character(0)), emptyMsg), check.names = FALSE)
+    return(df |> .dtstyleCP())
+  }
 
   if(ncol(tab) > 1) {
     sortby = if("GLR" %in% names(tab)) tab$GLR else (tab$k1/4 + tab$k2/2)
-    tab = tab[order(sortby, decreasing = TRUE), ]
+    tab = tab[order(sortby, decreasing = TRUE), ] # no need for drop = F!
+  }
+
+  if(!is.null(alias1)) {
+    tab$id1 = alias1[tab$id1]
+    tab$id2 = alias2[tab$id2]
   }
 
   skipcols = c("N", "kappa0", "kappa1", "kappa2", "relgroup", "err")
-  tab[!names(tab) %in% skipcols]
+  tab = tab[!names(tab) %in% skipcols]
+
+  .dtstyleCP(tab)
+
 }
 
+.dtstyleCP = function(df) { print(df);
+  scrollY = if(nrow(df)>10) "220px" else NULL
+  .pick = function(...) intersect(c(...), names(df))
 
+  DT::datatable(df,
+                class = "stripe compact nowrap",
+                selection = "none",
+                width = "100%",
+                rownames = FALSE,
+                options = list(dom = "ft",
+                               language=list(search = "Filter: "),
+                               scrollY = scrollY, scrollX = TRUE)) |>
+  DT::formatStyle(names(df), target = "row", lineHeight = "75%") |>
+  DT::formatStyle(.pick("pedrel"), fontSize = "80%") |>
+  formatRound(.pick("k0", "k1", "k2"), digits = 2) |>
+  formatRound(.pick("pval"), digits = 3, zero.print = "<0.001") |>
+  formatSignif(.pick("GLR"), digits = 3)
+}
 
 # Result matrices (LR/exclusion) ----------------------------------------------
 
@@ -145,7 +181,10 @@ formatMatrix = function(m) {
     )
 }
 
-formatExclusionMatrix = function(m, maxIncomp = 2, transpose = FALSE) {
+formatExclusionMatrix = function(m, maxIncomp = 2, aliasPM = NULL, transpose = FALSE) {
+  if(!is.null(aliasPM))
+    rownames(m) = aliasPM[rownames(m)]
+
   if (transpose) m = t(m)
 
   rowsEx = which(apply(m, 1, allAbove, maxIncomp))
@@ -193,7 +232,10 @@ formatExclusionMatrix = function(m, maxIncomp = 2, transpose = FALSE) {
 }
 
 
-formatLRmatrix = function(m, LRthresh = 1e4, transpose = FALSE) {
+formatLRmatrix = function(m, LRthresh = 1e4, aliasPM = NULL, transpose = FALSE) {
+  if(!is.null(aliasPM))
+    rownames(m) = aliasPM[rownames(m)]
+
   if (transpose) m = t(m)
 
   naMat = is.na(m)
@@ -232,7 +274,7 @@ formatLRmatrix = function(m, LRthresh = 1e4, transpose = FALSE) {
 }
 
 # Used in the main app: Insert missing row/columns
-completeMatrix = function(m, rownames, colnames) {print(m); print(rownames)
+completeMatrix = function(m, rownames, colnames) {
   rr = setdiff(rownames, rownames(m))
   if(length(rr))
     m = rbind(m, matrix(NA, nrow = length(rr), ncol = ncol(m), dimnames = list(rr, NULL)))
@@ -241,7 +283,7 @@ completeMatrix = function(m, rownames, colnames) {print(m); print(rownames)
   if(length(cc))
     m = cbind(m, matrix(NA, nrow = nrow(m), ncol = length(cc), dimnames = list(NULL, cc)))
 
-  m[rownames, colnames]
+  m[rownames, colnames, drop = FALSE]
 }
 
 # Utility: Check if all elements exceed a certain value (and not all NA)

@@ -1,9 +1,32 @@
+/* Custom CSS for the Diviana shiny app */
+
+.card-title { width: 100%; }
+
+.checkbox label > span { font-weight: normal;}
+.checkbox label { margin-bottom:0}
+
+.selectize-dropdown {line-height: 1.2em}
+
+.radio label {font-weight: normal !important; margin-bottom:0}
+.radio-inline {font-weight: normal !important; margin-bottom:0}
+.radio-inline:not(:last-child) { padding-right: 10px; }
+
+/* Custom classes for horizontally aligned & distributed items */
+.aligned-row      { display: flex; flex-wrap: nowrap; align-items: center; }
+.aligned-row-wide { display: flex; flex-wrap: nowrap; align-items: center; width: 100%; justify-content: space-between; }
+
+.aligned-row .bttn-jelly.bttn-sm {padding-top: 0; padding-bottom: 0;}
 
 .navbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: nowrap; }
 .navbar .nav-item {font-size: large; white-space: nowrap}
 
 .modal-title, .modal-footer {width: 100%}
 .tab-pane {padding: 0}
+
+/* More compact search field for DT tables*/
+.dataTables_filter label, .dataTables_filter input[type='search'] {
+ padding:0px 5px; font-size:95%
+}
 
 #debugdiv .shiny-input-container {width:fit-content;}
 #debugdiv .checkbox {margin:0; line-height:0rem}
@@ -17,8 +40,7 @@
 .shiny-input-container {margin-bottom: 0;}
 
 
-/* Used in triangle plots */
-
+/* Triangle plots */
 .overlay {position: relative;}
 .top-right { position: absolute; top:0;  right:0; z-index: 100;}
 
@@ -28,15 +50,6 @@
   height: fit-content !important;
 }
 */
-
-.radio, .radio-inline {font-weight: normal !important;}
-.radio-inline:not(:last-child) { padding-right: 10px; }
-
-/*
-#mutmodel .radio-inline { font-weight:normal; }
-#mutmodel .radio-inline:not(:last-child) { padding-right: 20px; }
-*/
-.amcheck label { margin-bottom: 0}
 
 .mutation-inputs .shiny-input-container {
   margin-bottom: 0; /* Less space between rows */
@@ -64,5 +77,3 @@
 /* Analysis tab -----------------------------------*/
 
 #solve {width: 100%}
-
-.card-title { width: 100%; }
