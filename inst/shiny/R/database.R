@@ -25,7 +25,7 @@ normaliseName = function(x) {
 }
 
 # Wrapper of pedtools::setMutmod
-.setMuts = function(x, markers, params) {
+.setMutsOLD = function(x, markers, params) {
   for(i in seq_along(markers)) {
     parlist = params[[i]]
     #print(parlist)
@@ -38,7 +38,7 @@ normaliseName = function(x) {
 }
 
 # Wrapper of pedmut::getParams
-.getAllMutParams = function(x) {
+.getAllMutParamsOLD = function(x) {
   markers = name(x) |> .setnames()
   lapply(markers, function(m) {
     mut = mutmod(x, m)
@@ -48,4 +48,15 @@ normaliseName = function(x) {
          rate2 = list(female = p$rate2[1], male = p$rate2[2]),
          range = list(female = p$range[1], male = p$range[2]))
   })
+}
+
+.getAllMutModels = function(x) {
+  markers = name(x) |> .setnames()
+  lapply(markers, function(m) mutmod(x, m))
+}
+
+.setMuts = function(x, models) {
+  for(nm in name(x))
+    mutmod(x, nm) = models[[nm]]
+  x
 }

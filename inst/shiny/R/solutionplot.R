@@ -29,9 +29,11 @@ plotSolutionDIVIANA = function(dvi, summary, pednrs = NULL, ...) { # summaryAM
   linecol = list("red" = c(groups$Excluded, stillmiss))
   carrier = stillmiss
 
+  labs = dvi$missing
+
   tryCatch(
-    plotDVI(dvi, style = 0, pm = FALSE, am = pednrs, titles = NULL,
-            fill = fill, hatched = refs, deceased = excl,
+    plotDVI(dvi, style = 0, pm = FALSE, am = pednrs, labs = labs,
+            titles = NULL, fill = fill, hatched = refs, deceased = excl,
             col = linecol, carrier = carrier, lwd = list("1.5" = c(excl)), ...),
     error = function(e) {
       msg = conditionMessage(e)

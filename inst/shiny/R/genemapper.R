@@ -47,12 +47,40 @@ readGenoFromTxt = function(file) {
   x = read.table(file, header = TRUE, sep = "\t", colClasses = "character",
                  check.names = FALSE, row.names = NULL)
 
-  # Use sample ID as rownames
-  idcol = grep("sample", tolower(names(x)))
-  if(length(idcol) == 0)
-    stop2("No column with 'sample' in the name")
-  rownames(x) = trimws(x[[idcol]])
-  x = x[, -idcol, drop = FALSE]
+  # Convert sample ID columns to row names
+  trycols = match(c("Family", "Sample", "Relationship"), names(x), nomatch = 0)
+  if(trycols[2] > 0)
+    idcols = trycols[trycols > 0]
+  else
+    idcols = grep("sample", names(x), ignore.case = TRUE)
+
+  # If no luck, use first column
+  if(length(idcols) == 0)
+    idcols = 1
+
+  args = lapply(idcols, function(i) trimws(x[[i]]))
+  rownames(x) = do.call(paste, c(args, list(sep = "_")))
+  x = x[, -idcols, drop = FALSE]
+
+  # Check if there are 2 columns per marker
+  splitcols = grep("[-_. ][12]$", names(x))
+  if(length(splitcols) > 0 && length(splitcols) %% 2 == 0) {
+    odd = seq_along(splitcols) %% 2 == 1
+    col1 = splitcols[odd]
+    col2 = splitcols[!odd]
+    nms0 = substr(names(x)[splitcols], 1, nchar(names(x)[splitcols]) - 2)
+    if(!all.equal(nms0[col1], nms0[col2])) {
+      stop2("Genotypes seems to be split in the wrong order")
+    }
+    nms = nms0[odd]
+
+    # Merge
+    for(i in seq_along(nms)) {
+      x[[nms[i]]] = paste(x[[col1[i]]], x[[col2[i]]], sep = "/")
+    }
+     # Remove split columns
+    x = x[, -splitcols, drop = FALSE]
+  }
 
   # Remove cols with all NA
   x = x[, !apply(is.na(x) | x == "", 2, all), drop = FALSE]

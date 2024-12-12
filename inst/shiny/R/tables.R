@@ -34,7 +34,7 @@ COLS_BG = c(
 redText = c("Nonidentifiable", "No match", "Inconclusive")
 
 
-formatResultTable = function(x, aliasPM = NULL, style = 6) {
+formatResultTable = function(x, usealias = FALSE, aliasPM = NULL, style = 6) {
 
   if(is.character(x)) {
     emptyGT = gt(data.frame(Message = x)) |>
@@ -45,7 +45,7 @@ formatResultTable = function(x, aliasPM = NULL, style = 6) {
     return(emptyGT)
   }
 
-  if(!is.null(aliasPM))
+  if(usealias && !is.null(aliasPM))
     x$Sample = aliasPM[x$Sample]
 
   tab = gt(x) |>
@@ -102,7 +102,7 @@ CPnoplot = function(x, ...) {
 }
 
 
-formatCP = function(tab, alias1 = NULL, alias2 = alias1, sortby = NULL) {
+formatCP = function(tab, usealias = FALSE, alias1 = NULL, alias2 = alias1, sortby = NULL) {
   # TODO: fix this. the problem is that CPnotplot returns NULL if less than 2 indivs
   emptyMsg = NULL
   if(is.null(tab))
@@ -120,7 +120,7 @@ formatCP = function(tab, alias1 = NULL, alias2 = alias1, sortby = NULL) {
     tab = tab[order(sortby, decreasing = TRUE), ] # no need for drop = F!
   }
 
-  if(!is.null(alias1)) {
+  if(usealias && !is.null(alias1)) {
     tab$id1 = alias1[tab$id1]
     tab$id2 = alias2[tab$id2]
   }
@@ -128,11 +128,13 @@ formatCP = function(tab, alias1 = NULL, alias2 = alias1, sortby = NULL) {
   skipcols = c("N", "kappa0", "kappa1", "kappa2", "relgroup", "err")
   tab = tab[!names(tab) %in% skipcols]
 
-  .dtstyleCP(tab)
+  if("pedrel" %in% names(tab))
+    tab$pedrel = abbreviatePedrel(tab$pedrel)
 
+  .dtstyleCP(tab)
 }
 
-.dtstyleCP = function(df) { print(df);
+.dtstyleCP = function(df) {
   scrollY = if(nrow(df)>10) "220px" else NULL
   .pick = function(...) intersect(c(...), names(df))
 
@@ -141,9 +143,11 @@ formatCP = function(tab, alias1 = NULL, alias2 = alias1, sortby = NULL) {
                 selection = "none",
                 width = "100%",
                 rownames = FALSE,
-                options = list(dom = "ft",
-                               language=list(search = "Filter: "),
-                               scrollY = scrollY, scrollX = TRUE)) |>
+                plugins = "natural",
+                options = list(dom = "ft", paging = FALSE,
+                               language = list(search = "Filter: "),
+                               scrollY = scrollY, scrollX = TRUE,
+                               columnDefs = list(list(type = "natural", targets = 0:1)))) |>
   DT::formatStyle(names(df), target = "row", lineHeight = "75%") |>
   DT::formatStyle(.pick("pedrel"), fontSize = "80%") |>
   formatRound(.pick("k0", "k1", "k2"), digits = 2) |>
@@ -155,12 +159,15 @@ formatCP = function(tab, alias1 = NULL, alias2 = alias1, sortby = NULL) {
 
 # Shared formatting options
 formatMatrix = function(m) {
+  nr=nrow(m); nc=ncol(m)
+  wraptxt = if(any(nchar(c(rownames(m), colnames(m))) > 7)) NULL else "nowrap"
+
   m |>
     as.data.frame() |>
     gt(rownames_to_stub = TRUE) |>
     sub_missing(missing_text = "-") |>
     tab_style(
-      style = cell_text(weight = "bold"),
+      style = cell_text(weight = "bold", size = "90%", whitespace = wraptxt),
       locations = list(cells_column_labels(), cells_stub())
     ) |>
     tab_style(
@@ -170,19 +177,22 @@ formatMatrix = function(m) {
     ) |>
     tab_style(
       style = cell_text(align = "center"),
-      locations = cells_body()
+      locations = list(cells_body(), cells_column_labels(), cells_stub())
     ) |>
     tab_options(
       table.align = "left",
-      data_row.padding = if(nrow(m)>10) px(3) else if(nrow(m)>20) px(1),
       table_body.hlines.style = "solid",
       table_body.vlines.style = "solid",
-      column_labels.vlines.style = "solid"
+      column_labels.vlines.style = "solid",
+      data_row.padding = if(nr > 10) px(3) else if(nr > 20) px(1),
+      column_labels.padding.horizontal = if(nc > 10) px(3) else if(nc > 20) px(1),
+      table.font.size = if(nr > 20 || nc > 20) "75%" else if(nr > 10 || nc > 10) "90%"
     )
 }
 
-formatExclusionMatrix = function(m, maxIncomp = 2, aliasPM = NULL, transpose = FALSE) {
-  if(!is.null(aliasPM))
+formatExclusionMatrix = function(m, maxIncomp = 2, usealias = FALSE,
+                                 aliasPM = NULL, transpose = FALSE) {
+  if(usealias && !is.null(aliasPM))
     rownames(m) = aliasPM[rownames(m)]
 
   if (transpose) m = t(m)
@@ -232,8 +242,9 @@ formatExclusionMatrix = function(m, maxIncomp = 2, aliasPM = NULL, transpose = F
 }
 
 
-formatLRmatrix = function(m, LRthresh = 1e4, aliasPM = NULL, transpose = FALSE) {
-  if(!is.null(aliasPM))
+formatLRmatrix = function(m, LRthresh = 1e4, usealias = FALSE,
+                          aliasPM = NULL, transpose = FALSE) {
+  if(usealias && !is.null(aliasPM))
     rownames(m) = aliasPM[rownames(m)]
 
   if (transpose) m = t(m)

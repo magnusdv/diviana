@@ -1,37 +1,59 @@
+myBtn = function(id, label, mar = "2px", side = NULL, style = NULL, width = "100%", ...) {
+  st = paste("padding:1px 0;", sprintf("margin: %s;", mar), style)
+  if(!is.null(side))
+    st = paste(st, sprintf("margin-%s: 0;", side))
+  actionButton(id, label, style = st, width = width, ...)
+}
 
 pedigreeUI = function(id, famid = "F1", references = NULL) {
   ns = NS(id)
 
   fluidRow(
-    useShinyjs(),  # Set up shinyjs
-#tags$script(sprintf("
-#      Shiny.addCustomMessageHandler('selectText', function(message) {
-#        $('#%s').select();
-#      });
-#    ", ns("customlabel"))),
-
+    useShinyjs(),
     column(width = 3,
-           actionButton(ns("child"), "Add child", width = "100%"),
-           actionButton(ns("sibling"), "Sibling", width = "100%"),
-           actionButton(ns("parents"), "Parents", width = "100%"),
-           actionButton(ns("swapsex"), "Swap sex", width = "100%"),
-           actionButton(ns("remove"), "Remove", width = "100%"),
-           hr(),
-           p("Edit role:"),
-           actionButton(ns("missing"), "Missing", width = "100%"),
-           actionButton(ns("untyped"), "Untyped", width = "100%"),
-           selectInput(ns("setref"), "Reference", width = "100%",
-                       choices = c("Select" = "", references)),
-           hr(),
-           fluidRow(
-             column(width = 6,
-                actionButton(ns("reset"), "Reset", width = "100%", status = "danger",
-                             style = "font-size: smaller; padding: 0")),
-             column(width = 6,
-                actionButton(ns("undo"), "Undo", width = "100%", status = "warning",
-                                      style = "font-size: smaller; padding: 0"))
-           ),
 
+       p("Add", style = "font-weight:bold; margin-bottom: 0"),
+       div(class = "aligned-row-wide",
+           myBtn(ns("child"), "Child", side = "left"),
+           myBtn(ns("parents"), "Parents", side = "right"),
+       ),
+       div(class = "aligned-row-wide",
+           myBtn(ns("sibleft"), tagList(icon("arrow-left"), "Sib"), side = "left"),
+           myBtn(ns("sibright"), tagList("Sib", icon("arrow-right")), side = "right"),
+       ),
+       p("Sex", style = "font-weight:bold; margin-bottom: 0; margin-top: 10px"),
+       div(class = "aligned-row-wide",
+           myBtn(ns("sex1"), icon("square"), side = "left"),
+           myBtn(ns("sex2"), icon("circle"), side = NULL),
+           myBtn(ns("sex0"), "?", side = "right")
+        ),
+
+       #--------
+       p("Missing person", style = "font-weight:bold; margin-bottom: 0; margin-top: 10px"),
+       div(class = "aligned-row-wide",
+           myBtn(ns("missing"), icon("circle-dot", style = "color:red; font-size:large"), side = "left"),
+           myBtn(ns("nonmissing"), icon("circle", style = "font-size:large"), side = "right"),
+       ),
+
+       div(class = "aligned-row-wide", style = "font-weight: bold; margin-bottom: 0; margin-top: 12px;",
+           p("Reference", style = "margin-bottom: 5px"),
+           myBtn(ns("untyped"), icon("trash-can", style = "color: #353839"),
+                 mar = 0, width = "auto", style = "padding:0 3px 0 0; line-height:100%; background-color:inherit; border: none"),
+       ),
+       DTOutput(ns("refTable"), width = "100%"),
+       #-------
+       br(),
+       div(class = "aligned-row-wide",
+           myBtn(ns("remove"), "Remove", side = "left", width = "50%"),
+           actionButton(ns("clearsel"), style = "padding:5px; border:none; background-color: inherit;",
+                        label = tagList(tags$img(src="hand-pointer-strikethrough.svg",
+                                                 style = "height:1em; width:auto; vertical-align:middle;")))
+       ),
+       div(class = "aligned-row-wide",
+          myBtn(ns("reset"), "RESET", status = "danger", side = "left", size = "sm"),
+          myBtn(ns("undo"), "UNDO", status = "warning", side = "right", size = "sm")#      style = "font-size: small")
+       )
+       #--------
     ),
 
     # Pedigree plot
@@ -44,7 +66,7 @@ pedigreeUI = function(id, famid = "F1", references = NULL) {
 }
 
 pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
-                          allrefs = NULL, avoidLabs = NULL, .debug = NULL) {
+                          allrefs = NULL, avoidLabs = NULL, currentModal = NULL, .debug = NULL) {
 
   avoid = c(allrefs, avoidLabs$vics, avoidLabs$labs)
 
@@ -56,6 +78,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
 
   moduleServer(id, function(input, output, session) {
     ns = session$ns
+    addTooltips(session)
 
     currData = reactiveValues(ped = initialDat$ped,
                               miss = initialDat$miss,
@@ -68,15 +91,19 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
     sel = reactiveVal(character(0))
 
     # Modal creation and invocation
-    showModal(modalDialog(
-        title = "Pedigree builder",
+    showModal({
+      mod = modalDialog(
+        title = div(class = "aligned-row-wide", "Pedigree builder", helpBtn("help-ped")),
         tags$head(tags$style(HTML("@media (min-width: 576px) {.modal-dialog { max-width: 600px !important; }}"))),
         pedigreeUI(id, famid, allrefs),   # use the UI function here
         footer = tagList(
-          actionButton(ns("save"), "Save"),
-          actionButton(ns("cancel"), "Cancel")
+          actionButton(ns("cancel"), "Cancel"),
+          actionButton(ns("save"), "Save")
         )
-    ))
+      )
+      currentModal(mod)
+      mod
+    })
 
     # Return (or cancel) ------------------------------------------------------
 
@@ -117,28 +144,46 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       updatePedData(ped = newped, clearSel = FALSE)
     })
 
-    observeEvent(input$sibling, { .debug("--ped module: add sibling")
-      newped = tryCatch(
-        .addSib(currData$ped, req(sel()), sex = 1, avoid = avoid),
-        error = showErr)
+    observeEvent(input$sibleft, { .debug("--ped: left sibling")
+      id = req(sel())
+      tryCatch({
+        updatePedData(ped = .addSib(currData$ped, id, side = "left", avoid = avoid))
+      }, error = showErr)
+    })
 
-      req(is.ped(newped))
-      updatePedData(ped = newped)
+    observeEvent(input$sibright, { .debug("--ped: right sibling")
+      id = req(sel())
+      tryCatch({
+        updatePedData(ped = .addSib(currData$ped, id, side = "right", avoid = avoid))
+      }, error = showErr)
     })
 
     observeEvent(input$parents, { .debug("--ped module: add parents")
-      newped = tryCatch(
-        .addParents(currData$ped, req(sel()), avoid = avoid),
-        error = showErr)
-
-      req(is.ped(newped))
-      updatePedData(ped = newped)
+      id = req(sel())
+      newped = tryCatch({
+        updatePedData(ped = .addParents(currData$ped, id, avoid = avoid))
+      }, error = showErr)
     })
 
-    observeEvent(input$swapsex, { .debug("--ped module: swap sex")
-      id = req(sel())
-      newped = swapSex(currData$ped, id, verbose = FALSE)
-      updatePedData(ped = newped, clearSel = length(id) > 1)
+    observeEvent(input$sex1, {    .debug("--ped: sex1")
+      ids = req(sel())
+      tryCatch({
+        updatePedData(ped = changeSex(currData$ped, ids, sex = 1))
+      }, error = showErr)
+    })
+
+    observeEvent(input$sex2, {    .debug("--ped: sex2")
+      ids = req(sel())
+      tryCatch({
+        updatePedData(ped = changeSex(currData$ped, ids, sex = 2))
+      }, error = showErr)
+    })
+
+    observeEvent(input$sex0, {    .debug("--ped: sex0")
+      ids = req(sel())
+      tryCatch({
+        updatePedData(ped = changeSex(currData$ped, ids, sex = 0))
+      }, error = showErr)
     })
 
     observeEvent(input$remove, { .debug("--ped module: remove")
@@ -148,7 +193,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       updatePedData(ped = newped)
     })
 
-    #observeEvent(input$clearselection, sel(character(0)))
+    observeEvent(input$clearsel, sel(character(0)))
 
 
     # Set status --------------------------------------------------------------
@@ -159,10 +204,12 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
         showErr("Reference cannot be set as missing: ", intersect(currData$refs, ids))
         return()
       }
+      updatePedData(miss = c(currData$miss, ids)) # dups ok here
+    })
 
-      oldmiss = currData$miss
-      newmiss = c(setdiff(oldmiss, ids), setdiff(ids, oldmiss))
-      updatePedData(miss = newmiss)
+    observeEvent(input$nonmissing, { .debug("--ped module: set nonmissing")
+      ids = req(sel())
+      updatePedData(miss = setdiff(currData$miss, ids))
     })
 
     observeEvent(input$untyped, { .debug("--ped module: set untyped")
@@ -187,6 +234,42 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
 
       updatePedData(ped = newped, refs = setdiff(refs, ids))
     })
+
+    remainingRefs = reactive(setdiff(allrefs, c(avoidLabs$refs, currData$refs)))
+
+    output$refTable = renderDT({
+      df = data.frame(Refs = remainingRefs())
+      datatable(df, rownames = FALSE, class = "compact stripe",
+                selection = "single", colnames = "",
+                options = list(dom = 't', pageLength = -1, scrollY = "200px",
+                             scrollCollapse = TRUE, ordering = FALSE,
+                             language = list(zeroRecords = "No further refs"),
+                             headerCallback = JS("function(thead, data, start, end, display){ $('th', thead).css('display', 'none');}"))) |>
+        DT::formatStyle(names(df), target = "row", lineHeight = "80%")
+    })
+
+    observeEvent(input$refTable_rows_selected, {
+      id = req(sel())
+      if(length(id) > 1) {
+        showErr("Multiple pedigree members are selected")
+        return()
+      }
+      if(id %in% currData$miss) {
+        showErr("A missing person cannot be a reference")
+        return()
+      }
+
+      ref = remainingRefs()[input$refTable_rows_selected]
+      #req(!ref %in% currData$refs)
+      newped = relabel(currData$ped, old = id, new = ref)
+      newrefs = c(currData$refs, ref)
+
+      ron = currData$refOrigName
+      ron[ref] = id
+      currData$refOrigName = ron
+
+      updatePedData(ped = newped, refs = newrefs)
+  })
 
     observeEvent(input$setref, { .debug("--ped module: set reference")
       id = req(sel())
@@ -249,7 +332,9 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
 
       miss = currData$miss
       dat = tryCatch(
-        plot(x, title = famid, hatched = currData$refs, cex = 1.2, cex.main = 1.5,
+        plot(x, title = famid, margins = 2,
+             hatched = currData$refs,
+             cex = 1.2, cex.main = 1.5,
              col = list(red = miss, blue = sel()),
              lwd = list(`1.2` = miss, `2` = sel()),
              carrier = miss, foldLabs = 10),
@@ -313,18 +398,33 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
         slimTextInput(ns("customlabel"), label = "Enter new name:", value = id, style = "width:auto",
                       labelStyle = "font-size: small; margin-bottom: 0; padding-left: 3px",
                       textStyle = "font-size: smaller; color: black; width: auto;"),
-        fluidRow(
-          column(6, align = "left", editLabBttn(ns("savelabel"), "Save", "primary")),
-          column(6, align = "right", editLabBttn(ns("cancellabel"), "Cancel", "secondary"))
+        div(class = "aligned-row-wide", style = "padding: 0",
+          editLabBttn(ns("cancellabel"), "Cancel", "warning"),
+          editLabBttn(ns("savelabel"), "Save", "success")
         ),
-        style = paste("position: absolute; z-index: 1000; background-color:lightyellow; padding:6px; width:auto;",
+
+        # Bind Enter key to savelabels button
+        tags$script(HTML(sprintf("
+          (function() {
+            const input = document.getElementById('%s');
+            const saveBtn = document.getElementById('%s');
+            if (input && saveBtn) {
+              input.addEventListener('keyup', function(e) {
+                if (e.key === 'Enter') {
+                  saveBtn.click();
+                }
+              });
+              input.focus();
+              input.select();
+            }
+          })();
+        ", ns("customlabel"), ns("savelabel")))),
+
+        style = paste("position: absolute; z-index: 1000; background-color:lightyellow; padding:6px; width:auto; border: 1px solid gray;",
                       sprintf("left: %fpx;", click_x + 40),
-                      sprintf("top: %fpx;", click_y - 40))
+                      sprintf("top:  %fpx;", click_y - 40))
         )
       )
-      #session$sendCustomMessage("selectText", "select")
-      #runjs(sprintf('console.log("JavaScript is running for customlabel focus: %s");', ns("customlabel")))
-      #runjs(sprintf('$("#%s").focus();', ns("customlabel")))
     })
 
 

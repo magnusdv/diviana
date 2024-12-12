@@ -33,38 +33,6 @@ midHeading = function(x)
 bold = function(x) strong(x, .noWS = "outside")
 ital = function(x) em(x, .noWS = "outside")
 
-errModal = function(..., html = FALSE) {
-  args = list(...)
-  if(length(args) == 1 && inherits(args[[1]], "condition")) {
-    mess = conditionMessage(args[[1]])
-    if(grepl("reduce cex", mess))
-      mess = "Plot region is too small"
-  }
-  else
-    mess = paste(lapply(args, toString), collapse = "")
-  if(html)
-    mess = HTML(mess)
-  showModal(modalDialog(mess, easyClose = TRUE))
-}
-
-showErr = function(..., html = TRUE) {
-  args = list(...)
-  if(length(args) == 1 && inherits(args[[1]], "condition"))
-    mess = conditionMessage(args[[1]])
-  else
-    mess = paste(lapply(args, toString), collapse = "")
-  if(html)
-    mess = HTML(mess)
-  showNotification(mess, type = "error")
-}
-
-# No used
-textInput2 = function(inputId, value) {
-  w  = textInput(inputId, label = NULL, value = value, width = "100%")
-  w$children[[2]]$attribs[["style"]] = "padding-top: 1px; padding-bottom: 1px; height: 24px;"
-  w
-}
-
 .generateLabs = pedtools:::generateLabs
 
 .addChild = function(x, ids, sex, avoid = NULL) {
@@ -84,7 +52,36 @@ textInput2 = function(inputId, value) {
   addParents(x, id, father = newids[1], mother = newids[2], verbose = FALSE)
 }
 
-.addSib = function(x, id, sex, avoid = NULL) {
+
+.addSib = function(x, id, sex = 1, side = c("right", "left"), avoid = NULL) {
+
+  if(length(id) > 1)
+    stop2("To add a sibling, please select exactly one individual. Current selection: ", sortIds(x, id))
+
+  newids = .generateLabs(x, 3, avoid = avoid)
+
+  if(id %in% founders(x)) {
+    fa = newids[1]; mo = newids[2]; child = newids[3]
+    x = addParents(x, id, father = fa, mother = mo, verbose = FALSE)
+  }
+  else {
+    fa = father(x, id); mo = mother(x, id); child = newids[1]
+  }
+
+
+  newped = addChildren(x, father = fa, mother = mo, ids = child, sex = sex, verbose = FALSE)
+
+  # Reorder so that new sib comes directly before or after (default) `id`
+  idInt = internalID(x, id)
+  n = length(x$ID)
+  ord = switch(match.arg(side),
+               left = c(seq_len(idInt-1), n+1, idInt:n),
+               right = c(seq_len(idInt), n+1, if(idInt < n) seq.int(idInt+1, n)))
+
+  reorderPed(newped, ord)
+}
+
+.addSibOLD = function(x, id, sex, avoid = NULL) {
   if(length(id) > 1)
     stop2("Too many individuals are selected. Current selection: ", sortIds(x, id), "<br><br>",
           "To add a sibling, please select exactly one individual.")
@@ -190,19 +187,6 @@ useAlias = function(labs, alias) {
   labs
 }
 
-# Wrapper for the three triangle cards
-triangleCard = function(title, idpref) {
-  id = paste0(idpref, c("kappa", "triangle", "table"))
-  bs4Dash::bs4Card(
-    width = 4,
-    collapsible = FALSE,
-    title = div(class = "aligned-row-wide", title,
-                div(actionButton(id[1], "Calculate", class = "btn-sm",
-                                 icon = icon("play")), style = "margin-left: 30px;")),
-    plotlyOutput(id[2], width = "100%", height = "350px"),
-    hr(),
-    DT::DTOutput(id[3]))
-}
 
 rbindSafe = function(df1, df2) {
   if(is.null(df1))
@@ -219,7 +203,36 @@ getGenotypesAndSex = function(x) {
   df
 }
 
-inlineRadioButtons = function(inputId, label, ...) {
-  radios = radioButtons(inputId, label = NULL, inline = TRUE, ...)
-  div(class = "aligned-row", strong(label, style = "padding-right:20px"), radios)
+abbreviatePedrel = function(x, width = 15) {
+    if(!any(long <- (nchar(x) > width)))
+      return(x)
+
+    x[long] = sub(" &.*", " &", x[long])
+    if(!any(long <- (nchar(x) > width)))
+      return(x)
+
+    x[long] = sub("--.*", "/", x[long])
+    if(!any(long <- (nchar(x) > width)))
+      return(x)
+
+    x[long] = paste0(substr(x[long], 1, width-2), "..")
+    x
+}
+
+
+changeSex = function(ped, ids, sex) {
+
+  if(sex == 0) {
+    if(!all(ids %in% leaves(ped)))
+      stop2("Only individuals without children can have unknown sex")
+    newped = setSex(ped, ids, sex = 0)
+    return(newped)
+  }
+
+  # By now: sex is 1 or 2
+  currentSex = getSex(ped, ids)
+
+  ped |>
+    swapSex(ids[currentSex == (3-sex)], verbose = FALSE) |>
+    setSex(ids[currentSex == 0], sex = sex)
 }
