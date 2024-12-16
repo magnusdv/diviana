@@ -63,8 +63,8 @@ ui = bs4Dash::bs4DashPage(
     rightUi = tagList(tags$li(class = "nav-item dropdown",
       div(class = "aligned-row", style = "margin-right: 22.5px; gap: 15px;",
         awesomeCheckbox("usealias", "Alias", value = TRUE, width = "auto", status = "success"),
-        downloadBttn("downloaddata", NULL, style = "jelly", color = "warning", size = "s"),
-        actionBttn("resetall", icon("redo"), style = "jelly", color = "danger", size = "s"),
+        downloadBttn("downloaddata", NULL, style = "jelly", color = "warning", size = "m"),
+        actionBttn("resetall", icon("redo"), style = "jelly", color = "danger", size = "m"),
         selectInput("example", NULL, choices = c("Load example" = "", DATASETS), width = "200px")
       )
     ))
@@ -96,12 +96,13 @@ ui = bs4Dash::bs4DashPage(
         bs4Card(width = 12, collapsible = FALSE,
                 title = "Frequency database",
           radioButtons("dbtype", NULL, inline = TRUE, width = "100%",
+                       selected = character(0),
                        choices = c("Built-in" = "builtin",
                                    "In dataset" = "data",
                                    "Custom" = "custom")),
           conditionalPanel(
             condition = "input.dbtype == 'builtin'",
-            pickerInput("dbselect", NULL, choices = "NorwegianFrequencies", selected = "NorwegianFrequencies",
+            pickerInput("dbselect", NULL, choices = "NorwegianFrequencies", selected = NULL,
                         options = pickerOptions(title = "Builtin database",
                                                 style = "btn-outline-secondary"))
           ),
@@ -242,6 +243,7 @@ ui = bs4Dash::bs4DashPage(
 
 server = function(input, output, session) {
   addTooltips(session)
+
   .debug = function(...) {
     if(!DEVMODE) return()
     args = lapply(list(...), function(a) {
@@ -287,17 +289,20 @@ server = function(input, output, session) {
   mainPM = reactive({ .debug("mainPM")
     if(is.null(g <- genoPM()))
       return(NULL)
+    g[g==""] = NA
 
     s = pedtools::singletons(rownames(g), sex = sexPM())
     names(s) = rownames(g)
 
-    g[g==""] = NA
-    pm = tryCatch(
-      s |> setMarkers(alleleMatrix = g, sep = alleleSepPM()) |>
-        .setDB(DB()),
-      warning = showErr, error = showErr)
+    pm = NULL
+    tryCatch({
+      pm = setMarkers(s, alleleMatrix = g, sep = alleleSepPM())
+    }, error = showErr)
 
-    if(is.character(pm)) return(NULL)
+    db = DB()
+    cat(length(db), "markers\n")
+    tryCatch({pm = pm |> .setDB(db)}, error = showErr)
+
     pm
   })
 
@@ -895,31 +900,37 @@ server = function(input, output, session) {
   # Help pages --------------------------------------------------------------
 
   currentModal = reactiveVal()
+  # Ensure the www directory is added as a resource path
+  addResourcePath("www", "www")
 
-  showInstructions = function(id) {
-    helpfile = paste0("www/", id, ".md")
+  showInstructions = function(id) { .debug("help:", id)
+    helpfile = paste0("www/", id, ".html")
     req(file.exists(helpfile))
 
     showModal(modalDialog(
       title = NULL,
-      includeMarkdown(helpfile),
+      tags$iframe(src = helpfile,
+                  style = "width:100%; height:80vh; border:none; font-size: 90%"),
       footer = actionButton("close_instructions", "Back"),
-      easyClose = FALSE
+      easyClose = FALSE,
+      tags$style(HTML("
+       .modal-content { width:fit-content;}
+      "))
     ))
   }
 
-  observeEvent(input$close_instructions, {
+  observeEvent(input$close_instructions, { .debug("close help")
+    removeModal()
     if(!is.null(m <- currentModal()))
       showModal(m)
-    removeModal()
   })
 
   # Identify all help-*.md files in www/
-  helpFiles = list.files("www", pattern = "^help-.*\\.md$", full.names = FALSE)
-  helpIds = sub("\\.md$", "", helpFiles)
+  helpFiles = list.files("www", pattern = "^help-.*\\.html$", full.names = FALSE)
+  helpIds = sub("\\.html$", "", helpFiles)
 
   # Create observers for each help button
-  lapply(helpIds, function(id) observeEvent(input[[id]], {print(id); showInstructions(id)}))
+  lapply(helpIds, function(id) observeEvent(input[[id]], showInstructions(id)))
 }
 
 shinyApp(ui = ui, server = server, options = list(launch.browser = TRUE))

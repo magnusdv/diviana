@@ -107,6 +107,12 @@ simplePar = function(text, height, style = NULL) {
   w
 }
 
+myIcon = function(name, height = 1, align = "middle", tagList = FALSE) {
+  tt = tags$img(src = sprintf("www/icons/%s.svg", name),
+                style = sprintf("height:%fem; width:auto; vertical-align:%s;", height, align))
+  if(tagList)
+    tagList(tt) else tt
+}
 
 # not used
 jellyBttn = function(id, label = NULL, height = 30, margin = "0 0 3px 0") {

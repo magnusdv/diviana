@@ -36,7 +36,7 @@ pedigreeUI = function(id, famid = "F1", references = NULL) {
        ),
 
        div(class = "aligned-row-wide", style = "font-weight: bold; margin-bottom: 0; margin-top: 12px;",
-           p("Reference", style = "margin-bottom: 5px"),
+           p("Reference", style = "margin-bottom: -5px"),
            myBtn(ns("untyped"), icon("trash-can", style = "color: #353839"),
                  mar = 0, width = "auto", style = "padding:0 3px 0 0; line-height:100%; background-color:inherit; border: none"),
        ),
@@ -46,7 +46,7 @@ pedigreeUI = function(id, famid = "F1", references = NULL) {
        div(class = "aligned-row-wide",
            myBtn(ns("remove"), "Remove", side = "left", width = "50%"),
            actionButton(ns("clearsel"), style = "padding:5px; border:none; background-color: inherit;",
-                        label = tagList(tags$img(src="hand-pointer-strikethrough.svg",
+                        label = tagList(tags$img(src = "hand-pointer-strikethrough.svg",
                                                  style = "height:1em; width:auto; vertical-align:middle;")))
        ),
        div(class = "aligned-row-wide",
@@ -243,8 +243,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
                 selection = "single", colnames = "",
                 options = list(dom = 't', pageLength = -1, scrollY = "200px",
                              scrollCollapse = TRUE, ordering = FALSE,
-                             language = list(zeroRecords = "No further refs"),
-                             headerCallback = JS("function(thead, data, start, end, display){ $('th', thead).css('display', 'none');}"))) |>
+                             language = list(zeroRecords = "No available refs"))) |>
         DT::formatStyle(names(df), target = "row", lineHeight = "80%")
     })
 

@@ -1,6 +1,6 @@
 .setDB = function(x, db = NULL) {
   if(is.null(db))
-    stop2("No database given")
+    stop2("No database loaded")
 
   m = name(x)
 
@@ -13,11 +13,13 @@
     stop2("None of the markers found in database")
 
   if(any(idx == 0)) {
-    warning("Ignoring markers not found in database:", m[idx == 0])
+    showNotification(sprintf("Ignoring %s markers not found in database:\n%s", sum(idx == 0), toString(m[idx == 0])))
     x = selectMarkers(x, idx > 0)
   }
 
-  setFreqDatabase(x, db[idx])
+  y = setFreqDatabase(x, db[idx])
+  showNotification(sprintf("Database attached: %d markers: ", sum(idx > 0)))
+  y
 }
 
 normaliseName = function(x) {

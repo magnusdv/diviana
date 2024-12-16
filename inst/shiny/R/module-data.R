@@ -7,9 +7,9 @@ dataUI = function(id, title = paste(id, "data")) {
     br(),
     shiny::uiOutput(ns("sourcefield")),
     footer = div(class = "btn-group",
-      actionButton(ns("importButton"), label = tagList(icon("file-upload"), "Import")),
-      actionButton(ns("editButton"), label = tagList(icon("edit"), "Edit")),
-      actionButton(ns("aliasButton"), label = tagList(icon("user-edit"), "Aliases"))
+      actionButton(ns("importButton"), label = tagList(myIcon("file-arrow-up", align = "-0.1em"), "Import")),
+      actionButton(ns("editButton"), label = tagList(shiny::icon("edit"), myIcon("edit", align = "-0.1em"), "Edit")),
+      actionButton(ns("aliasButton"), label = tagList(icon("user-pen", align = "-0.1em"), "Aliases"))
     )
   )
 }

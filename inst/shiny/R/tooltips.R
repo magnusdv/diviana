@@ -1,5 +1,6 @@
 
 tooltips = list(
+  usealias = "Use aliases in plots/tables",
   resetall = "Reset all",
   downloaddata = "Download R/dviData",
   debug = "Debugging mode",

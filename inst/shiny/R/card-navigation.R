@@ -6,9 +6,9 @@ cardNavigation = function(id, title, ...) {
       title,
       ...,
       div(class = "aligned-row",
-        actionBttn(ns("prev"), label = NULL, style = "jelly", size = "s", icon = icon("backward-step")),
+        actionBttn(ns("prev"), label = myIcon("backward-step", align = "-0.15em"), style = "jelly", size = "s"),
         uiOutput(ns("counter")),
-        actionBttn(ns("nxt"), label = NULL, style = "jelly", size = "s", icon = icon("forward-step"))
+        actionBttn(ns("nxt"), label = myIcon("forward-step", align = "-0.15em"), style = "jelly", size = "s")
       )
     )
   )

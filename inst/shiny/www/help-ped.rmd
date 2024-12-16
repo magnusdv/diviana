@@ -1,0 +1,46 @@
+---
+output: html_document
+title: Help! Pedigree builder
+---
+
+```{r include = FALSE}
+# Simple function to retrieve local icons
+mySvg = function(name, height = 1, align = "-0.1em") {
+  shiny::tags$img(src = sprintf("icons/%s.svg", name),
+                  style = sprintf("height:%fem; width:auto; vertical-align:%s;", height, align))
+  
+}
+```
+
+This tool allows you to create and edit the reference families in your DVI case. Importantly, this is where you tell the program ___who is missing___, and the identity of the genotyped ___reference individuals___.
+
+#### 1. Edit the pedigree
+
+* **Select** a pedigree member by clicking on it so that it turns blue.
+* **Click** an appropriate button, for instance:
+    - `Child` to add a child
+    - <code>`r mySvg("arrow-left-solid", align = "-0.2em")`&thinsp;Sib</code> to add a sibling to the left
+    - `Remove` to remove the individual and its descendants
+* To **deselect** individuals, either click on them again, or use `r mySvg("hand-pointer-strikethrough", height = 1.2)` to deselect all.
+* Use the <button type="button" class="btn btn-warning btn-sm" style="padding:0 2px;">UNDO</button> button to revert the last action.
+* The <button type="button" class="btn btn-danger btn-sm" style="padding:0 2px;">RESET</button> button resets the pedigree to as it was when the pedigree builder was opened.
+
+#### 2. Set missing status
+
+* **Select** one or several pedigree members.
+* **Click** the `r mySvg("circle-dot-red", height = 1.1)` button to mark them as missing, or the grey circle to revert to normal.
+
+*Result:* The missing pedigree members appear with a red symbol.
+
+#### 3. Assign reference individuals
+
+* **Select** an 'empty' pedigree member.
+* **Click** the corresponding entry in the *Reference* list.
+* To **unassign** references, select them in the pedigree and click the trash can <img src="icons/trash-can-regular.svg" style="height:1.2em; width:auto; vertical-align:-0.1em"> .
+
+*Result:* Reference individuals are displayed with a hatched symbol in the pedigree. 
+The Reference list always shows the currently not-yet-assigned references.
+
+#### 4. Save
+
+Click *Save* to save the pedigree and go back to the main window.

@@ -39,6 +39,9 @@
 
 .shiny-input-container {margin-bottom: 0;}
 
+.dataTables_empty {
+  font-style: italic; font-size: smaller; text-align: left;
+}
 
 /* Triangle plots */
 .overlay {position: relative;}

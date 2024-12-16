@@ -184,8 +184,8 @@ formatMatrix = function(m) {
       table_body.hlines.style = "solid",
       table_body.vlines.style = "solid",
       column_labels.vlines.style = "solid",
-      data_row.padding = if(nr > 10) px(3) else if(nr > 20) px(1),
-      column_labels.padding.horizontal = if(nc > 10) px(3) else if(nc > 20) px(1),
+      data_row.padding = if(nr > 10) px(2) else if(nr > 20) px(0),
+      column_labels.padding.horizontal = if(nc > 10) px(2) else if(nc > 20) px(0),
       table.font.size = if(nr > 20 || nc > 20) "75%" else if(nr > 10 || nc > 10) "90%"
     )
 }
