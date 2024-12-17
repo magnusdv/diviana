@@ -78,6 +78,7 @@ ui = bs4Dash::bs4DashPage(
   bs4DashBody(
     includeCSS("www/custom.css"),
     tags$head(tags$script(src = "scripts.js")),
+    tags$script("$(document).on('shown.bs.modal',function(){$('[data-toggle=\"tooltip\"]').tooltip();});"),
 
     useShinyjs(),
     useBusyIndicators(spinners = FALSE, pulse = TRUE),
@@ -909,13 +910,18 @@ server = function(input, output, session) {
 
     showModal(modalDialog(
       title = NULL,
-      tags$iframe(src = helpfile,
-                  style = "width:100%; height:80vh; border:none; font-size: 90%"),
+      div(
+        includeHTML(helpfile),
+        style = "height:80vh; overflow-y:auto; font-size: 90%; padding: 0"),
+      tags$style(HTML("code {
+        background-color: #f8f8f8;
+        color: #333;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        padding: 1px 4px;
+        font-size: 90%;}")),
       footer = actionButton("close_instructions", "Back"),
-      easyClose = FALSE,
-      tags$style(HTML("
-       .modal-content { width:fit-content;}
-      "))
+      easyClose = FALSE
     ))
   }
 

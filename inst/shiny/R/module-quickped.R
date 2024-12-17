@@ -1,57 +1,67 @@
-myBtn = function(id, label, mar = "2px", side = NULL, style = NULL, width = "100%", ...) {
-  st = paste("padding:1px 0;", sprintf("margin: %s;", mar), style)
-  if(!is.null(side))
-    st = paste(st, sprintf("margin-%s: 0;", side))
-  actionButton(id, label, style = st, width = width, ...)
-}
 
 pedigreeUI = function(id, famid = "F1", references = NULL) {
   ns = NS(id)
 
+  myBtn = function(id, label, mar = "2px", side = NULL, style = NULL,
+                   width = "100%", tt = NULL, ...) {
+    st = paste("padding:1px 0;", sprintf("margin: %s;", mar), style)
+    if(!is.null(side))
+      st = paste(st, sprintf("margin-%s: 0;", side))
+
+    b = actionButton(ns(id), label, style = st, width = width, ...)
+    if(!is.null(tt))
+      b = wrap_tooltip(b, id, placement = match.arg(tt, c("top", "bottom", "left", "right")))
+    b
+  }
+
   fluidRow(
     useShinyjs(),
-    column(width = 3,
+    column(width = 3, style = "padding-top:5px",
 
        p("Add", style = "font-weight:bold; margin-bottom: 0"),
        div(class = "aligned-row-wide",
-           myBtn(ns("child"), "Child", side = "left"),
-           myBtn(ns("parents"), "Parents", side = "right"),
+           myBtn("child", "Child", side = "left"),
+           myBtn("parents", "Parents", side = "right"),
        ),
        div(class = "aligned-row-wide",
-           myBtn(ns("sibleft"), tagList(icon("arrow-left"), "Sib"), side = "left"),
-           myBtn(ns("sibright"), tagList("Sib", icon("arrow-right")), side = "right"),
+           myBtn("sibleft", tagList(myIcon("arrow-left", align = "-0.1em"), "Sib"),
+                 side = "left", tt = "b"),
+           myBtn("sibright", tagList("Sib", myIcon("arrow-right", align = "-0.1em")),
+                 side = "right", tt = "b"),
        ),
        p("Sex", style = "font-weight:bold; margin-bottom: 0; margin-top: 10px"),
        div(class = "aligned-row-wide",
-           myBtn(ns("sex1"), icon("square"), side = "left"),
-           myBtn(ns("sex2"), icon("circle"), side = NULL),
-           myBtn(ns("sex0"), "?", side = "right")
+           myBtn("sex1", icon("square"), side = "left", tt = "b"),
+           myBtn("sex2", icon("circle"), side = NULL, tt = "b"),
+           myBtn("sex0", "?", side = "right", tt = "b")
         ),
 
        #--------
        p("Missing person", style = "font-weight:bold; margin-bottom: 0; margin-top: 10px"),
        div(class = "aligned-row-wide",
-           myBtn(ns("missing"), icon("circle-dot", style = "color:red; font-size:large"), side = "left"),
-           myBtn(ns("nonmissing"), icon("circle", style = "font-size:large"), side = "right"),
+           myBtn("missing", myIcon("circle-dot-red", height = 1.2, align = "text-bottom"),
+                 side = "left", tt = "b"),
+           myBtn("nonmissing", myIcon("circle", height = 1.2, align = "text-bottom"),
+                 side = "right", tt = "b"),
        ),
 
-       div(class = "aligned-row-wide", style = "font-weight: bold; margin-bottom: 0; margin-top: 12px;",
-           p("Reference", style = "margin-bottom: -5px"),
-           myBtn(ns("untyped"), icon("trash-can", style = "color: #353839"),
-                 mar = 0, width = "auto", style = "padding:0 3px 0 0; line-height:100%; background-color:inherit; border: none"),
+       div(class = "aligned-row-wide", style = "font-weight: bold; margin-bottom: -8px; margin-top: 12px;",
+           p("Reference", style = "margin-bottom:0"),
+           myBtn("untyped", myIcon("trash-can", align = "-0.1em"),
+                 width = "auto", tt = "right",
+                 style = "padding:0 3px 0 0; background-color:inherit; border: none"),
        ),
        DTOutput(ns("refTable"), width = "100%"),
        #-------
        br(),
        div(class = "aligned-row-wide",
-           myBtn(ns("remove"), "Remove", side = "left", width = "50%"),
-           actionButton(ns("clearsel"), style = "padding:5px; border:none; background-color: inherit;",
-                        label = tagList(tags$img(src = "hand-pointer-strikethrough.svg",
-                                                 style = "height:1em; width:auto; vertical-align:middle;")))
+           myBtn("remove", "Remove", side = "left", width = "50%", tt = "top"),
+           myBtn("clearsel", myIcon("hand-pointer-strikethrough"), tt = "right",
+                 style = "padding:5px; border:none; background-color: inherit;")
        ),
        div(class = "aligned-row-wide",
-          myBtn(ns("reset"), "RESET", status = "danger", side = "left", size = "sm"),
-          myBtn(ns("undo"), "UNDO", status = "warning", side = "right", size = "sm")#      style = "font-size: small")
+          myBtn("reset", "RESET", status = "danger", side = "left", size = "sm"),
+          myBtn("undo", "UNDO", status = "warning", side = "right", size = "sm")#      style = "font-size: small")
        )
        #--------
     ),
@@ -60,6 +70,8 @@ pedigreeUI = function(id, famid = "F1", references = NULL) {
     column(width = 9,
            plotOutput(ns("plot"), click = ns("ped_click"), dblclick = ns("ped_dblclick"),
                       width = "auto", height = "auto"),
+           p("Double-click pedigree symbols to edit names",
+             style = "font-size:small; margin-top: 0; margin-bottom: 0"),
            uiOutput(ns("editlabel")),
     ),
   )
@@ -78,7 +90,6 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
 
   moduleServer(id, function(input, output, session) {
     ns = session$ns
-    addTooltips(session)
 
     currData = reactiveValues(ped = initialDat$ped,
                               miss = initialDat$miss,
@@ -330,16 +341,18 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       x = req(currData$ped)
 
       miss = currData$miss
+      refs = currData$refs
       dat = tryCatch(
-        plot(x, title = famid, margins = 2,
-             hatched = currData$refs,
-             cex = 1.2, cex.main = 1.5,
+        plot(x, title = famid, margins = 2, labs = c(miss, refs),
+             hatched = refs, cex = 1.2, cex.main = 1.5,
              col = list(red = miss, blue = sel()),
              lwd = list(`1.2` = miss, `2` = sel()),
              carrier = miss, foldLabs = 10),
         error = showErr)
-      box("outer", col = 1)
-      req(dat) # if unsuccessful, return gracefully
+
+      # If unsuccessful, return gracefully
+      req(dat)
+      graphics::box("outer", col = 1)
       plotdat$alignment = dat$alignment
       plotdat$scaling = dat$scaling
       plotdat$annotation = dat$annotation

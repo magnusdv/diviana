@@ -74,8 +74,7 @@ slimTextInput = function(id, label = NULL, value = "", height = 25, style = NULL
   w$children[[1]]$attribs$style = labelStyle
 
   # Text field
-  textStyle = paste(textStyle, sprintf(
-    "height: %dpx; padding: 0 1px 0 5px", height, height))
+  textStyle = paste(textStyle, sprintf("height: %dpx; padding: 0 1px 0 5px", height))
   w$children[[2]]$attribs$style = textStyle
 
   w
@@ -94,7 +93,7 @@ slimTextOutput = function(id, height = 25, col = "white") {
 slimCheck = function(id, height = 25) {
   w = checkboxInput(id, label = NULL)
   w$attribs$style = sprintf("height: %dpx; line-height: %dpx; margin:0;", height, height)
-  w$children[[1]]$children[[1]]$attribs$style = "margin:0"
+  w$children[[1]] $children[[1]]$attribs$style = "margin:0"
   w
 }
 
@@ -109,7 +108,7 @@ simplePar = function(text, height, style = NULL) {
 
 myIcon = function(name, height = 1, align = "middle", tagList = FALSE) {
   tt = tags$img(src = sprintf("www/icons/%s.svg", name),
-                style = sprintf("height:%fem; width:auto; vertical-align:%s;", height, align))
+                style = sprintf("height:%gem; width:auto; vertical-align:%s;", height, align))
   if(tagList)
     tagList(tt) else tt
 }
