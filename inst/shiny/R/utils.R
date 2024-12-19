@@ -236,6 +236,3 @@ changeSex = function(ped, ids, sex) {
     swapSex(ids[currentSex == (3-sex)], verbose = FALSE) |>
     setSex(ids[currentSex == 0], sex = sex)
 }
-
-
-HTML('<img src="icons/myicon.svg" style="height:1em;width:auto;vertical-align:middle;"> Click Me')

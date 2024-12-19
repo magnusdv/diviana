@@ -2,13 +2,15 @@
 pedigreeUI = function(id, famid = "F1", references = NULL) {
   ns = NS(id)
 
+  ### Button factory
   myBtn = function(id, label, mar = "2px", side = NULL, style = NULL,
                    width = "100%", tt = NULL, ...) {
-    st = paste("padding:1px 0;", sprintf("margin: %s;", mar), style)
+    sty = paste("padding:2px; line-height:100%;",
+               sprintf("margin: %s;", mar), style)
     if(!is.null(side))
-      st = paste(st, sprintf("margin-%s: 0;", side))
+      sty = paste(sty, sprintf("margin-%s: 0;", side))
 
-    b = actionButton(ns(id), label, style = st, width = width, ...)
+    b = actionButton(ns(id), label, style = sty, width = width, ...)
     if(!is.null(tt))
       b = wrap_tooltip(b, id, placement = match.arg(tt, c("top", "bottom", "left", "right")))
     b
@@ -16,9 +18,9 @@ pedigreeUI = function(id, famid = "F1", references = NULL) {
 
   fluidRow(
     useShinyjs(),
-    column(width = 3, style = "padding-top:5px",
+    column(width = 3,
 
-       p("Add", style = "font-weight:bold; margin-bottom: 0"),
+       p("Add", style = "font-weight:bold; margin-bottom: 0; margin-top:-5px"),
        div(class = "aligned-row-wide",
            myBtn("child", "Child", side = "left"),
            myBtn("parents", "Parents", side = "right"),
@@ -55,7 +57,7 @@ pedigreeUI = function(id, famid = "F1", references = NULL) {
        #-------
        br(),
        div(class = "aligned-row-wide",
-           myBtn("remove", "Remove", side = "left", width = "50%", tt = "top"),
+           myBtn("remove", "Remove", side = "left", tt = "top"),
            myBtn("clearsel", myIcon("hand-pointer-strikethrough"), tt = "right",
                  style = "padding:5px; border:none; background-color: inherit;")
        ),
@@ -104,7 +106,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
     # Modal creation and invocation
     showModal({
       mod = modalDialog(
-        title = div(class = "aligned-row-wide", "Pedigree builder", helpBtn("help-ped")),
+        title = div(class = "aligned-row-wide", "Pedigree builder", helpBtn("help-ped") |> wrap_tooltip("pedhelp", "left")),
         tags$head(tags$style(HTML("@media (min-width: 576px) {.modal-dialog { max-width: 600px !important; }}"))),
         pedigreeUI(id, famid, allrefs),   # use the UI function here
         footer = tagList(
@@ -250,12 +252,15 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
 
     output$refTable = renderDT({
       df = data.frame(Refs = remainingRefs())
-      datatable(df, rownames = FALSE, class = "compact stripe",
-                selection = "single", colnames = "",
+      datatable(df, rownames = FALSE,
+                class = "compact stripe",
+                selection = "single",
+                colnames = "",
                 options = list(dom = 't', pageLength = -1, scrollY = "200px",
                              scrollCollapse = TRUE, ordering = FALSE,
                              language = list(zeroRecords = "No available refs"))) |>
-        DT::formatStyle(names(df), target = "row", lineHeight = "80%")
+        DT::formatStyle(names(df), target = "row", lineHeight = "75%") |>
+        DT::formatStyle(names(df), fontSize = "85%")
     })
 
     observeEvent(input$refTable_rows_selected, {

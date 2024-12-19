@@ -47,6 +47,7 @@
 .overlay {position: relative;}
 .top-right { position: absolute; top:0;  right:0; z-index: 100;}
 
+/* Triangle plots
 .tooltip-inner {
   background:white;
   color:black;
@@ -57,32 +58,11 @@
 .tooltip-arrow {
   display:none;
 }
+*/
 
 .modal-content:has(.modal-body.autowide) {
   width: fit-content !important;
   height: fit-content !important;
-}
-
-.mutation-inputs .shiny-input-container {
-  margin-bottom: 0; /* Less space between rows */
-  padding: 2px; /* Less padding inside input fields */
-}
-
-.mutation-inputs input[type='number'] {
-  height: 24px; /* Smaller field height */
-  -moz-appearance: textfield;
-  -webkit-appearance: none;
-}
-
-.mutation-inputs input::-webkit-outer-spin-button,input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  -moz-appearance: textfield;
-  margin: 0;
-}
-
-/* Adjust labels within the custom card class to be closer to inputs */
-.mutation-inputs label {
-  margin-bottom: 2px;
 }
 
 

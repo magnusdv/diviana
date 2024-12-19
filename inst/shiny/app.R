@@ -62,9 +62,9 @@ ui = bs4Dash::bs4DashPage(
     ),
     rightUi = tagList(tags$li(class = "nav-item dropdown",
       div(class = "aligned-row", style = "margin-right: 22.5px; gap: 15px;",
-        awesomeCheckbox("usealias", "Alias", value = TRUE, width = "auto", status = "success"),
-        downloadBttn("downloaddata", NULL, style = "jelly", color = "warning", size = "m"),
-        actionBttn("resetall", icon("redo"), style = "jelly", color = "danger", size = "m"),
+        awesomeCheckbox("usealias", "Alias", value = TRUE, width = "auto", status = "success") |> wrap_tooltip("usealias", "bottom"),
+        downloadBttn("downloaddata", NULL, style = "jelly", color = "warning", size = "m")|> wrap_tooltip("downloaddata", "bottom"),
+        actionBttn("resetall", icon("redo"), style = "jelly", color = "danger", size = "m") |> wrap_tooltip("resetall", "bottom"),
         selectInput("example", NULL, choices = c("Load example" = "", DATASETS), width = "200px")
       )
     ))
@@ -78,7 +78,6 @@ ui = bs4Dash::bs4DashPage(
   bs4DashBody(
     includeCSS("www/custom.css"),
     tags$head(tags$script(src = "scripts.js")),
-    tags$script("$(document).on('shown.bs.modal',function(){$('[data-toggle=\"tooltip\"]').tooltip();});"),
 
     useShinyjs(),
     useBusyIndicators(spinners = FALSE, pulse = TRUE),
@@ -90,17 +89,15 @@ ui = bs4Dash::bs4DashPage(
    tabItem("pmdata",
       fluidRow(column(width = 7, dataUI("PM")),
 
-      # Data tab - right column -----------------------------------------------
+      # Database -----------------------------------------------
 
       column(width = 5,
-
-        bs4Card(width = 12, collapsible = FALSE,
-                title = "Frequency database",
-          radioButtons("dbtype", NULL, inline = TRUE, width = "100%",
+        bs4Card(width = 12, collapsible = FALSE, title = "Database",
+          radioButtons("dbtype", "Allele frequencies", inline = TRUE, width = "100%",
                        selected = character(0),
                        choices = c("Built-in" = "builtin",
-                                   "In dataset" = "data",
-                                   "Custom" = "custom")),
+                                   "Custom file" = "custom",
+                                   "In dataset" = "data")),
           conditionalPanel(
             condition = "input.dbtype == 'builtin'",
             pickerInput("dbselect", NULL, choices = "NorwegianFrequencies", selected = NULL,
@@ -110,43 +107,26 @@ ui = bs4Dash::bs4DashPage(
           conditionalPanel(
             condition = "input.dbtype == 'custom'",
             fileInput("dbcustom", NULL, accept = c("text/tab-separated-values", "text/plain", ".txt"))
-          )
+          ),
+          hr(),
 
-          # pickerInput("freqmarker", label = "Marker", choices = NULL,
-          #             options = pickerOptions(title = "Select marker",
-          #                                     style = "btn-outline-secondary")),
-          # plotOutput("freqhist", height = "220")
-        ),
-        bs4Card(width = 12, collapsible = FALSE, class = "mutation-inputs", style = "padding-top:0",
-          title = cardNavigation("mutcard", "Mutation models"),
-          uiOutput("markName"),
-          radioButtons("mutmodel", NULL, inline = TRUE, width = "100%", selected = character(0),
+          # Mutation model ----------------------------------------------------------
+
+          radioButtons("mutmodel", "Mutation model", inline = TRUE, width = "100%", selected = "none",
                        choices = c("No model" = "none", Equal = "equal", Prop = "proportional",
-                                   Stepwise = "stepwise", Custom = "custom")),
-          fluidRow(
-            column(3, offset = 3, em("Rate")),
-            column(3, em("Rate2")),
-            column(3, em("Range")),
-          ),
-          fluidRow(
-            column(3, "Female:"),
-            column(3, numericInput("rateF", label = NULL, value = NA, max = 1)),
-            column(3, numericInput("rate2F", label = NULL, value = NA, max = 1)),
-            column(3, numericInput("rangeF", label = NULL, value = NA, max = 1)),
-          ),
-          fluidRow(
-            column(3, "Male:"),
-            column(3, numericInput("rateM", label = NULL, value = NA, max = 1)),
-            column(3, numericInput("rate2M", label = NULL, value = NA, max = 1)),
-            column(3, numericInput("rangeM", label = NULL, value = NA, max = 1))
-          ),
-          footer = tags$div(class = "btn-group",
-            actionButton("mutApply1", label = tagList(icon("check-circle"), "Apply Here")),
-            actionButton("mutApplyAll", label = tagList(icon("globe"), "Apply All"))
+                                   Stepwise = "stepwise", "In dataset" = "data")),
+          div(id = "mutcontrol", class = "aligned-row-wide", style = "align-items: flex-end; margin: 10px 0;",
+              tagList(tags$style(HTML(
+                "#mutcontrol .control-label {margin-bottom:0; font-size:90%;}
+                 #mutcontrol .form-control  {font-size:90%; width:80%; padding:0 10px; height:auto;}")
+              )),
+              numericInput("mutrateF", "Female rate", width = "90%", min = 0, max = 1, value = NULL),
+              numericInput("mutrateM", "Male rate", width = "90%",   min = 0, max = 1, value = NULL),
+              actionButton("mutApplyAll", label = tagList(icon("globe"), "Apply to all markers"),
+                           width = "100%", style = "white-space:nowrap; margin:0")
           )
-        ),
-      ),
-    )),
+        )
+    ))),
 
     # Tab: AM data and pedigrees -----------------------------------------------
 
@@ -160,11 +140,12 @@ ui = bs4Dash::bs4DashPage(
             plotOutput("pedplot", width = "auto", height = "auto"),
             footer = div(class = "aligned-row-wide",
               div(class = "btn-group",
-                actionButton("newped", label = tagList(icon("plus"), "New")),
-                actionButton("editped", label = tagList(icon("edit"), "Edit")),
-                actionButton("delped", label = tagList(icon("trash"), "Delete"))
+                actionButton("newped", label = tagList(icon("plus"), "New")) |> wrap_tooltip("newped"),
+                actionButton("editped", label = tagList(icon("edit"), "Edit")) |> wrap_tooltip("editped"),
+                actionButton("delped", label = tagList(icon("trash-can"), "Delete") ) |> wrap_tooltip("delped")
               ),
-              actionBttn("plotdviButton", "Overview", style = "jelly", size = "s", color = "success")
+              actionBttn("plotdviButton", "Overview", style = "jelly", size = "s", color = "success") |>
+                wrap_tooltip("dviplot")
             )
           ),
           bs4InfoBoxOutput("dvisummary", width = 12)
@@ -200,17 +181,21 @@ ui = bs4Dash::bs4DashPage(
 
       # Buttons: Solve! --------------------------------------------
       column(width = 2, class = "col-xl-1",
-             actionBttn("solve", label = "SOLVE", icon = icon("calculator"), color = "primary", style = "jelly", ),
-             br(),hr(),
+             actionBttn("solve", label = "SOLVE", icon = icon("calculator"),
+                        color = "primary", style = "jelly") |>
+               wrap_tooltip("solve"),
+             br(), hr(),
              h4("Settings"),
-             numericInput("LRthresh", "LR threshold", value = 10000,min = 1),
+             numericInput("LRthresh", "LR threshold", value = 10000,min = 1) |>
+               wrap_tooltip("LRthresh"),
              br(),
-             numericInput("maxIncomp", "Exclusion limit", min = 0, step = 1, value = 2),
+             numericInput("maxIncomp", "Exclusion limit", min = 0, step = 1, value = 2)|>
+               wrap_tooltip("maxIncomp"),
              br(),
              checkboxInput("ignoresex", "Ignore Sex", value = FALSE),
              hr(), br(),
              downloadButton('downloadTables', "Download", class = "btn btn-warning",
-                            style = "width:100%")
+                            style = "width:100%") |> wrap_tooltip("downloadRes")
       ),
 
       # Report table: AM and PM tabs --------------------------------------------
@@ -243,7 +228,7 @@ ui = bs4Dash::bs4DashPage(
 
 
 server = function(input, output, session) {
-  addTooltips(session)
+  #addTooltips(session)
 
   .debug = function(...) {
     if(!DEVMODE) return()
@@ -269,6 +254,7 @@ server = function(input, output, session) {
 
   externalPM = reactiveVal(NULL)
   externalAM = reactiveVal(NULL)
+  externalLoci = reactiveValues(db = NULL, mut = NULL)
 
   dataServerPM = dataServer("PM", externalPM, .debug = .debug)
   dataServerAM = dataServer("AM", externalAM, .debug = .debug)
@@ -287,6 +273,8 @@ server = function(input, output, session) {
   alleleSepPM = reactive(getAlleleSep(req(genoPM())))
   alleleSepAM = reactive(getAlleleSep(req(genoAM())))
 
+  locusAttrs = reactiveVal(NULL)
+
   mainPM = reactive({ .debug("mainPM")
     if(is.null(g <- genoPM()))
       return(NULL)
@@ -296,34 +284,25 @@ server = function(input, output, session) {
     names(s) = rownames(g)
 
     pm = NULL
-    tryCatch({
-      pm = setMarkers(s, alleleMatrix = g, sep = alleleSepPM())
-    }, error = showErr)
-
-    db = DB()
-    cat(length(db), "markers\n")
-    tryCatch({pm = pm |> .setDB(db)}, error = showErr)
-
+    tryCatch({pm = setMarkers(s, alleleMatrix = g, sep = alleleSepPM())},
+             error = showErr)
+    tryCatch({pm = .setDB(pm, db = locusAttrs(), tag = "PM")},
+             error = showErr)
     pm
   })
 
   mainAM = reactive({ .debug("mainAM")
     if(is.null(g <- genoAM()) || is.null(peddata <- pedigrees()))
       return(NULL)
+    g[g==""] = NA
 
     peds = lapply(peddata, `[[`, "ped")
 
-    g[g==""] = NA
-    am = tryCatch({
-      peds |>
-        setMarkers(alleleMatrix = g, sep = alleleSepAM()) |>
-        .setDB(DB()) |>
-        .setMuts(mutModels())
-    }, warning = showErr, error = showErr)
-
-    req(!is.character(am))
-    if(is.character(am))
-      return(NULL)
+    am = NULL
+    tryCatch({am = setMarkers(peds, alleleMatrix = g, sep = alleleSepAM())},
+             error = showErr)
+    tryCatch({am = .setDB(am, db = locusAttrs(), tag = "AM")},
+             error = showErr)
     am
   })
 
@@ -341,23 +320,30 @@ server = function(input, output, session) {
 
   observeEvent(dataServerAM$completeDvi(), { .debug("AM complete dvi")
     setCompleteDVI(dataServerAM$completeDvi())}, ignoreNULL = TRUE)
-  observeEvent(dataServerPM$completeDvi(), { .debug("PM complete dvi")
+
+  observeEvent(dataServerPM$completeDvi(), { .debug("PM complete dvi:")
     setCompleteDVI(dataServerPM$completeDvi())}, ignoreNULL = TRUE)
 
   observeEvent(setCompleteDVI(), { .debug("set complete dvi")
     dvi = setCompleteDVI() |> dvir:::consolidateDVI(dedup = TRUE)
+    am1 = dvi$am[[1]]
 
+    # Database and custom mutation models
+    db = getFreqDatabase(am1)
+    mut = getLocusAttributes(am1, attribs = "mutmod", simplify = TRUE)
+    externalLoci$db = db
+    externalLoci$mut = mut
+
+    updateRadioButtons(session, "dbtype", selected = "data")
+    updateRadioButtons(session, "mutmodel", selected = "data")
+
+    DB(db)
     externalAM(getGenotypesAndSex(dvi$am))
     externalPM(getGenotypesAndSex(dvi$pm))
 
     peds = lapply(dvi$am, function(a)
       list(ped = a, miss = .myintersect(dvi$missing, a$ID), refs = typedMembers(a)))
     pedigrees(peds)
-
-    updateRadioButtons(session, "dbtype", selected = "data")
-    DB(getFreqDatabase(dvi$am))
-
-    mutModels(.getAllMutModels(dvi$am))
 
     # Reset
     setCompleteDVI(NULL)
@@ -376,114 +362,20 @@ server = function(input, output, session) {
       isolate(updateSelectInput(session, "example", selected = ""))
   })
 
-  # Mutation models --------------------------------------------------------
-
-  # Main storage for mutation parameters (list of lists)
-  mutModels = reactiveVal(NULL)
-  mutParams = reactive({
-    lapply(mutModels(), function(mut) {
-      p = getParams(mut, format = 1)
-      list(model = p$model[1],
-        rate = list(female = p$rate[1], male = p$rate[2]),
-        rate2 = list(female = p$rate2[1], male = p$rate2[2]),
-        range = list(female = p$range[1], male = p$range[2]))
-    })
-  })
-
-  markernames = reactive(colnames(genoAM()))
-  currentMutIdx = cardCounter("mutcard", reactive(length(markernames())))
-  currentMutMarker = reactive(markernames()[currentMutIdx()])
-  output$markName = renderUI(HTML(sprintf("<b>%s</b>", currentMutMarker())))
-
-  inputParams = reactive({
-    list(
-      model = input$mutmodel,
-      rate  = list(female = input$rateF,  male = input$rateM),
-      rate2 = list(female = input$rate2F, male = input$rate2M),
-      range = list(female = input$rangeF, male = input$rangeM))
-  })
-
-  observeEvent(input$mutApply1, { .debug("mutations: apply 1")
-    m = currentMutMarker()
-    if(is.null(m)) {
-      showErr("No markers loaded")
-      return()
-    }
-    mut = NULL
-    if(input$mutmodel != "none") {
-      args = c(list(afreq = req(DB()[[m]]), validate = TRUE), inputParams())
-      mut = tryCatch(do.call(mutationModel, args), error = errModal)
-      req(isMutationModel(mut))
-    }
-    mods = mutModels()
-    mods[m] = list(mut)
-    mutModels(mods)
-    showNotification(paste("Updated mutation model of", m), type = "message")
-  })
-
-  observeEvent(input$mutApplyAll, { .debug("mutations: apply all")
-    #ask_confirmation("confirmMutApply", type = "warning",
-    #  title = "Click 'Confirm' to apply this mutation model to all markers")
-    mods = mutModels()
-    if(!length(mods)) {
-      showErr("No markers loaded")
-      return()
-    }
-
-    allms = markernames()
-    if(input$mutmodel == "none") {
-      mutModels(lapply(.setnames(allms), function(m) NULL))
-      showNotification("Removed all mutation models", type = "message")
-      return()
-    }
-
-    args = c(list(afreq = NULL, validate = TRUE), inputParams())
-    for(m in intersect(markernames(), names(DB()))) {
-      args$afreq = DB()[[m]]
-      mut = tryCatch(do.call(mutationModel, args), error = errModal)
-      if(isMutationModel(mut))
-        mods[m] = list(mut)
-    }
-    mutModels(mods)
-    showNotification("Updated all mutation models", type = "message")
-  })
-
-  observeEvent({currentMutIdx();mutModels()}, { .debug("mutations: update input fields")
-    idx = currentMutIdx()
-    params = if(idx > 0) mutParams()[[idx]] else NULL
-    model = params$model %||% "none"
-
-    for(p in c("rate", "rate2", "range")) {
-      shinyjs::enable(paste0(p, "F")); shinyjs::enable(paste0(p, "M"))
-      updateNumericInput(session, paste0(p, "F"), value = params[[p]]$female)
-      updateNumericInput(session, paste0(p, "M"), value = params[[p]]$male)
-    }
-
-    updateRadioButtons(session, "mutmodel", selected = model)
-  })
-
-  # Enable/disable mutation fields
-  observeEvent(input$mutmodel, { .debug("mutations: dis/enable fields")
-    setfields = switch(input$mutmodel,
-                       none  = , custom = character(),
-                       equal = , proportional = "rate",
-                       stepwise = c("rate", "rate2", "range"))
-    disfields = setdiff(c("rate", "rate2", "range"), setfields)
-    for(p in setfields) {
-      shinyjs::enable(paste0(p, "F"))
-      shinyjs::enable(paste0(p, "M"))
-    }
-    for(p in disfields) {
-      updateNumericInput(session, paste0(p, "F"), value = NA)
-      updateNumericInput(session, paste0(p, "M"), value = NA)
-      shinyjs::disable(paste0(p, "F"))
-      shinyjs::disable(paste0(p, "M"))
-    }
-  }, ignoreInit = TRUE)
-
   # Frequency database ------------------------------------------------------
 
-  observeEvent(input$dbselect, { .debug("database: selected", input$dbselect)
+  observeEvent(DB(), { .debug("reset locusAttrs with new DB")
+    if(is.null(db <- DB())) {
+      locusAttrs(NULL)
+      return()
+    }
+    nms = names(db) |> .setnames()
+    loci = lapply(nms, function(m) list(name = m, alleles = names(db[[m]]), afreq = as.numeric(db[[m]])))
+    loci = .updateDB(loci, mutParams())
+    locusAttrs(loci)
+  })
+
+  observeEvent(input$dbselect, { .debug("database: builtin -", input$dbselect)
     if(input$dbselect == "")
       newdb = NULL
     if(input$dbselect == "NorwegianFrequencies")
@@ -491,11 +383,35 @@ server = function(input, output, session) {
     DB(newdb)
   })
 
-  observeEvent(DB(), { .debug("database: update freqmarker selector")
-    m = names(req(DB()))
-    updatePickerInput(session, "freqmarker", choices = m)
+  observeEvent(input$dbcustom, { .debug("database: custom file", input$dbcustom$name)
+    path = req(input$dbcustom$datapath)
+    tryCatch({
+      db = readFreqDatabase(path)
+      DB(db)
+    }, error = errModal)
   })
 
+  observeEvent(input$dbtype, {
+    if(input$dbtype == "data")
+      DB(externalLoci$db)
+  })
+
+  observe(toggleState(selector = "#dbtype input[value='data']", condition = !is.null(externalLoci$db)))
+  observe(toggleState(selector = "#mutmodel input[value='data']", condition = !is.null(externalLoci$mut)))
+  observe(toggleState("mutrateF", condition = input$mutmodel != "data"))
+  observe(toggleState("mutrateM", condition = input$mutmodel != "data"))
+
+  # Mutation models --------------------------------------------------------
+
+  mutParams = reactive(list(model = input$mutmodel,
+                            rate = list(female = input$mutrateF, male = input$mutrateM),
+                            fullmods = if(input$mutmodel == "data") externalLoci$mut))
+
+  observeEvent(input$mutApplyAll, { .debug("mutations: apply all")
+    newloci = .updateDB(req(locusAttrs()), mutParams())
+    locusAttrs(newloci)
+    showNotification("Updated mutation parameters", type = "message")
+  })
 
   # Pedigrees -----------------------------------------------------------
 
@@ -797,7 +713,6 @@ server = function(input, output, session) {
   output$lrmatrix = gt::render_gt({ .debug("render LR matrix")
     dvi = currentDviData()
     m = req(solutionTable$LR) |> completeMatrix(names(dvi$pm), dvi$missing)
-    #mm <<- solutionTable$LR; dd <<- dvi; al <<- aliasPM()
     formatLRmatrix(m, input$LRthresh, input$usealias, aliasPM = aliasPM())
   }, height = 600)
 
@@ -827,8 +742,12 @@ server = function(input, output, session) {
   output$downloadTables = downloadHandler(
     filename = function() sprintf("foo_%s.xlsx", Sys.Date()),
     content = function(file) { .debug("download")
-      downloadTables(req(solutionTable$AM), solutionTable$PM,
-                     currentAlias$am, currentAlias$pm, file)
+      req(solutionTable$AM)
+      dvi = req(currentDviData())
+      tables = reactiveValuesToList(solutionTable)
+      tables$LR = tables$LR |> completeMatrix(names(dvi$pm), dvi$missing)
+      tables$EX = tables$EX |> completeMatrix(names(dvi$pm), dvi$missing)
+      downloadTables(tables, file)
     },
     contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )
@@ -840,8 +759,11 @@ server = function(input, output, session) {
   observeEvent(input$resetall, { .debug("reset all")
     externalAM(NULL)
     externalPM(NULL)
+    externalLoci$db = externalLoci$mut = NULL
     pedigrees(NULL)
     isolate(updateSelectInput(session, "example", selected = ""))
+    updateRadioButtons(session, "dbtype", selected = character(0))
+    updateRadioButtons(session, "mutmodel", selected = "none")
     updateNumericInput(session, "LRthresh", value = 10000)
     updateNumericInput(session, "maxIncomp", value = 2)
     updateCheckboxInput(session, "ignoresex", value = FALSE)
@@ -858,7 +780,6 @@ server = function(input, output, session) {
   observe({
     if(DEVMODE) { .debug("devmode!")
       updateSelectInput(session, "example", selected = "example1")
-      # updateTabItems(session, "tabmenu", "amdata")
     }
   })
 

@@ -5,16 +5,12 @@ plotSolutionDIVIANA = function(dvi, summary, pednrs = NULL, ...) { # summaryAM
   if(is.null(pednrs))
     pednrs = seq_along(dvi$am)
 
-  # Ensure proper dviData object
   refs = typedMembers(dvi$am)
+  miss = dvi$missing
 
-  miss = summary$Missing
   conc = summary$Conclusion
 
-  groups = lapply(names(COLS_BG), function(g)
-    miss[conc == g])
-  names(groups) = names(COLS_BG)
-
+  groups = lapply(names(COLS_BG) |> .setnames(), function(g) miss[conc == g])
   groups$noconc = miss[conc == ""]
 
   fill = list()
@@ -22,11 +18,9 @@ plotSolutionDIVIANA = function(dvi, summary, pednrs = NULL, ...) { # summaryAM
     cl = COLS_BG[i]
     fill[[cl]] = c(fill[[cl]], groups[[i]])
   }
-
   excl = groups$Excluded
-  stillmiss = unlist(groups[c("Nonidentifiable", "Inconclusive", "Inconclusive GLR", "No match", "noconc")])
-
-  linecol = list("red" = c(groups$Excluded, stillmiss))
+  stillmiss = setdiff(miss, unlist(groups[c("Undisputed", "Match (GLR)", "Symmetric match", "Probable", "Disputed")]))
+  linecol = list("red" = c(excl, stillmiss))
   carrier = stillmiss
 
   labs = dvi$missing

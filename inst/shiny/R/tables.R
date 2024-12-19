@@ -45,7 +45,7 @@ formatResultTable = function(x, usealias = FALSE, aliasPM = NULL, style = 6) {
     return(emptyGT)
   }
 
-  if(usealias && !is.null(aliasPM))
+  if(usealias && !is.null(aliasPM) && !all(is.na(x$Sample)))
     x$Sample = aliasPM[x$Sample]
 
   tab = gt(x) |>

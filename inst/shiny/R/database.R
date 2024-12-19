@@ -1,6 +1,36 @@
-.setDB = function(x, db = NULL) {
-  if(is.null(db))
+
+.updateDB = function(loci, mutParams) {
+  mod = mutParams$model
+  if(is.null(mod) || mod == "none") {
+    for(m in names(loci)) loci[[m]]$mutmod = NULL
+  }
+  else if(mod == "data") {
+    mods = mutParams$fullmods
+    for(m in names(loci)) loci[[m]]$mutmod = mods[[m]]
+  }
+  else {
+    args = list(model = mod, rate = mutParams$rate, validate = TRUE)
+    if(mod == "stepwise") { args$rate2 = 1e-6; args$range = 0.1 }
+    for(m in names(loci)) {
+      tryCatch({
+        args$alleles = loci[[m]]$alleles
+        args$afreq = loci[[m]]$afreq
+        loci[[m]]$mutmod = do.call(mutationModel, args)
+      }, error = function(e) {
+        msg = paste0(conditionMessage(e), "<br>Disabling mutation modelling for this marker.")
+        errModal(msg, html = TRUE)
+        loci[[m]]$mutmod = NULL
+      })
+    }
+  }
+  loci
+}
+
+
+.setDB = function(x, db = NULL, tag = "") {
+  if(is.null(db)) {
     stop2("No database loaded")
+  }
 
   m = name(x)
 
@@ -13,52 +43,16 @@
     stop2("None of the markers found in database")
 
   if(any(idx == 0)) {
-    showNotification(sprintf("Ignoring %s markers not found in database:\n%s", sum(idx == 0), toString(m[idx == 0])))
+    showNotification(sprintf("%s: Ignoring markers not found in database:\n%s",
+                             tag, sum(idx == 0), toString(m[idx == 0])))
     x = selectMarkers(x, idx > 0)
   }
 
-  y = setFreqDatabase(x, db[idx])
-  showNotification(sprintf("Database attached: %d markers: ", sum(idx > 0)))
+  y = setLocusAttributes(x, markers = m[idx > 0], locusAttributes = db[idx], erase = TRUE)
+   showNotification(sprintf("%s: Database attached (%d markers)", tag, sum(idx > 0)))
   y
 }
 
 normaliseName = function(x) {
   tolower(gsub("[-._ ]", "", x))
-}
-
-# Wrapper of pedtools::setMutmod
-.setMutsOLD = function(x, markers, params) {
-  for(i in seq_along(markers)) {
-    parlist = params[[i]]
-    #print(parlist)
-    if(is.null(parlist$model) || parlist$model == "none")
-      x = setMutmod(x, i, model = NULL)
-    else
-      x = do.call(setMutmod, c(list(x = x, markers = i), parlist))
-  }
-  x
-}
-
-# Wrapper of pedmut::getParams
-.getAllMutParamsOLD = function(x) {
-  markers = name(x) |> .setnames()
-  lapply(markers, function(m) {
-    mut = mutmod(x, m)
-    p = getParams(mut, format = 1)
-    list(model = p$model[1],
-         rate = list(female = p$rate[1], male = p$rate[2]),
-         rate2 = list(female = p$rate2[1], male = p$rate2[2]),
-         range = list(female = p$range[1], male = p$range[2]))
-  })
-}
-
-.getAllMutModels = function(x) {
-  markers = name(x) |> .setnames()
-  lapply(markers, function(m) mutmod(x, m))
-}
-
-.setMuts = function(x, models) {
-  for(nm in name(x))
-    mutmod(x, nm) = models[[nm]]
-  x
 }

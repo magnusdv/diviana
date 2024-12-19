@@ -2,7 +2,7 @@
 dataUI = function(id, title = paste(id, "data")) {
   ns = NS(id)
   bs4Card(width = NULL, title = title, collapsible = FALSE,
-    DT::DTOutput(ns("mainTable"), width = "fit-content"),
+    DT::DTOutput(ns("mainTable"), width = "fit-content", height = "600px"),
     tags$head(tags$style(HTML(sprintf("#%s {width:fit-content; max-width: 100%%;}", ns("mainTable"))))),
     br(),
     shiny::uiOutput(ns("sourcefield")),
@@ -211,7 +211,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
       removeModal()
     })
 
-    output$mainTable = DT::renderDT(genoDT(req(mainTable$main)), server = FALSE)
+    output$mainTable = DT::renderDT(genoDT(req(mainTable$main), scrollY = "500px"), server = FALSE)
 
     output$sourcefield = renderUI({
       src = unlist(lapply(req(sources$all), function(s) as.character(em(s))))
