@@ -1,3 +1,5 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^notes-private$
+^README\.Rmd$
+^Rprof.out$

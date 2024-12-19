@@ -48,11 +48,17 @@ readGenoFromTxt = function(file) {
                  check.names = FALSE, row.names = NULL)
 
   # Convert sample ID columns to row names
-  trycols = match(c("Family", "Sample", "Relationship"), names(x), nomatch = 0)
-  if(trycols[2] > 0)
+  trycols = list()
+  for(a in c("Family", "Sample", "Relationship")) {
+    i = grep(a, names(x), ignore.case = TRUE)
+    trycols[[a]] = if(length(i) > 0) i else 0
+  }
+  trycols = unlist(trycols)
+  if(trycols[2] > 0) {
     idcols = trycols[trycols > 0]
-  else
+  } else {
     idcols = grep("sample", names(x), ignore.case = TRUE)
+  }
 
   # If no luck, use first column
   if(length(idcols) == 0)

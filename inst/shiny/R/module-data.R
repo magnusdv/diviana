@@ -2,7 +2,7 @@
 dataUI = function(id, title = paste(id, "data")) {
   ns = NS(id)
   bs4Card(width = NULL, title = title, collapsible = FALSE,
-    DT::DTOutput(ns("mainTable"), width = "fit-content", height = "600px"),
+    DT::DTOutput(ns("mainTable"), width = "fit-content", height = "400px"),
     tags$head(tags$style(HTML(sprintf("#%s {width:fit-content; max-width: 100%%;}", ns("mainTable"))))),
     br(),
     shiny::uiOutput(ns("sourcefield")),
@@ -26,9 +26,18 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
     sources = reactiveValues(current = NULL, all = NULL)
 
     observeEvent(externalData(), { .debug2("set external", externalData())
-      mainTable$main = externalData() |> prepareGenoDf(id = id)
-      completeDvi$raw = completeDvi$import = NULL
-      }, ignoreInit = TRUE, ignoreNULL = FALSE)
+      ext = externalData()
+      if(identical(ext, "reset")) {
+        mainTable$main = mainTable$raw = completeDvi$raw = completeDvi$import = NULL
+        sources$all = sources$current = NULL
+        isolate(externalData(NULL)) # TODO
+        return()
+      }
+      else {
+        mainTable$main = externalData() |> prepareGenoDf(id = id)
+        completeDvi$raw = completeDvi$import = NULL
+      }
+    }, ignoreInit = TRUE, ignoreNULL = FALSE)
 
 
     # Import ------------------------------------------------------------------
@@ -153,7 +162,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
         gm    = { rawtable = readGenemapper(path)},
         txt   = { rawtable = readGenoFromTxt(path)},
       ),
-      # warning = showErr, TODO!
+       warning = function(e) print(conditionMessage(e)), #showErr, TODO!
       error = function(e) fileError(conditionMessage(e)))
 
       if(!is.null(rawtable)) {
@@ -211,7 +220,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
       removeModal()
     })
 
-    output$mainTable = DT::renderDT(genoDT(req(mainTable$main), scrollY = "500px"), server = FALSE)
+    output$mainTable = DT::renderDT(genoDT(req(mainTable$main), scrollY = "370px"), server = FALSE)
 
     output$sourcefield = renderUI({
       src = unlist(lapply(req(sources$all), function(s) as.character(em(s))))

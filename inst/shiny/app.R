@@ -35,7 +35,7 @@ suppressMessages(suppressPackageStartupMessages({
 #---------------------------------------------
 
 
-DEVMODE = F
+DEVMODE = T
 
 DATASETS = c("example1", "example2", "exclusionExample", "fire", "grave", "icmp", "planecrash")
 
@@ -757,10 +757,11 @@ server = function(input, output, session) {
   resetAnalysis = reactiveVal(0)
 
   observeEvent(input$resetall, { .debug("reset all")
-    externalAM(NULL)
-    externalPM(NULL)
+    externalAM("reset")
+    externalPM("reset")
     externalLoci$db = externalLoci$mut = NULL
     pedigrees(NULL)
+    DB(NULL); locusAttrs(NULL) # needed?
     isolate(updateSelectInput(session, "example", selected = ""))
     updateRadioButtons(session, "dbtype", selected = character(0))
     updateRadioButtons(session, "mutmodel", selected = "none")
