@@ -2,8 +2,9 @@
 # Temporary name waiting for better solution in dvir
 plotSolutionDIVIANA = function(dvi, summary, pednrs = NULL, ...) { # summaryAM
 
+  Nped = length(dvi$am)
   if(is.null(pednrs))
-    pednrs = seq_along(dvi$am)
+    pednrs = seq_len(Nped)
 
   refs = typedMembers(dvi$am)
   miss = dvi$missing
@@ -26,7 +27,7 @@ plotSolutionDIVIANA = function(dvi, summary, pednrs = NULL, ...) { # summaryAM
   labs = dvi$missing
 
   tryCatch(
-    plotDVI(dvi, style = 0, pm = FALSE, am = pednrs, labs = labs,
+    plotDVI(dvi, style = 0, pm = FALSE, am = pednrs, labs = labs, nrowAM = if(Nped > 4) 2 else NA,
             titles = NULL, fill = fill, hatched = refs, deceased = excl,
             col = linecol, carrier = carrier, lwd = list("1.5" = c(excl)), ...),
     error = function(e) {
