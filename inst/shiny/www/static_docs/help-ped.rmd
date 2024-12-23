@@ -5,7 +5,7 @@ output: html_fragment
 ```{r include = FALSE}
 # Simple function to retrieve local icons
 mySvg = function(name, height = 1, align = "-0.1em") {
-  shiny::tags$img(src = sprintf("icons/%s.svg", name),
+  shiny::tags$img(src = sprintf("../static_icons/%s.svg", name),
                   style = sprintf("height:%fem; width:auto; vertical-align:%s;", height, align))
   
 }

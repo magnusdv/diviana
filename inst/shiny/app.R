@@ -15,6 +15,8 @@ suppressMessages(suppressPackageStartupMessages({
   library(openxlsx)
 }))
 
+# Add path to icons
+addResourcePath("icons", system.file("shiny/www/static_icons", package = "diviana"))
 
 # TODO----------------------------------------------------------------
 #
@@ -823,12 +825,15 @@ server = function(input, output, session) {
 
   # Help pages --------------------------------------------------------------
 
+  # All help files
+  helpDir = system.file("shiny/www/static_docs", package = "diviana")
+  helpFiles = list.files(helpDir, pattern = "^help-.*\\.html$", full.names = FALSE)
+  helpIds = sub("\\.html$", "", helpFiles)
+
   currentModal = reactiveVal()
-  # Ensure the www directory is added as a resource path
-  addResourcePath("www", "www")
 
   showInstructions = function(id) { .debug("help:", id)
-    helpfile = paste0("www/", id, ".html")
+    helpfile = file.path(helpDir, sprintf("%s.html", id))
     req(file.exists(helpfile))
 
     showModal(modalDialog(
@@ -853,10 +858,6 @@ server = function(input, output, session) {
     if(!is.null(m <- currentModal()))
       showModal(m)
   })
-
-  # Identify all help-*.md files in www/
-  helpFiles = list.files("www", pattern = "^help-.*\\.html$", full.names = FALSE)
-  helpIds = sub("\\.html$", "", helpFiles)
 
   # Create observers for each help button
   lapply(helpIds, function(id) observeEvent(input[[id]], showInstructions(id)))

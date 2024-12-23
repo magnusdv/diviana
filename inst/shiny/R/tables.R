@@ -138,16 +138,26 @@ formatCP = function(tab, usealias = FALSE, alias1 = NULL, alias2 = alias1, sortb
   scrollY = if(nrow(df)>10) "220px" else NULL
   .pick = function(...) intersect(c(...), names(df))
 
+  # Order by pval if present
+  pvalIdx = match("pval", names(df), nomatch = 0)
+  ord = if(pvalIdx > 0) list(pvalIdx - 1, 'asc') else NULL
+
   DT::datatable(df,
                 class = "stripe compact nowrap",
                 selection = "none",
                 width = "100%",
                 rownames = FALSE,
                 plugins = "natural",
-                options = list(dom = "ft", paging = FALSE,
+                options = list(dom = "ft",
+                               paging = FALSE,
                                language = list(search = "Filter: "),
                                scrollY = scrollY, scrollX = TRUE,
-                               columnDefs = list(list(type = "natural", targets = 0:1)))) |>
+                               order = ord,
+                               columnDefs = list(
+                                 list(type = "natural", targets = 0:1),
+                                 list(className = "dt-left", targets = "_all"))
+                               )
+                ) |>
   DT::formatStyle(names(df), target = "row", lineHeight = "75%") |>
   DT::formatStyle(.pick("pedrel"), fontSize = "80%") |>
   formatRound(.pick("k0", "k1", "k2"), digits = 2) |>

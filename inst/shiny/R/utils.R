@@ -204,19 +204,23 @@ getGenotypesAndSex = function(x) {
 }
 
 abbreviatePedrel = function(x, width = 15) {
-    if(!any(long <- (nchar(x) > width)))
-      return(x)
+  x[x == "Unrelated"] = "Unrel"
+  x[x == "Mother-daughter"] = "Mother-dau"
+  x[x == "Father-daughter"] = "Father-dau"
 
-    x[long] = sub(" &.*", " &", x[long])
-    if(!any(long <- (nchar(x) > width)))
-      return(x)
+  if(!any(long <- (nchar(x) > width)))
+    return(x)
 
-    x[long] = sub("--.*", "/", x[long])
-    if(!any(long <- (nchar(x) > width)))
-      return(x)
+  x[long] = sub(" &.*", " &", x[long])
+  if(!any(long <- (nchar(x) > width)))
+    return(x)
 
-    x[long] = paste0(substr(x[long], 1, width-2), "..")
-    x
+  x[long] = sub("--.*", "/", x[long])
+  if(!any(long <- (nchar(x) > width)))
+    return(x)
+
+  x[long] = paste0(substr(x[long], 1, width-2), "..")
+  x
 }
 
 
