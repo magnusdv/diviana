@@ -115,10 +115,10 @@ formatCP = function(tab, usealias = FALSE, alias1 = NULL, alias2 = alias1, sortb
     return(df |> .dtstyleCP())
   }
 
-  if(ncol(tab) > 1) {
-    sortby = if("GLR" %in% names(tab)) tab$GLR else (tab$k1/4 + tab$k2/2)
-    tab = tab[order(sortby, decreasing = TRUE), ] # no need for drop = F!
-  }
+  #if(ncol(tab) > 1) {
+  #  sortby = if("GLR" %in% names(tab)) tab$GLR else (tab$k1/4 + tab$k2/2)
+  #  tab = tab[order(sortby, decreasing = TRUE), ] # no need for drop = F!
+  #}
 
   if(usealias && !is.null(alias1)) {
     tab$id1 = alias1[tab$id1]
