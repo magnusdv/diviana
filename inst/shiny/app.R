@@ -221,8 +221,8 @@ ui = bs4Dash::bs4DashPage(
         ),
       ),
     )
-  )))
-)
+  ))
+))
 
 
 
@@ -335,6 +335,8 @@ server = function(input, output, session) {
     mut = getLocusAttributes(am1, attribs = "mutmod", simplify = TRUE)
     externalLoci$db = db
     externalLoci$mut = mut
+    # TODO: mutation models are not automatically applied!!
+    # Currently requires to click "Apply to all markers"
 
     updateRadioButtons(session, "dbtype", selected = "data")
     updateRadioButtons(session, "mutmodel", selected = "data")
@@ -549,8 +551,8 @@ server = function(input, output, session) {
       showErr("No pedigrees to show")
     req(nPed() > 0)
     showModal(modalDialog(
-      style = "height: 600px",
-      title = "Main DVI plot",
+      style = "width: fit-content; height: 600px",
+      title = "DVI overview",
       plotOutput("plotdvi"),
       easyClose = TRUE,
       class = "autowide"

@@ -33,6 +33,12 @@ midHeading = function(x)
 bold = function(x) strong(x, .noWS = "outside")
 ital = function(x) em(x, .noWS = "outside")
 
+mylink = function(text, href, .noWS = "outside", ...) {
+  if(missing(href))
+    href = text
+  shiny::a(text, href = href, .noWS = .noWS, target = "_blank", ...)
+}
+
 .generateLabs = pedtools:::generateLabs
 
 .addChild = function(x, ids, sex, avoid = NULL) {

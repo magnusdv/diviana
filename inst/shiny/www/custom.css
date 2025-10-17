@@ -18,7 +18,7 @@
 .aligned-row .bttn-jelly.bttn-sm {padding-top: 0; padding-bottom: 0;}
 
 .navbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: nowrap; }
-.navbar .nav-item {font-size: large; white-space: nowrap}
+.navbar .nav-item {font-size: larger; white-space: nowrap}
 
 .modal-title, .modal-footer {width: 100%}
 .tab-pane {padding: 0}
@@ -60,10 +60,16 @@
 }
 */
 
+
 .modal-content:has(.modal-body.autowide) {
   width: fit-content !important;
   height: fit-content !important;
 }
+
+
+/* center the modal horizontally */
+.modal-dialog.autowide { margin: 1.75rem auto; }
+
 
 
 /* Analysis tab -----------------------------------*/
