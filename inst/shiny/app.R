@@ -20,6 +20,11 @@ addResourcePath("icons", system.file("shiny/www/static_icons", package = "divian
 
 # TODO----------------------------------------------------------------
 #
+# * Pedbuilder: trashcan -> back arrow?
+# * Family name editor
+# * DVI overview: center plot on screen
+# * Update plots when editing AM names
+#
 # DATA
 # * Reset all button
 # * Genemapper wide + Relationship
@@ -79,6 +84,7 @@ ui = bs4Dash::bs4DashPage(
   # Main panel
   bs4DashBody(
     includeCSS("www/custom.css"),
+    tags$head(includeHTML(system.file("shiny/www/GA.html", package = "diviana"))),
     tags$head(tags$script(src = "scripts.js")),
 
     useShinyjs(),
@@ -128,7 +134,13 @@ ui = bs4Dash::bs4DashPage(
                            width = "100%", style = "white-space:nowrap; margin:0")
           )
         )
-    ))),
+    )),
+    br(),
+    p("This is DIVIANA version", "0.3.1", "(",
+      mylink("changelog", "https://github.com/magnusdv/diviana/blob/master/NEWS.md"), ").",
+      "DIVIANA is still under development. If you experience problems, please file an issue ",
+      mylink("here", "https://github.com/magnusdv/diviana/issues"), ".")
+   ),
 
     # Tab: AM data and pedigrees -----------------------------------------------
 
