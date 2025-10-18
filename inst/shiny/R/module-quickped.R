@@ -5,6 +5,7 @@ pedigreeUI = function(id, famid = "F1", references = NULL) {
   ### Button factory
   myBtn = function(id, label, mar = "2px", side = NULL, style = NULL,
                    width = "100%", tt = NULL, ...) {
+
     sty = paste("padding:2px; line-height:100%;",
                sprintf("margin: %s;", mar), style)
     if(!is.null(side))
@@ -48,7 +49,7 @@ pedigreeUI = function(id, famid = "F1", references = NULL) {
        ),
 
        div(class = "aligned-row-wide", style = "font-weight: bold; margin-bottom: -8px; margin-top: 12px;",
-           p("Reference", style = "margin-bottom:0"),
+           p("References", style = "margin-bottom:0"),
            myBtn("untyped", myIcon("trash-can", align = "-0.1em"),
                  width = "auto", tt = "right",
                  style = "padding:0 3px 0 0; background-color:inherit; border: none"),
@@ -258,9 +259,13 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
                 colnames = "",
                 options = list(dom = 't', pageLength = -1, scrollY = "200px",
                              scrollCollapse = TRUE, ordering = FALSE,
-                             language = list(zeroRecords = "No available refs"))) |>
-        DT::formatStyle(names(df), target = "row", lineHeight = "75%") |>
-        DT::formatStyle(names(df), fontSize = "85%")
+                             language = list(zeroRecords = "No further AM samples"))) |>
+        DT::formatStyle(names(df),
+                        target = "row",
+                        lineHeight = "75%",
+                        fontSize = "85%",
+                        whiteSpace = "nowrap"
+        )
     })
 
     observeEvent(input$refTable_rows_selected, {

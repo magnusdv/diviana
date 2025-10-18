@@ -13,7 +13,8 @@ mySvg = function(name, height = 1, align = "-0.1em") {
 
 # Pedigree builder
 
-This tool allows you to create and edit the reference families in your DVI case. Importantly, this is where you tell the program ___who is missing___, and the identity of the genotyped ___reference individuals___.
+The pedigree builder lets you create and edit the reference families in your DVI case. </br> 
+This is where you tell the program ___who is missing___ and their relation to the ___reference individuals___.
 
 #### 1. Edit the pedigree
 
@@ -37,12 +38,12 @@ or <code style="background-color:orangered;">RESET</code> to start over.
 #### 3. Reference individuals
 
 * **Select** a pedigree member you want to link to a reference sample.
-* **Click** the corresponding entry in the *Reference* list.
+* **Click** the corresponding entry in the *References* list.
 * To **unassign** references, select them in the pedigree and click the trash can 
 `r mySvg("trash-can", height = 1.2, align = "-0.1em")`.
 
-*Result:* Reference individuals are displayed with a hatched symbol in the pedigree. 
-The Reference list always shows the currently not-yet-assigned references.
+*Result:* Reference individuals appear with hatched symbols in the pedigree.  
+AM individuals that have not been assigned anywhere, are given in the *References* list.
 
 #### 4. Save
 
