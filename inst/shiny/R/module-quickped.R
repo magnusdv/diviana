@@ -21,7 +21,10 @@ pedigreeUI = function(id, famid = "F1", references = NULL) {
     useShinyjs(),
     column(width = 3,
 
-       p("Add", style = "font-weight:bold; margin-bottom: 0; margin-top:-5px"),
+       p("Family label", style = "font-weight:bold; margin-bottom: 0; margin-top:-5px"),
+       textInput(ns("famid"), label = NULL, value = famid, width = "100%"),
+
+       p("Add", style = "font-weight:bold; margin-bottom: 0; margin-top:10px"),
        div(class = "aligned-row-wide",
            myBtn("child", "Child", side = "left"),
            myBtn("parents", "Parents", side = "right"),
@@ -81,20 +84,23 @@ pedigreeUI = function(id, famid = "F1", references = NULL) {
 }
 
 pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
-                          allrefs = NULL, avoidLabs = NULL, currentModal = NULL, .debug = NULL) {
+                          allrefs = NULL, avoidLabs = NULL, currentModal = NULL,
+                          .debug = NULL) {
 
   avoid = c(allrefs, avoidLabs$vics, avoidLabs$labs)
+  avoidFamids = setdiff(avoidLabs$famids, famid)
 
   if(is.null(initialDat)) {
     ids = .generateLabs(character(0), 3, avoid = avoid)
     initialDat = list(ped = nuclearPed(father = ids[1], mother = ids[2], children = ids[3]),
-                      miss = character(), refs = character())
+                      famid = famid, miss = character(), refs = character())
   }
 
   moduleServer(id, function(input, output, session) {
     ns = session$ns
 
     currData = reactiveValues(ped = initialDat$ped,
+                              famid = initialDat$famid,
                               miss = initialDat$miss,
                               refs = initialDat$refs,
                               refOrigName = initialDat$refOrigName)
@@ -122,6 +128,14 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
     # Return (or cancel) ------------------------------------------------------
 
     observeEvent(input$save, { .debug("--ped module: save")
+      if(currData$famid %in% avoidFamids) {
+        showErr("Family label is already in use by another family")
+        return()
+      }
+      if(currData$famid == "") {
+        showErr("Family label cannot be empty")
+        return()
+      }
       removeModal()
       resultVar(reactiveValuesToList(currData))
     })
@@ -133,10 +147,13 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
 
     # Update pedigree ---------------------------------------------------------
 
-    updatePedData = function(ped = currData$ped, miss = currData$miss,
+    updatePedData = function(ped = currData$ped,
+                             famid = currData$famid,
+                             miss = currData$miss,
                              refs = currData$refs, clearSel = TRUE) {
       .debug("--ped module: update data")
       currData$ped = req(ped)
+      currData$famid = trimws(famid)
       currData$miss = .myintersect(ped$ID, miss)
       currData$refs = .myintersect(ped$ID, refs)
 
@@ -148,6 +165,10 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
     }
 
     # Modify pedigree ---------------------------------------------------------
+
+    observeEvent(input$famid, { .debug("--ped module: edit family name")
+      updatePedData(famid = input$famid, clearSel = FALSE)
+    }) |> debounce(200)
 
     observeEvent(input$child, { .debug("--ped module: add child")
       newped = tryCatch(
@@ -289,7 +310,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       currData$refOrigName = ron
 
       updatePedData(ped = newped, refs = newrefs)
-  })
+    })
 
     observeEvent(input$setref, { .debug("--ped module: set reference")
       id = req(sel())
@@ -350,6 +371,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
     output$plot = renderPlot({ .debug("--ped module: plot")
       x = req(currData$ped)
 
+      famid = currData$famid
       miss = currData$miss
       refs = currData$refs
       dat = tryCatch(

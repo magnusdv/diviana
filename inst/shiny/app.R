@@ -4,7 +4,6 @@ suppressMessages(suppressPackageStartupMessages({
   library(shinyWidgets)
   library(shinyjs)
   library(DT)
-  #library(shinyBS)
   library(gt)
   library(pedtools)
   library(pedmut)
@@ -16,14 +15,17 @@ suppressMessages(suppressPackageStartupMessages({
 }))
 
 # Add path to icons
-addResourcePath("icons", system.file("shiny/www/static_icons", package = "diviana"))
+addResourcePath("icons", "www/static_icons")
 
 # TODO----------------------------------------------------------------
 #
 # * Pedbuilder: trashcan -> back arrow?
-# * Family name editor
+# * pedbuilder: slimmer family label; fatter buttons
 # * DVI overview: center plot on screen
 # * Update plots when editing AM names
+#
+# AM data
+# * Family column
 #
 # DATA
 # * Reset all button
@@ -33,7 +35,7 @@ addResourcePath("icons", system.file("shiny/www/static_icons", package = "divian
 #
 # PED
 # * Select references: no line wrap
-# * DELETE ped!
+# * delete ped (done??)
 #
 #
 # TRIANGLES
@@ -42,7 +44,7 @@ addResourcePath("icons", system.file("shiny/www/static_icons", package = "divian
 #---------------------------------------------
 
 
-DEVMODE = F
+DEVMODE = T
 
 DATASETS = c("example1", "example2", "exclusionExample", "fire", "grave", "icmp", "planecrash")
 
@@ -69,9 +71,12 @@ ui = bs4Dash::bs4DashPage(
     ),
     rightUi = tagList(tags$li(class = "nav-item dropdown",
       div(class = "aligned-row", style = "margin-right: 22.5px; gap: 15px;",
-        awesomeCheckbox("usealias", "Alias", value = TRUE, width = "auto", status = "success") |> wrap_tooltip("usealias", "bottom"),
-        downloadBttn("downloaddata", NULL, style = "jelly", color = "warning", size = "m")|> wrap_tooltip("downloaddata", "bottom"),
-        actionBttn("resetall", icon("redo"), style = "jelly", color = "danger", size = "m") |> wrap_tooltip("resetall", "bottom"),
+        awesomeCheckbox("usealias", "Alias", value = TRUE, width = "auto", status = "success") |>
+          wrap_tooltip("usealias", "bottom"),
+        downloadBttn("downloaddata", NULL, style = "jelly", color = "warning", size = "m")|>
+          wrap_tooltip("downloaddata", "bottom"),
+        actionBttn("resetall", icon("redo"), style = "jelly", color = "danger", size = "m") |>
+          wrap_tooltip("resetall", "bottom"),
         selectInput("example", NULL, choices = c("Load example" = "", DATASETS), width = "200px")
       )
     ))
@@ -84,7 +89,7 @@ ui = bs4Dash::bs4DashPage(
   # Main panel
   bs4DashBody(
     includeCSS("www/custom.css"),
-    tags$head(includeHTML(system.file("shiny/www/GA.html", package = "diviana"))),
+    tags$head(includeHTML("www/GA.html")),
     tags$head(tags$script(src = "scripts.js")),
 
     useShinyjs(),
@@ -445,7 +450,8 @@ server = function(input, output, session) {
     isNewPed(TRUE)
     uniqueID = uniquify("quickpedModule")
 
-    avoidLabs = list(vics = names(mainPM()),
+    avoidLabs = list(famids = names(mainAM()),
+                     vics = names(mainPM()),
                      refs = if(nPed() > 0) typedMembers(mainAM()) else NULL,
                      miss = mainMissing(),
                      labs = labels(mainAM()))
@@ -468,16 +474,19 @@ server = function(input, output, session) {
     curr = req(pedigrees()[[curped]])
     uniqueID = uniquify("quickpedModule")
     allrefs = rownames(genoAM())
+    famids = names(mainAM())
 
     otherFams = mainAM()[-curped]
-    avoidLabs = list(vics = names(mainPM()),
+    avoidLabs = list(famids = famids[-curped],
+                     vics = names(mainPM()),
                      refs = if(nPed() > 1) typedMembers(otherFams) else NULL,
                      miss = setdiff(mainMissing(), curr$ped$ID),
                      labs = labels(otherFams))
 
     pedigreeServer(uniqueID, resultVar = pedFromModule, initialDat = curr,
-                   famid = paste0("F", curped),
-                   allrefs = allrefs, avoidLabs = avoidLabs,
+                   famid = famids[curped],
+                   allrefs = allrefs,
+                   avoidLabs = avoidLabs,
                    currentModal = currentModal,
                    .debug = .debug)
   })
@@ -499,11 +508,12 @@ server = function(input, output, session) {
     peds = pedigrees()
     if(isNewPed()) {
       idx = nPed() + 1
-      peds[[paste0("F", idx)]] = newdat
+      peds[[newdat$famid]] = newdat
     }
     else {
       idx = curPed()
       peds[[idx]] = newdat
+      names(peds)[idx] = newdat$famid
     }
     pedigrees(peds)
     curPed(idx)
@@ -511,10 +521,11 @@ server = function(input, output, session) {
   })
 
   output$pedplot = renderPlot({ .debug("plot current pedigree:", curPed());
-    req(curPed() > 0)
+    curped = curPed()
+    req(curped > 0)
     peds = pedigrees()
-    peddat = peds[[curPed()]]
-    title = names(peds)[curPed()]
+    peddat = peds[[curped]]
+    title = names(peds)[curped]
     miss = peddat$miss
     refs = peddat$refs
     labs = c(refs, miss)
@@ -798,6 +809,7 @@ server = function(input, output, session) {
   observe({
     if(DEVMODE) { .debug("devmode!")
       updateSelectInput(session, "example", selected = "example1")
+      updateNavbarTabs(session, "navmenu", selected = "amdata")
     }
   })
 
