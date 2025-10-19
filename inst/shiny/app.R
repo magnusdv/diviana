@@ -529,11 +529,16 @@ server = function(input, output, session) {
     miss = peddat$miss
     refs = peddat$refs
     labs = c(refs, miss)
+    ngen = generations(peddat$ped)
+    topmar = switch(ngen, 5,5,3,2)
+    botmar = topmar - 1
+    sidemar = switch(ngen, 6,6,4,2)
+    margins = c(botmar, sidemar, topmar, sidemar)
     if(input$usealias)
       labs = useAlias(labs, aliasAM())
 
     plot(peddat$ped, title = title, hatched = refs, cex = 1.2, cex.main = 1.5,
-         margins = c(1,3,2,3), labs = labs, foldLabs = 8,
+         margins = margins, labs = labs, foldLabs = 8,
          carrier = miss, col = list("red" = miss), lwd = list("1.2" = miss))
     box("outer", col = 1)
   },
