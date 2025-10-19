@@ -1,6 +1,7 @@
 /* Custom CSS for the Diviana shiny app */
 
 .card-title { width: 100%; }
+.card-body { padding: 0.75rem 1.25rem; } /* default: all 1.25rem */
 
 .checkbox label > span { font-weight: normal;}
 .checkbox label { margin-bottom:0}
