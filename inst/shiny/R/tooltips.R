@@ -2,6 +2,7 @@
 TT = list(
   usealias = "Use aliases in plots/tables",
   resetall = "Reset all",
+  settings = "Open settings window",
   downloaddata = "Download R/dviData",
   downloadRes = "Export results to Excel",
   debug = "Debugging mode",

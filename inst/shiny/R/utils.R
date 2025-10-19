@@ -246,3 +246,13 @@ changeSex = function(ped, ids, sex) {
     swapSex(ids[currentSex == (3-sex)], verbose = FALSE) |>
     setSex(ids[currentSex == 0], sex = sex)
 }
+
+# `labs` function for pedigree plots
+getLabfun = function(dvi, hide, alias, aliasAM) {
+  function(x) {
+    labs = if(hide) c(dvi$missing, typedMembers(x)) else labels(x)
+    if(alias)
+      labs = useAlias(labs, aliasAM)
+    labs
+  }
+}

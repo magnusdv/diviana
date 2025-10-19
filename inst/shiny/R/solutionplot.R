@@ -1,6 +1,6 @@
 
 # Temporary name waiting for better solution in dvir
-plotSolutionDIVIANA = function(dvi, summary, pednrs = NULL, ...) { # summaryAM
+plotSolutionDIVIANA = function(dvi, summary, pednrs = NULL, labs = dvi$missing, ...) { # summaryAM
 
   Nped = length(dvi$am)
   if(is.null(pednrs))
@@ -23,8 +23,6 @@ plotSolutionDIVIANA = function(dvi, summary, pednrs = NULL, ...) { # summaryAM
   stillmiss = setdiff(miss, unlist(groups[c("Undisputed", "Match (GLR)", "Symmetric match", "Probable", "Disputed")]))
   linecol = list("red" = c(excl, stillmiss))
   carrier = stillmiss
-
-  labs = dvi$missing
 
   tryCatch(
     plotDVI(dvi, style = 0, pm = FALSE, am = pednrs, labs = labs, nrowAM = if(Nped > 4) 2 else NA,

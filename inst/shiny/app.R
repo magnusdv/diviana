@@ -71,13 +71,13 @@ ui = bs4Dash::bs4DashPage(
     ),
     rightUi = tagList(tags$li(class = "nav-item dropdown",
       div(class = "aligned-row", style = "margin-right: 22.5px; gap: 15px;",
-        awesomeCheckbox("usealias", "Alias", value = TRUE, width = "auto", status = "success") |>
-          wrap_tooltip("usealias", "bottom"),
+        actionBttn("settings", icon("gear"), style = "jelly", color = "success", size = "m") |>
+          wrap_tooltip("settings", "bottom"),
         downloadBttn("downloaddata", NULL, style = "jelly", color = "warning", size = "m")|>
           wrap_tooltip("downloaddata", "bottom"),
         actionBttn("resetall", icon("redo"), style = "jelly", color = "danger", size = "m") |>
           wrap_tooltip("resetall", "bottom"),
-        selectInput("example", NULL, choices = c("Load example" = "", DATASETS), width = "200px")
+        selectInput("example", NULL, choices = c("Load example" = "", DATASETS), width = "200px"),
       )
     ))
   ),
@@ -525,19 +525,23 @@ server = function(input, output, session) {
     req(curped > 0)
     peds = pedigrees()
     peddat = peds[[curped]]
+
     title = names(peds)[curped]
+    ped = peddat$ped
     miss = peddat$miss
     refs = peddat$refs
-    labs = c(refs, miss)
-    ngen = generations(peddat$ped)
+
+    labs = if(settings$hideUnimportantLabs) c(refs, miss) else ped$ID
+    if(settings$useAliases)
+      labs = useAlias(labs, aliasAM())
+
+    ngen = generations(ped)
     topmar = switch(ngen, 5,5,3,2)
     botmar = topmar - 1
     sidemar = switch(ngen, 6,6,4,2)
     margins = c(botmar, sidemar, topmar, sidemar)
-    if(input$usealias)
-      labs = useAlias(labs, aliasAM())
 
-    plot(peddat$ped, title = title, hatched = refs, cex = 1.2, cex.main = 1.5,
+    plot(ped, title = title, hatched = refs, cex = 1.2, cex.main = 1.5,
          margins = margins, labs = labs, foldLabs = 8,
          carrier = miss, col = list("red" = miss), lwd = list("1.2" = miss))
     box("outer", col = 1)
@@ -593,10 +597,9 @@ server = function(input, output, session) {
     dvi = currentDviData()
     req(length(dvi$am) > 0, length(dvi$pm) > 0, length(dvi$missing) > 0)
     labs = c(rownames(genoAM()), rownames(genoPM()), dvi$missing)
-    if(input$usealias)
-      labs = useAlias(labs, c(aliasAM(), aliasPM()))
-
-    tryCatch(plotDVI(dvi, style = 2, labs = labs),
+    labfun = getLabfun(dvi, settings$hideUnimportantLabs, settings$useAliases,
+                       c(aliasAM(), aliasPM()))
+    tryCatch(plotDVI(dvi, style = 2, labs = labfun),
              error = function(e) {
                msg = conditionMessage(e)
                if(grepl("Cannot fit|no room", msg)) msg = "Sorry - the plot is too big!"
@@ -612,9 +615,10 @@ server = function(input, output, session) {
 
   kappa = reactiveValues(am = NULL, pm = NULL, ampm = NULL)
 
-  output$amtable = DT::renderDT(formatCP(kappa$am, input$usealias, alias1 = aliasAM()), server = FALSE)
-  output$ampmtable = DT::renderDT(formatCP(kappa$ampm, input$usealias, alias1 = aliasAM(), alias2 = aliasPM()), server = FALSE)
-  output$pmtable = DT::renderDT(formatCP(kappa$pm, input$usealias, alias1 = aliasPM()), server = FALSE)
+  output$amtable = DT::renderDT(formatCP(kappa$am, settings$useAliases, alias1 = aliasAM()),
+                                server = FALSE)
+  output$ampmtable = DT::renderDT(formatCP(kappa$ampm, settings$useAliases, alias1 = aliasAM(), alias2 = aliasPM()), server = FALSE)
+  output$pmtable = DT::renderDT(formatCP(kappa$pm, settings$useAliases, alias1 = aliasPM()), server = FALSE)
 
   observeEvent(input$acrossComps, {kappa$am = NULL}, ignoreInit = TRUE)
 
@@ -736,23 +740,23 @@ server = function(input, output, session) {
   })
 
   output$amcentric = gt::render_gt({  .debug("render result AM")
-    formatResultTable(req(solutionTable$AM), input$usealias, aliasPM = aliasPM())
+    formatResultTable(req(solutionTable$AM), settings$useAliases, aliasPM = aliasPM())
   }, height = 600)
 
   output$pmcentric = gt::render_gt({  .debug("render result PM")
-    formatResultTable(req(solutionTable$PM), input$usealias, aliasPM = aliasPM())
+    formatResultTable(req(solutionTable$PM), settings$useAliases, aliasPM = aliasPM())
   }, height = 600)
 
   output$lrmatrix = gt::render_gt({ .debug("render LR matrix")
     dvi = currentDviData()
     m = req(solutionTable$LR) |> completeMatrix(names(dvi$pm), dvi$missing)
-    formatLRmatrix(m, input$LRthresh, input$usealias, aliasPM = aliasPM())
+    formatLRmatrix(m, input$LRthresh, settings$useAliases, aliasPM = aliasPM())
   }, height = 600)
 
   output$exmatrix = gt::render_gt({ .debug("render exclusion matrix")
     dvi = currentDviData()
     m = req(solutionTable$EX) |> completeMatrix(names(dvi$pm), dvi$missing)
-    formatExclusionMatrix(m, input$maxIncomp, input$usealias, aliasPM = aliasPM())
+    formatExclusionMatrix(m, input$maxIncomp, settings$useAliases, aliasPM = aliasPM())
   }, height = 600)
 
   output$solvelog = renderText({ .debug("render result log")
@@ -765,10 +769,9 @@ server = function(input, output, session) {
     dvi = currentDviData()
     req(length(dvi$am) > 0, length(dvi$pm) > 0, length(dvi$missing) > 0)
     pednr = seq(curSols() * 6 - 5, min(nPed(), curSols() * 6))
-    plotSolutionDIVIANA(dvi, solutionTable$AM, pednr = pednr)
+    labfun = getLabfun(dvi, settings$hideUnimportantLabs, settings$useAliases, aliasAM())
+    plotSolutionDIVIANA(dvi, solutionTable$AM, pednr = pednr, labs = labfun)
   }, res = 96, width = "auto", height = 600, execOnResize = TRUE)
-
-
 
   # Download solution tables ------------------------------------------------
 
@@ -784,6 +787,32 @@ server = function(input, output, session) {
     },
     contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )
+
+
+  # Settings dialog ----------------------------------------------------------
+
+  settings = reactiveValues(hideUnimportantLabs = TRUE,
+                            useAliases = TRUE)
+
+  observeEvent(input$settings, {
+    showModal(modalDialog(
+      h3("Settings"),
+      awesomeCheckbox("hideUnimportantLabs", "Hide irrelevant names in pedigree plots",
+                      value = settings$hideUnimportantLabs, width = "auto"),
+      awesomeCheckbox("useAliases", "Use aliases (short names) in plots and tables",
+                      value = settings$useAliases, width = "auto"),
+      easyClose = TRUE,
+      footer = modalButton("Save and close"),
+    ))
+  })
+
+  observeEvent(input$hideUnimportantLabs, {
+    settings$hideUnimportantLabs = input$hideUnimportantLabs
+  })
+
+  observeEvent(input$useAliases, {
+    settings$useAliases = input$useAliases
+  })
 
   # Reset -------------------------------------------------------------------
 
