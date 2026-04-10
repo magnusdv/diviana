@@ -120,3 +120,41 @@ jellyBttn = function(id, label = NULL, height = 30, margin = "0 0 3px 0") {
   w
 }
 
+freqRadios = function(id) {
+  tagList(
+    tags$style(HTML("
+      .freq-radios .shiny-input-container { margin-bottom: 1rem; }
+      .freq-radios .control-label { margin-bottom: 0;}
+      .freq-radios label { margin-bottom: 0; }
+    ")),
+    tags$div(
+      class = "form-group shiny-input-radiogroup freq-radios",
+      style = "display:grid;grid-template-columns:auto 1fr;gap:0 16px;align-items:center;",
+
+      tags$input(
+        type = "radio",
+        name = id,
+        value = "builtin",
+        checked = "checked"
+      ),
+      selectInput("builtin", "Builtin", c("NorwegianFrequencies")),
+
+      tags$input(
+        type = "radio",
+        name = id,
+        value = "custom"
+      ),
+      fileInput("custom", "Custom"),
+
+      tags$input(
+        type = "radio",
+        name = id,
+        value = "dataset"
+      ),
+      tags$div(
+        tags$label("In dataset"),
+        textOutput("database_famname")
+      )
+    )
+  )
+}

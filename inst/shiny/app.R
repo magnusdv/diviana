@@ -64,8 +64,8 @@ ui = bs4Dash::bs4DashPage(
     ),
     navbarMenu(
          id = "navmenu",
-         navbarTab(tabName = "pmdata", text = "PM DATA"),
-         navbarTab(tabName = "amdata", text = "AM DATA"),
+         navbarTab(tabName = "database", text = "DATABASE"),
+         navbarTab(tabName = "data", text = "DATA"),
          navbarTab(tabName = "relatedness", text = "RELATEDNESS"),
          navbarTab(tabName = "analysis", text = "ANALYSIS")
     ),
@@ -97,38 +97,29 @@ ui = bs4Dash::bs4DashPage(
 
    tabItems(
 
-   # Tab: PM data (and other input) -------------------------------------------
+   # Tab: Marker database -------------------------------------------
 
-   tabItem("pmdata",
-      fluidRow(column(width = 7, dataUI("PM")),
+   tabItem("database",
+    fluidRow(
+      column(width = 4,
 
-      # Database -----------------------------------------------
+        # Frequency source- -----------------------------------------
 
-      column(width = 5,
-        bs4Card(width = 12, collapsible = FALSE, title = "Database",
-          radioButtons("dbtype", "Allele frequencies", inline = TRUE, width = "100%",
-                       selected = character(0),
-                       choices = c("Built-in" = "builtin",
-                                   "Custom file" = "custom",
-                                   "In dataset" = "data")),
-          conditionalPanel(
-            condition = "input.dbtype == 'builtin'",
-            pickerInput("dbselect", NULL, choices = "NorwegianFrequencies", selected = NULL,
-                        options = pickerOptions(title = "Builtin database",
-                                                style = "btn-outline-secondary"))
-          ),
-          conditionalPanel(
-            condition = "input.dbtype == 'custom'",
-            fileInput("dbcustom", NULL, accept = c("text/tab-separated-values", "text/plain", ".txt"))
-          ),
-          hr(),
+        bs4Card(width = 12, collapsible = FALSE, title = "Allele frequencies",
+          freqRadios("dbtype")
+        ),
 
-          # Mutation model ----------------------------------------------------------
+        # Mutation model --------------------------------------------
 
-          radioButtons("mutmodel", "Mutation model", inline = TRUE, width = "100%", selected = "none",
-                       choices = c("No model" = "none", Equal = "equal", Prop = "proportional",
+        bs4Card(width = 12, collapsible = FALSE, title = "Mutation model",
+
+          radioButtons("mutmodel", "Mutation model", inline = TRUE, width = "100%",
+                       selected = "none",
+                       choices = c("No model" = "none", Equal = "equal",
+                                   Prop = "proportional",
                                    Stepwise = "stepwise", "In dataset" = "data")),
-          div(id = "mutcontrol", class = "aligned-row-wide", style = "align-items: flex-end; margin: 10px 0;",
+          div(id = "mutcontrol", class = "aligned-row-wide",
+              style = "align-items: flex-end; margin: 10px 0;",
               tagList(tags$style(HTML(
                 "#mutcontrol .control-label {margin-bottom:0; font-size:90%;}
                  #mutcontrol .form-control  {font-size:90%; width:80%; padding:0 10px; height:auto;}")
@@ -139,19 +130,36 @@ ui = bs4Dash::bs4DashPage(
                            width = "100%", style = "white-space:nowrap; margin:0")
           )
         )
-    )),
+      ),
+
+      # Main marker table ---------------------------------------------------------------------------
+
+      column(width = 8,
+        bs4Card(width = 12, collapsible = FALSE, title = "Marker summary",
+          DT::DTOutput("markersummary", width = "fit-content"),
+          footer = div(class = "btn-group",
+            actionButton("chartButton",
+                         label = tagList(myIcon("simple-chart", align = "-0.1em"), " Frequencies")),
+            actionButton("showmutButton",
+                         label = tagList(myIcon("bolt", align = "-0.1em"), "Mutation matrix"))
+          )
+        ),
+      ),
+    ),
+
     br(),
+
     p("This is DIVIANA version", "0.3.1", "(",
       mylink("changelog", "https://github.com/magnusdv/diviana/blob/master/NEWS.md"), ").",
       "DIVIANA is still under development. If you experience problems, please file an issue ",
       mylink("here", "https://github.com/magnusdv/diviana/issues"), ".")
    ),
 
-    # Tab: AM data and pedigrees -----------------------------------------------
+   # Tab: AM/PM data and pedigrees -----------------------------------------------
 
-   tabItem("amdata",
+   tabItem("data",
       fluidRow(
-        column(width = 7, dataUI("AM")),
+        column(width = 7, dataUI("AM"), dataUI("PM")),
         column(
           width = 5, id = "pedcol",
           bs4Card(width = NULL, collapsible = FALSE,
@@ -424,15 +432,68 @@ server = function(input, output, session) {
 
   # Mutation models --------------------------------------------------------
 
+  # NEW!
+  observeEvent(input$mutmodBtn, { .debug("click mutation model button")
+    print(input$markersummary_rows_selected)
+    showModal(modalDialog( #style = "width: fit-content; height: 600px",
+      title = "Mutation model dialog",
+      radioButtons("mutmodel", "Mutation model", inline = TRUE, width = "100%", selected = "none",
+                   choices = c("No model" = "none", Equal = "equal", Prop = "proportional",
+                               Stepwise = "stepwise", "In dataset" = "data")),
+      div(id = "mutcontrol", class = "aligned-row-wide", style = "align-items: flex-end; margin: 10px 0;",
+          tagList(tags$style(HTML(
+            "#mutcontrol .control-label {margin-bottom:0; font-size:90%;}
+             #mutcontrol .form-control  {font-size:90%; width:80%; padding:0 10px; height:auto;}")
+          )),
+          numericInput("mutrateF", "Female rate", width = "90%", min = 0, max = 1, value = NULL),
+          numericInput("mutrateM", "Male rate", width = "90%",   min = 0, max = 1, value = NULL),
+          actionButton("mutApplyAll", label = tagList(icon("globe"), "Apply to all markers"),
+                       width = "100%", style = "white-space:nowrap; margin:0")
+      ),
+      easyClose = TRUE,
+      class = "autowide"
+    ))
+  })
+
   mutParams = reactive(list(model = input$mutmodel,
                             rate = list(female = input$mutrateF, male = input$mutrateM),
-                            fullmods = if(input$mutmodel == "data") externalLoci$mut))
+                            fullmods = if(isTRUE(input$mutmodel == "data")) externalLoci$mut) |> print())
 
   observeEvent(input$mutApplyAll, { .debug("mutations: apply all")
     newloci = .updateDB(req(locusAttrs()), mutParams())
     locusAttrs(newloci)
     showNotification("Updated mutation parameters", type = "message")
   })
+
+
+  # Database: Marker summary table ------------------------------------------
+
+  output$markersummary = DT::renderDT(formatDatabaseTable(markerSummary(am = mainAM())))
+
+  observeEvent(input$chartButton, { .debug("freq chart")
+    i = input$markersummary_rows_selected; print(i)
+    req(length(i) == 1)
+    marker = req(names(DB())[i])
+    freqs = req(DB()[[i]])
+    output$freqPlot = renderPlot(plotFreqs(freqs, marker))
+    output$freqTable = DT::renderDT(formatFreqTable(freqs))
+
+    showModal(modalDialog(
+      title = paste("Allele frequencies:", marker),
+      size = "l",
+      tags$div(
+        style = "display:flex;align-items:flex-start;gap:15px;",
+        tags$div(style = "flex:0 0 75%;",
+          plotOutput("freqPlot", height = 350)
+        ),
+        tags$div(style = "flex:0 0 25%;",
+          DT::DTOutput("freqTable", height = 350)
+        )
+      ),
+      easyClose = TRUE
+    ))
+  })
+
 
   # Pedigrees -----------------------------------------------------------
 
