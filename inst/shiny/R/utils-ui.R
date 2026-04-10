@@ -37,10 +37,10 @@ triangleCard = function(title, idpref) {
   id = paste0(idpref, c("kappa", "triangle", "table"))
   calcBtn = actionButton(id[1], "Calculate", class = "btn-sm",
                          icon = icon("play"), style = "margin-left: 30px;")
-  if(idpref == "am")
-    calcBtn = div(class = "aligned-row",
-                  div(checkboxInput("acrossComps", HTML("Across<br>components"), width = "auto"), style = "font-size: small;"),
-                  calcBtn)
+  #if(idpref == "am")
+  #  calcBtn = div(class = "aligned-row",
+  #                div(checkboxInput("acrossComps", HTML("Across<br>components"), width = "auto"), style = "font-size: small;"),
+  #                calcBtn)
 
   bs4Dash::bs4Card(
     width = 4,
