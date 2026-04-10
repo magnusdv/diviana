@@ -6,7 +6,7 @@ pedigreeUI = function(id, famid = "F1", references = NULL) {
   myBtn = function(id, label, mar = "2px", side = NULL, style = NULL,
                    width = "100%", tt = NULL, ...) {
 
-    sty = paste("padding:2px; line-height:100%;",
+    sty = paste("padding:3px; line-height:100%;",
                sprintf("margin: %s;", mar), style)
     if(!is.null(side))
       sty = paste(sty, sprintf("margin-%s: 0;", side))

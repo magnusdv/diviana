@@ -1,9 +1,10 @@
 
 dataUI = function(id, title = paste(id, "data")) {
   ns = NS(id)
-  bs4Card(width = NULL, title = title, collapsible = FALSE,
-    DT::DTOutput(ns("mainTable"), width = "fit-content", height = "400px"),
-    tags$head(tags$style(HTML(sprintf("#%s {width:fit-content; max-width: 100%%;}", ns("mainTable"))))),
+  bs4Card(width = NULL, title = title, collapsible = TRUE,
+    DT::DTOutput(ns("mainTable"), width = "fit-content"), #, height = "400px"),
+    tags$head(tags$style(HTML(
+      sprintf("#%s {width:fit-content; max-height: 400px; max-width: 100%%;}", ns("mainTable"))))),
     br(),
     shiny::uiOutput(ns("sourcefield")),
     footer = div(class = "btn-group",

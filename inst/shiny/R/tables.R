@@ -115,7 +115,7 @@ formatDatabaseTable = function(df) {
       autoWidth = T,
       scrollY = if(nrow(df) > 10) "550px" else NULL
     )) |>
-    DT::formatStyle("Chart", borderRight = "2px solid #ddd")
+    DT::formatStyle("Model", borderLeft = "2px solid #ddd")
 }
 
 

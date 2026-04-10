@@ -97,15 +97,6 @@ slimCheck = function(id, height = 25) {
   w
 }
 
-# Not used? # p() for single line of given height
-simplePar = function(text, height, style = NULL) {
-  w = p(text)
-  style1 = sprintf("height: %dpx; line-height: %dpx; margin:0; padding: 0 3px;",
-                   height, height)
-  w$attribs$style = paste(style1, style)
-  w
-}
-
 myIcon = function(name, height = 1, align = "middle") {
   tags$img(src = sprintf("icons/%s.svg", name),
            style = sprintf("height:%gem; width:auto; vertical-align:%s;", height, align))

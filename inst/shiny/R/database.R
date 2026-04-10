@@ -1,5 +1,5 @@
 
-.updateDB = function(loci, mutParams) {
+.updateDB = function(loci, mutParams) { #print(mutParams)
   mod = mutParams$model
   if(is.null(mod) || mod == "none") {
     for(m in names(loci)) loci[[m]]$mutmod = NULL

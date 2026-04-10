@@ -1,30 +1,28 @@
-#' Generate table of marker data
+#' Summary table of marker information
 #'
-#' @param dvi A `dviData` object
+#' @param dvi A `dvir::dviData` object.
+#' @param locAttrs Optional locus attributes, typically from
+#'   `pedtools::getLocusAttributes(dvi$am)`, supplied instead of `dvi`.
 #'
 #' @return A data frame.
 #'
 #' @examples
 #' markerSummary(planecrash)
 #'
-markerSummary = function(dvi = NULL, am = NULL, pm = NULL) { print("in marker summary...")
-  if(!is.null(dvi))
+markerSummaryDiviana = function(dvi = NULL, locAttrs = NULL) {
+  if(!is.null(dvi)) {
     dvi = dvir:::consolidateDVI(dvi)
+    locAttrs = pedtools::getLocusAttributes(dvi$am, checkComps = TRUE)
+  }
 
-  am = am %||% dvi$am
-  pm = pm %||% dvi$pm
-
-  # List of lists: Marker attributes
-  #print(am)
-
-  if(is.null(am) && is.null(pm))
+  if(!length(locAttrs))
     return()
-  locAttrsAM = pedtools::getLocusAttributes(am, checkComps = TRUE)
 
-  reslist = lapply(locAttrsAM, function(a) {
+  reslist = lapply(locAttrs, function(a) {
     mut = a$mutmod
     pars = pedmut::getParams(mut, c("model", "rate", "rate2", "range"), format = 3)
     colnames(pars) = c("Model", "Rate", "Rate2", "Range")
+
     if(is.na(pars$Model))
       pars$Model = "No model"
     else
@@ -38,11 +36,9 @@ markerSummary = function(dvi = NULL, am = NULL, pm = NULL) { print("in marker su
     data.frame(Marker = a$name,
                Alleles = length(a$alleles),
                PIC = PIC(a$afreq) |> round(2),
-               Chart = "",
                pars,
                Stat = stattxt,
-               Lump = lumptxt,
-               Mut = "")
+               Lump = lumptxt)
   })
 
   res = do.call(rbind, reslist)

@@ -28,11 +28,11 @@ addResourcePath("icons", "www/static_icons")
 # * Family column
 #
 # DATA
-# * Reset all button
 # * Genemapper wide + Relationship
 # * Download dviData (not only debug)
 # * Plot fires twice!!!
-#
+# * Sex: Update plots when edit, and vice versa?
+
 # PED
 # * Select references: no line wrap
 # * delete ped (done??)
@@ -321,7 +321,7 @@ server = function(input, output, session) {
   mainAM = reactive({ .debug("mainAM")
     if(is.null(g <- genoAM()) || is.null(peddata <- pedigrees()))
       return(NULL)
-    g[g==""] = NA
+    g[g == ""] = NA
 
     peds = lapply(peddata, `[[`, "ped")
 
@@ -681,10 +681,10 @@ server = function(input, output, session) {
   output$ampmtable = DT::renderDT(formatCP(kappa$ampm, settings$useAliases, alias1 = aliasAM(), alias2 = aliasPM()), server = FALSE)
   output$pmtable = DT::renderDT(formatCP(kappa$pm, settings$useAliases, alias1 = aliasPM()), server = FALSE)
 
-  observeEvent(input$acrossComps, {kappa$am = NULL}, ignoreInit = TRUE)
+  observeEvent(settings$acrossComps, {kappa$am = NULL}, ignoreInit = TRUE)
 
   observeEvent(input$amkappa, { .debug("am-kappa")
-    kappa$am = CPnoplot(req(mainAM()), acrossComps = input$acrossComps)
+    kappa$am = CPnoplot(req(mainAM()), acrossComps = settings$acrossComps)
   })
 
   output$amtriangle = renderPlotly({ .debug("am triangle")
@@ -853,27 +853,29 @@ server = function(input, output, session) {
   # Settings dialog ----------------------------------------------------------
 
   settings = reactiveValues(hideUnimportantLabs = TRUE,
-                            useAliases = TRUE)
+                            useAliases = TRUE,
+                            acrossComps = FALSE)
 
   observeEvent(input$settings, {
     showModal(modalDialog(
       h3("Settings"),
+      h4("Names and aliases"),
       awesomeCheckbox("hideUnimportantLabs", "Hide irrelevant names in pedigree plots",
                       value = settings$hideUnimportantLabs, width = "auto"),
       awesomeCheckbox("useAliases", "Use aliases (short names) in plots and tables",
                       value = settings$useAliases, width = "auto"),
+      br(),
+      h4("Relatedness analysis"),
+      awesomeCheckbox("acrossComps", "Include AM-AM comparisons across families",
+                      value = settings$acrossComps, width = "auto"),
       easyClose = TRUE,
       footer = modalButton("Save and close"),
     ))
   })
 
-  observeEvent(input$hideUnimportantLabs, {
-    settings$hideUnimportantLabs = input$hideUnimportantLabs
-  })
-
-  observeEvent(input$useAliases, {
-    settings$useAliases = input$useAliases
-  })
+  observeEvent(input$hideUnimportantLabs, {settings$hideUnimportantLabs = input$hideUnimportantLabs})
+  observeEvent(input$useAliases, {settings$useAliases = input$useAliases})
+  observeEvent(input$acrossComps, {settings$acrossComps = input$acrossComps})
 
   # Reset -------------------------------------------------------------------
 
@@ -903,8 +905,8 @@ server = function(input, output, session) {
 
   observe({
     if(DEVMODE) { .debug("devmode!")
-      updateSelectInput(session, "example", selected = "example1")
-      updateNavbarTabs(session, "navmenu", selected = "amdata")
+      updateSelectInput(session, "example", selected = "planecrash")
+      updateNavbarTabs(session, "navmenu", selected = "database")
     }
   })
 
@@ -961,7 +963,7 @@ server = function(input, output, session) {
       title = NULL,
       div(
         includeHTML(helpfile),
-        style = "height:80vh; overflow-y:auto; font-size: 90%; padding: 0"),
+        style = "max-height:80vh; overflow-y:auto; font-size: 90%; padding: 0"),
       tags$style(HTML("code {
         background-color: #f8f8f8;
         color: #333;
