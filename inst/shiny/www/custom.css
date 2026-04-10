@@ -26,23 +26,23 @@
 
 /* More compact search field for DT tables*/
 .dataTables_filter label, .dataTables_filter input[type='search'] {
- padding:0px 5px; font-size:95%
+  padding:0px 5px; font-size:95%
 }
+
+#markersummary table.dataTable th,
+#markersummary table.dataTable td {padding-bottom: 2px; padding-top: 2px}
 
 #debugdiv .shiny-input-container {width:fit-content;}
 #debugdiv .checkbox {margin:0; line-height:0rem}
 
 .progress.shiny-file-input-progress {display: none !important;}
 
-
 #dvisummary .info-box-content { line-height: 1;}
 #dvisummary { padding: 0;}
 
 .shiny-input-container {margin-bottom: 0;}
 
-.dataTables_empty {
-  font-style: italic; font-size: smaller; text-align: left;
-}
+.dataTables_empty {  font-style: italic; font-size: smaller; text-align: left;}
 
 /* Triangle plots */
 .overlay {position: relative;}

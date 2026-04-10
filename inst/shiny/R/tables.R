@@ -92,6 +92,72 @@ formatResultTable = function(x, usealias = FALSE, aliasPM = NULL, style = 6) {
 
 
 
+# Marker summary table ----------------------------------------------------
+
+
+
+formatDatabaseTable = function(df) {
+  req(!is.null(df))
+
+  for(cl in c("Rate", "Rate2", "Range", "Stat", "Lump")) {
+    if(all(is.na(df[[cl]])))
+      df[[cl]] = NULL
+  }
+
+  DT::datatable(df,
+    class = "stripe nowrap",
+    #escape = FALSE,
+    selection = "single",
+    options = list(
+      dom = "t",
+      paging = FALSE,
+      ordering = FALSE,
+      autoWidth = T,
+      scrollY = if(nrow(df) > 10) "550px" else NULL
+    )) |>
+    DT::formatStyle("Chart", borderRight = "2px solid #ddd")
+}
+
+
+formatFreqTable = function(freqs) {
+  # Sort
+  als = names(freqs)
+  alsnum = suppressWarnings(as.numeric(als))
+  freqs = freqs[order(alsnum, als)]
+
+  # Update vars after sort
+  als = names(freqs)
+  alsnum = suppressWarnings(as.numeric(als))
+
+  # Ad hoc padding to align on "." for alleles < 10
+  singleDigit = !is.na(alsnum) & alsnum < 10
+  als[singleDigit] = paste0(" ", als[singleDigit])
+
+  # Hack to avoid long allele name
+  als[tolower(als) == "rest allele"] = "Rest"
+
+  df = data.frame(Allele = als, Frequency = unname(freqs), check.names = FALSE)
+
+  DT::datatable(
+        df,
+        class = "stripe compact nowrap",
+        rownames = FALSE,
+        selection = "none",
+        width = "100%",
+        options = list(
+          dom = "t",
+          paging = FALSE,
+          ordering = FALSE,
+          scrollX = FALSE,
+          scrollY = if(nrow(df) > 15) "310px" else NULL,
+          scrollCollapse = TRUE,
+          columnDefs = list(list(className = 'dt-left', targets = "_all"))
+        )
+      ) |>
+      DT::formatStyle(names(df), target = "row", lineHeight = "90%") |>
+      DT::formatStyle("Allele", fontFamily = "monospace", whiteSpace = "pre", fontSize = "95%")
+}
+
 # CheckPairwise tables ------------------------------------------------------
 
 CPnoplot = function(x, ...) {
