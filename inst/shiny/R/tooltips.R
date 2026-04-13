@@ -22,7 +22,11 @@ TT = list(
   sibleft = "Sibling to the left",
   sibright = "Sibling to the right",
   untyped = "Unassign selected refs",
-  pedhelp = "Help"
+  pedhelp = "Help",
+  mutApplyAll = "Apply to all markers",
+  mutradio_none = "Disable all mutation models",
+  mutradio_standard = "Apply a common model to all markers (see Settings)",
+  mutradio_original = "Use mutation models from the original input (if available)"
 )
 
 wrap_tooltip = function(tag, id, placement = "top"){

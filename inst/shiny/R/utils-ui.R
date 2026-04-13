@@ -112,6 +112,9 @@ jellyBttn = function(id, label = NULL, height = 30, margin = "0 0 3px 0") {
 }
 
 freqRadios = function(id) {
+
+  norstr = paste("norSTR:", c("Africa", "Europe", "Norway"))
+
   tagList(
     tags$style(HTML("
       .freq-radios .shiny-input-container { margin-bottom: 1rem; }
@@ -119,33 +122,64 @@ freqRadios = function(id) {
       .freq-radios label { margin-bottom: 0; }
     ")),
     tags$div(
+      id = id,
       class = "form-group shiny-input-radiogroup freq-radios",
-      style = "display:grid;grid-template-columns:auto 1fr;gap:0 16px;align-items:center;",
+      style = "display:grid; grid-template-columns:auto 1fr; gap:0 16px; align-items:center;",
 
-      tags$input(
-        type = "radio",
-        name = id,
-        value = "builtin",
-        checked = "checked"
-      ),
-      selectInput("builtin", "Builtin", c("NorwegianFrequencies")),
+      tags$input(type = "radio", name = id, value = "builtin", checked = "checked"),
+      selectInput("builtinDB", "Builtin", c(norstr, "NorwegianFrequencies (legacy)")),
 
-      tags$input(
-        type = "radio",
-        name = id,
-        value = "custom"
-      ),
-      fileInput("custom", "Custom"),
+      tags$input(type = "radio", name = id, value = "custom"),
+      fileInput("customDB", "Custom"),
 
-      tags$input(
-        type = "radio",
-        name = id,
-        value = "dataset"
-      ),
+      tags$input(type = "radio", name = id, value = "original"),
+      tags$div(tags$label("Original"), textOutput("database_famname"))
+    )
+  )
+}
+
+mutRadios = function(id) {
+  tagList(
+    tags$style(HTML("
+      .mut-radios label { margin-bottom: 0; }
+      .mut-radios .standard-rate { position: relative; flex: 1; min-width: 0; }
+      .mut-radios .standard-rate .shiny-input-container { margin-bottom: 0;}
+      .mut-radios .standard-rate input { height: 24px; padding: 2px 0 2px 6px; }
+      .mut-radios .standard-rate .tinylabel {
+        position: absolute; top: -14px; font-size: smaller; line-height: 1; text-align: center; width: 100%;
+      }
+      .mut-radios .bttn-jelly { padding:0 2px; }
+    ")),
+    tags$div(
+      id = id,
+      class = "form-group shiny-input-radiogroup mut-radios",
+      style = "display:grid; grid-template-columns:auto 1fr; gap:20px 16px; align-items:center;",
+
+      tags$input(type = "radio", name = id, value = "none", checked = "checked"),
+      tags$div(tags$label("No model")) |> wrap_tooltip("mutradio_none"),
+
+      tags$input(type = "radio", name = id, value = "standard"),
       tags$div(
-        tags$label("In dataset"),
-        textOutput("database_famname")
-      )
+        style = "display:flex; align-items:center; gap:16px; white-space:nowrap;",
+        tags$label("Standard")|> wrap_tooltip("mutradio_standard"),
+        tags$div(
+          style = "display:flex; align-items:center; gap:8px; flex:1; min-width:0; margin-top:4px",
+          tags$div(
+            class = "standard-rate",
+            tags$div("Female", class = "tinylabel"),
+            numericInput("mutrateF", NULL, width = "100%", min = 0, max = 1, value = 0.001)
+          ),
+          tags$div(
+            class = "standard-rate",
+            tags$div("Male", class = "tinylabel"),
+            numericInput("mutrateM", NULL, width = "100%", min = 0, max = 1, value = 0.002)
+          ),
+          actionBttn("mutApplyAll", label = tagList(myIcon("play", align = "-0.1em")), style = "jelly", size = "s") |>
+          wrap_tooltip("mutApplyAll")
+        )
+      ),
+      tags$input(type = "radio", name = id, value = "original"),
+      tags$div(tags$label("Original")) |> wrap_tooltip("mutradio_original")
     )
   )
 }

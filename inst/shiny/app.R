@@ -101,7 +101,7 @@ ui = bs4Dash::bs4DashPage(
 
    tabItem("database",
     fluidRow(
-      column(width = 4,
+      column(width = 3,
 
         # Frequency source- -----------------------------------------
 
@@ -112,35 +112,19 @@ ui = bs4Dash::bs4DashPage(
         # Mutation model --------------------------------------------
 
         bs4Card(width = 12, collapsible = FALSE, title = "Mutation model",
-
-          radioButtons("mutmodel", "Mutation model", inline = TRUE, width = "100%",
-                       selected = "none",
-                       choices = c("No model" = "none", Equal = "equal",
-                                   Prop = "proportional",
-                                   Stepwise = "stepwise", "In dataset" = "data")),
-          div(id = "mutcontrol", class = "aligned-row-wide",
-              style = "align-items: flex-end; margin: 10px 0;",
-              tagList(tags$style(HTML(
-                "#mutcontrol .control-label {margin-bottom:0; font-size:90%;}
-                 #mutcontrol .form-control  {font-size:90%; width:80%; padding:0 10px; height:auto;}")
-              )),
-              numericInput("mutrateF", "Female rate", width = "90%", min = 0, max = 1, value = NULL),
-              numericInput("mutrateM", "Male rate", width = "90%",   min = 0, max = 1, value = NULL),
-              actionButton("mutApplyAll", label = tagList(icon("globe"), "Apply to all markers"),
-                           width = "100%", style = "white-space:nowrap; margin:0")
-          )
+          mutRadios("muttype")
         )
       ),
 
       # Main marker table ---------------------------------------------------------------------------
 
-      column(width = 8,
+      column(width = 9,
         bs4Card(width = 12, collapsible = FALSE, title = "Marker summary",
           DT::DTOutput("markersummary", width = "fit-content"),
           footer = div(class = "btn-group",
             actionButton("chartButton",
                          label = tagList(myIcon("simple-chart", align = "-0.1em"), " Frequencies")),
-            actionButton("showmutButton",
+            actionButton("mutMatrixButton",
                          label = tagList(myIcon("bolt", align = "-0.1em"), "Mutation matrix"))
           )
         ),
@@ -281,7 +265,7 @@ server = function(input, output, session) {
 
   externalPM = reactiveVal(NULL)
   externalAM = reactiveVal(NULL)
-  externalLoci = reactiveValues(db = NULL, mut = NULL)
+  externalLoci = reactiveValues(db = NULL, mut = NULL, hasMut = FALSE) # `mut` becomes named list
 
   dataServerPM = dataServer("PM", externalPM, .debug = .debug)
   dataServerAM = dataServer("AM", externalAM, .debug = .debug)
@@ -360,11 +344,10 @@ server = function(input, output, session) {
     mut = getLocusAttributes(am1, attribs = "mutmod", simplify = TRUE)
     externalLoci$db = db
     externalLoci$mut = mut
-    # TODO: mutation models are not automatically applied!!
-    # Currently requires to click "Apply to all markers"
+    externalLoci$hasMut = sum(lengths(mut)) > 0 # quick hack to see if list of NULL's
 
-    updateRadioButtons(session, "dbtype", selected = "data")
-    updateRadioButtons(session, "mutmodel", selected = "data")
+    updateRadioButtons(session, "dbtype", selected = "original")
+    updateRadioButtons(session, "muttype", selected = if(externalLoci$hasMut) "original" else "none")
 
     DB(db)
     externalAM(getGenotypesAndSex(dvi$am))
@@ -400,100 +383,94 @@ server = function(input, output, session) {
     }
     nms = names(db) |> .setnames()
     loci = lapply(nms, function(m) list(name = m, alleles = names(db[[m]]), afreq = as.numeric(db[[m]])))
-    loci = .updateDB(loci, mutParams())
+    loci = .updateMutationAttr(loci, mutParams())
+    message("setting loci:", length(loci))
     locusAttrs(loci)
   })
 
-  observeEvent(input$dbselect, { .debug("database: builtin -", input$dbselect)
-    if(input$dbselect == "")
-      newdb = NULL
-    if(input$dbselect == "NorwegianFrequencies")
-      newdb = forrel::NorwegianFrequencies
-    DB(newdb)
-  })
 
-  observeEvent(input$dbcustom, { .debug("database: custom file", input$dbcustom$name)
-    path = req(input$dbcustom$datapath)
-    tryCatch({
-      db = readFreqDatabase(path)
-      DB(db)
-    }, error = errModal)
+  observeEvent(list(input$dbtype, input$builtinDB, input$customDB),  { .debug("dbtype:", input$dbtype)
+    type = req(input$dbtype)
+    newdb = switch(type,
+      builtin = switch(req(input$builtinDB),
+        "norSTR: Africa" = norSTR::africaDB,
+        "norSTR: Europe" = norSTR::europeDB,
+        "norSTR: Norway" = norSTR::norwayDB,
+        "NorwegianFrequencies (legacy)" = forrel::NorwegianFrequencies,
+        NULL
+      ),
+      custom = { .debug("database: custom file", input$customDB$name)
+        path = req(input$customDB$datapath)
+        tryCatch(readFreqDatabase(path), error = errModal)
+      },
+      original = externalLoci$db
+    )
+    tryCatch(DB(newdb), error = errModal)
   })
-
-  observeEvent(input$dbtype, {
-    if(input$dbtype == "data")
-      DB(externalLoci$db)
-  })
-
-  observe(toggleState(selector = "#dbtype input[value='data']", condition = !is.null(externalLoci$db)))
-  observe(toggleState(selector = "#mutmodel input[value='data']", condition = !is.null(externalLoci$mut)))
-  observe(toggleState("mutrateF", condition = input$mutmodel != "data"))
-  observe(toggleState("mutrateM", condition = input$mutmodel != "data"))
 
   # Mutation models --------------------------------------------------------
 
-  # NEW!
-  observeEvent(input$mutmodBtn, { .debug("click mutation model button")
-    print(input$markersummary_rows_selected)
-    showModal(modalDialog( #style = "width: fit-content; height: 600px",
-      title = "Mutation model dialog",
-      radioButtons("mutmodel", "Mutation model", inline = TRUE, width = "100%", selected = "none",
-                   choices = c("No model" = "none", Equal = "equal", Prop = "proportional",
-                               Stepwise = "stepwise", "In dataset" = "data")),
-      div(id = "mutcontrol", class = "aligned-row-wide", style = "align-items: flex-end; margin: 10px 0;",
-          tagList(tags$style(HTML(
-            "#mutcontrol .control-label {margin-bottom:0; font-size:90%;}
-             #mutcontrol .form-control  {font-size:90%; width:80%; padding:0 10px; height:auto;}")
-          )),
-          numericInput("mutrateF", "Female rate", width = "90%", min = 0, max = 1, value = NULL),
-          numericInput("mutrateM", "Male rate", width = "90%",   min = 0, max = 1, value = NULL),
-          actionButton("mutApplyAll", label = tagList(icon("globe"), "Apply to all markers"),
-                       width = "100%", style = "white-space:nowrap; margin:0")
-      ),
-      easyClose = TRUE,
-      class = "autowide"
-    ))
-  })
+  observe(shinyjs::toggleState("mutApplyAll", condition = input$muttype == "standard"))
+  observe(toggleState(selector = "input[name='muttype'][value='original']", condition = externalLoci$hasMut))
 
-  mutParams = reactive(list(model = input$mutmodel,
-                            rate = list(female = input$mutrateF, male = input$mutrateM),
-                            fullmods = if(isTRUE(input$mutmodel == "data")) externalLoci$mut) |> print())
+  mutParams = reactive(list(
+    muttype = input$muttype,
+    standardmodel = settings$standardmodel,
+    standardrate = list(female = input$mutrateF, male = input$mutrateM),
+    original = externalLoci$mut))
 
-  observeEvent(input$mutApplyAll, { .debug("mutations: apply all")
-    newloci = .updateDB(req(locusAttrs()), mutParams())
+  observeEvent(list(input$muttype, input$mutApplyAll), { .debug("Change mutation model:", input$muttype, input$mutApplyAll)
+    loci = req(locusAttrs())
+    newloci = .updateMutationAttr(loci, mutParams())
     locusAttrs(newloci)
     showNotification("Updated mutation parameters", type = "message")
   })
 
-
   # Database: Marker summary table ------------------------------------------
 
-  output$markersummary = DT::renderDT(formatDatabaseTable(markerSummary(am = mainAM())))
+  output$markersummary = DT::renderDT(formatDatabaseTable(markerSummaryDiviana(locAttrs = locusAttrs())))
 
   observeEvent(input$chartButton, { .debug("freq chart")
-    i = input$markersummary_rows_selected; print(i)
-    req(length(i) == 1)
-    marker = req(names(DB())[i])
-    freqs = req(DB()[[i]])
-    output$freqPlot = renderPlot(plotFreqs(freqs, marker))
+    i = req(input$markersummary_rows_selected); print(i)
+    loc = req(locusAttrs()[[i]])
+    mname = loc$name
+    freqs = .setnames(loc$afreq, loc$alleles)
+
+    output$freqPlot = renderPlot(plotFreqs(freqs, mname))
     output$freqTable = DT::renderDT(formatFreqTable(freqs))
 
     showModal(modalDialog(
-      title = paste("Allele frequencies:", marker),
+      title = paste("Allele frequencies:", mname),
       size = "l",
+      easyClose = TRUE,
       tags$div(
         style = "display:flex;align-items:flex-start;gap:15px;",
-        tags$div(style = "flex:0 0 75%;",
-          plotOutput("freqPlot", height = 350)
-        ),
-        tags$div(style = "flex:0 0 25%;",
-          DT::DTOutput("freqTable", height = 350)
-        )
-      ),
-      easyClose = TRUE
+        tags$div(style = "flex:0 0 75%;", plotOutput("freqPlot", height = 350)),
+        tags$div(style = "flex:0 0 25%;", DT::DTOutput("freqTable"))
+      )
     ))
   })
 
+  observeEvent(input$mutMatrixButton, { .debug("mutation matrix button")
+    i = req(input$markersummary_rows_selected)
+    loc = req(locusAttrs()[[i]])
+    mutmod = req(loc$mutmod)
+    malemat = mutmod$male |> as.matrix() |> formatMatrix() |> gt::fmt_auto()
+    femalemat = mutmod$female |> as.matrix() |> formatMatrix() |> gt::fmt_auto()
+
+    output$mutmatrix = gt::render_gt({
+      switch(req(input$mutsex), Female = femalemat, Male = malemat)
+    }, height = 400)
+
+    showModal(modalDialog(
+      title = paste("Mutation matrix:", loc$name),
+      size = "l",
+      radioButtons("mutsex", NULL, choices = c("Female", "Male"), selected = "Female",
+                   inline = TRUE),
+      gt::gt_output("mutmatrix"),
+      easyClose = TRUE
+    ))
+  })
 
   # Pedigrees -----------------------------------------------------------
 
@@ -854,20 +831,32 @@ server = function(input, output, session) {
 
   settings = reactiveValues(hideUnimportantLabs = TRUE,
                             useAliases = TRUE,
-                            acrossComps = FALSE)
+                            acrossComps = FALSE,
+                            standardmodel = "equal")
 
   observeEvent(input$settings, {
     showModal(modalDialog(
-      h3("Settings"),
-      h4("Names and aliases"),
-      awesomeCheckbox("hideUnimportantLabs", "Hide irrelevant names in pedigree plots",
-                      value = settings$hideUnimportantLabs, width = "auto"),
-      awesomeCheckbox("useAliases", "Use aliases (short names) in plots and tables",
-                      value = settings$useAliases, width = "auto"),
-      br(),
-      h4("Relatedness analysis"),
-      awesomeCheckbox("acrossComps", "Include AM-AM comparisons across families",
-                      value = settings$acrossComps, width = "auto"),
+      tags$style(HTML("
+        #settingsModal label { font-weight: 400 !important; }
+      ")),
+      tags$div(
+        id = "settingsModal",
+        h3("Settings"),
+        h4("Names and aliases"),
+        awesomeCheckbox("hideUnimportantLabs", "Hide irrelevant names in pedigree plots",
+                        value = settings$hideUnimportantLabs, width = "auto"),
+        awesomeCheckbox("useAliases", "Use aliases (short names) in plots and tables",
+                        value = settings$useAliases, width = "auto"),
+        br(),
+        h4("Mutation model"),
+        awesomeRadio("standardmodel", "Model family for `Standard` models",
+                     choices = c("Equal" = "equal", "Proportional" = "proportional", "Stepwise" = "stepwise"),
+                     selected = settings$standardmodel, inline = TRUE, width = "auto"),
+        br(),
+        h4("Relatedness analysis"),
+        awesomeCheckbox("acrossComps", "Include AM-AM comparisons across families",
+                        value = settings$acrossComps, width = "auto"),
+      ),
       easyClose = TRUE,
       footer = modalButton("Save and close"),
     ))
@@ -876,6 +865,7 @@ server = function(input, output, session) {
   observeEvent(input$hideUnimportantLabs, {settings$hideUnimportantLabs = input$hideUnimportantLabs})
   observeEvent(input$useAliases, {settings$useAliases = input$useAliases})
   observeEvent(input$acrossComps, {settings$acrossComps = input$acrossComps})
+  observeEvent(input$standardmodel, {settings$standardmodel = input$standardmodel})
 
   # Reset -------------------------------------------------------------------
 
@@ -885,14 +875,22 @@ server = function(input, output, session) {
     externalAM("reset")
     externalPM("reset")
     externalLoci$db = externalLoci$mut = NULL
+    externalLoci$hasMut = FALSE
     pedigrees(NULL)
     DB(NULL); locusAttrs(NULL) # needed?
     isolate(updateSelectInput(session, "example", selected = ""))
     updateRadioButtons(session, "dbtype", selected = character(0))
-    updateRadioButtons(session, "mutmodel", selected = "none")
+    updateRadioButtons(session, "muttype", selected = character(0))
+    updateNumericInput(session, "mutrateF", value = 0.001)
+    updateNumericInput(session, "mutrateM", value = 0.002)
     updateNumericInput(session, "LRthresh", value = 10000)
     updateNumericInput(session, "maxIncomp", value = 2)
     updateCheckboxInput(session, "ignoresex", value = FALSE)
+    # Settings
+    settings$hideUnimportantLabs = TRUE
+    settings$useAliases = TRUE
+    settings$acrossComps = FALSE
+    settings$standardmodel = "equal"
     resetAnalysis(resetAnalysis() + 1)
   })
 

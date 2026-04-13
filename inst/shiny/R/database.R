@@ -1,28 +1,30 @@
 
-.updateDB = function(loci, mutParams) { #print(mutParams)
-  mod = mutParams$model
-  if(is.null(mod) || mod == "none") {
-    for(m in names(loci)) loci[[m]]$mutmod = NULL
-  }
-  else if(mod == "data") {
-    mods = mutParams$fullmods
-    for(m in names(loci)) loci[[m]]$mutmod = mods[[m]]
-  }
-  else {
-    args = list(model = mod, rate = mutParams$rate, validate = TRUE)
-    if(mod == "stepwise") { args$rate2 = 1e-6; args$range = 0.1 }
-    for(m in names(loci)) {
-      tryCatch({
-        args$alleles = loci[[m]]$alleles
-        args$afreq = loci[[m]]$afreq
-        loci[[m]]$mutmod = do.call(mutationModel, args)
-      }, error = function(e) {
-        msg = paste0(conditionMessage(e), "<br>Disabling mutation modelling for this marker.")
-        errModal(msg, html = TRUE)
-        loci[[m]]$mutmod = NULL
-      })
+.updateMutationAttr = function(loci, mutParams) { print(pp<<- mutParams)
+  switch(mutParams$muttype,
+    none = {
+      for(m in names(loci)) loci[[m]]$mutmod = NULL
+    },
+    original = {
+      mods = mutParams$original
+      for(m in names(loci)) loci[[m]]$mutmod = mods[[m]]
+    },
+    standard = {
+      args = list(model = mutParams$standardmodel, rate = mutParams$standardrate, validate = TRUE)
+      if(args$model == "stepwise") { args$rate2 = 1e-6; args$range = 0.1 }
+      for(m in names(loci)) {
+        tryCatch({
+          args$alleles = loci[[m]]$alleles
+          args$afreq = loci[[m]]$afreq
+          loci[[m]]$mutmod = do.call(mutationModel, args)
+        }, error = function(e) {
+          msg = paste0(conditionMessage(e), "<br>Disabling mutation modelling for this marker.")
+          errModal(msg, html = TRUE)
+          loci[[m]]$mutmod = NULL
+        })
+      }
     }
-  }
+  )
+
   loci
 }
 
