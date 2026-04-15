@@ -18,7 +18,7 @@ suppressMessages(suppressPackageStartupMessages({
 addResourcePath("icons", "www/static_icons")
 
 # TODO----------------------------------------------------------------
-#
+
 # * Pedbuilder: trashcan -> back arrow?
 # * pedbuilder: slimmer family label; fatter buttons
 # * DVI overview: center plot on screen
@@ -259,7 +259,9 @@ server = function(input, output, session) {
   # Main reactive variables -------------------------------------------------
 
   pedigrees = reactiveVal(NULL)
-  DB = reactiveVal(NULL)
+  DB = reactiveVal(NULL) # list of freq vectors
+  locusAttrs = reactiveVal(NULL) # list of lists with name, alleles, afreq, mutmod
+
 
   # Import data ------------------------------------------------------------
 
@@ -284,8 +286,6 @@ server = function(input, output, session) {
   alleleSepPM = reactive(getAlleleSep(req(genoPM())))
   alleleSepAM = reactive(getAlleleSep(req(genoAM())))
 
-  locusAttrs = reactiveVal(NULL)
-
   mainPM = reactive({ .debug("mainPM")
     if(is.null(g <- genoPM()))
       return(NULL)
@@ -297,7 +297,7 @@ server = function(input, output, session) {
     pm = NULL
     tryCatch({pm = setMarkers(s, alleleMatrix = g, sep = alleleSepPM())},
              error = showErr)
-    tryCatch({pm = .setDB(pm, db = locusAttrs(), tag = "PM")},
+    tryCatch({pm = .setLocusAttrs(pm, loci = locusAttrs(), tag = "PM")},
              error = showErr)
     pm
   })
@@ -312,7 +312,7 @@ server = function(input, output, session) {
     am = NULL
     tryCatch({am = setMarkers(peds, alleleMatrix = g, sep = alleleSepAM())},
              error = showErr)
-    tryCatch({am = .setDB(am, db = locusAttrs(), tag = "AM")},
+    tryCatch({am = .setLocusAttrs(am, loci = locusAttrs(), tag = "AM")},
              error = showErr)
     am
   })
@@ -377,14 +377,30 @@ server = function(input, output, session) {
   # Frequency database ------------------------------------------------------
 
   observeEvent(DB(), { .debug("reset locusAttrs with new DB")
-    if(is.null(db <- DB())) {
+    if(is.null(db0 <- DB())) {
       locusAttrs(NULL)
       return()
     }
+
+    # Extend DB with missing alleles from data (if data is loaded)
+    db = db0
+    am = mainAM()
+    pm = mainPM()
+
+    if(!is.null(am) || !is.null(pm)) {
+      miss = missingAlleles(db0, am, pm)
+      print(miss)
+      for(m in names(miss)) {
+        db[[m]] = .addAlleles(db[[m]], miss[[m]])
+      }
+      n = sum(lengths(miss))
+      if(n > 0)
+        showNotification(sprintf("Added %d missing alleles to database", n))
+    }
+
     nms = names(db) |> .setnames()
     loci = lapply(nms, function(m) list(name = m, alleles = names(db[[m]]), afreq = as.numeric(db[[m]])))
-    loci = .updateMutationAttr(loci, mutParams())
-    message("setting loci:", length(loci))
+    loci = .updateMutmods(loci, mutParams())
     locusAttrs(loci)
   })
 
@@ -401,7 +417,7 @@ server = function(input, output, session) {
       ),
       custom = { .debug("database: custom file", input$customDB$name)
         path = req(input$customDB$datapath)
-        tryCatch(readFreqDatabase(path), error = errModal)
+        tryCatch(readFreqDatabase(path, sep = "\t"), error = errModal)
       },
       original = externalLoci$db
     )
@@ -421,14 +437,17 @@ server = function(input, output, session) {
 
   observeEvent(list(input$muttype, input$mutApplyAll), { .debug("Change mutation model:", input$muttype, input$mutApplyAll)
     loci = req(locusAttrs())
-    newloci = .updateMutationAttr(loci, mutParams())
+    newloci = .updateMutmods(loci, mutParams())
     locusAttrs(newloci)
     showNotification("Updated mutation parameters", type = "message")
   })
 
   # Database: Marker summary table ------------------------------------------
 
-  output$markersummary = DT::renderDT(formatDatabaseTable(markerSummaryDiviana(locAttrs = locusAttrs())))
+  output$markersummary = DT::renderDT({
+    mtab = markerSummaryDiviana(locAttrs = locusAttrs(), dvi = currentDviData())
+    formatDatabaseTable(mtab)
+  })
 
   observeEvent(input$chartButton, { .debug("freq chart")
     i = req(input$markersummary_rows_selected); print(i)
@@ -518,7 +537,7 @@ server = function(input, output, session) {
     avoidLabs = list(famids = famids[-curped],
                      vics = names(mainPM()),
                      refs = if(nPed() > 1) typedMembers(otherFams) else NULL,
-                     miss = setdiff(mainMissing(), curr$ped$ID),
+                     miss = .mysetdiff(mainMissing(), curr$ped$ID),
                      labs = labels(otherFams))
 
     pedigreeServer(uniqueID, resultVar = pedFromModule, initialDat = curr,
@@ -877,7 +896,7 @@ server = function(input, output, session) {
     externalLoci$db = externalLoci$mut = NULL
     externalLoci$hasMut = FALSE
     pedigrees(NULL)
-    DB(NULL); locusAttrs(NULL) # needed?
+    DB(NULL)
     isolate(updateSelectInput(session, "example", selected = ""))
     updateRadioButtons(session, "dbtype", selected = character(0))
     updateRadioButtons(session, "muttype", selected = character(0))
@@ -903,8 +922,8 @@ server = function(input, output, session) {
 
   observe({
     if(DEVMODE) { .debug("devmode!")
-      updateSelectInput(session, "example", selected = "planecrash")
-      updateNavbarTabs(session, "navmenu", selected = "database")
+      #updateSelectInput(session, "example", selected = "planecrash")
+      #updateNavbarTabs(session, "navmenu", selected = "database")
     }
   })
 
