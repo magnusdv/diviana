@@ -21,6 +21,9 @@ stop2 = function (...) {
   .setnames(names(x), x)
 }
 
+.mysetdiff = function(x, y)
+  unique.default(x[match(x, y, 0L) == 0L])
+
 .myintersect = function(x, y)
   y[match(x, y, 0L)]
 
@@ -198,8 +201,8 @@ rbindSafe = function(df1, df2) {
   if(is.null(df1))
     return(df2)
   cols = union(names(df1), names(df2))
-  df1[setdiff(cols, names(df1))] = NA
-  df2[setdiff(cols, names(df2))] = NA
+  df1[.mysetdiff(cols, names(df1))] = NA
+  df2[.mysetdiff(cols, names(df2))] = NA
   rbind(df1[, cols], df2[, cols])
 }
 

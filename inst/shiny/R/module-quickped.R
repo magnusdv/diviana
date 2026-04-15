@@ -88,7 +88,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
                           .debug = NULL) {
 
   avoid = c(allrefs, avoidLabs$vics, avoidLabs$labs)
-  avoidFamids = setdiff(avoidLabs$famids, famid)
+  avoidFamids = .mysetdiff(avoidLabs$famids, famid)
 
   if(is.null(initialDat)) {
     ids = .generateLabs(character(0), 3, avoid = avoid)
@@ -244,7 +244,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
 
     observeEvent(input$nonmissing, { .debug("--ped module: set nonmissing")
       ids = req(sel())
-      updatePedData(miss = setdiff(currData$miss, ids))
+      updatePedData(miss = .mysetdiff(currData$miss, ids))
     })
 
     observeEvent(input$untyped, { .debug("--ped module: set untyped")
@@ -267,10 +267,10 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       newron = ron[!names(ron) %in% ids]
       currData$refOrigName = newron
 
-      updatePedData(ped = newped, refs = setdiff(refs, ids))
+      updatePedData(ped = newped, refs = .mysetdiff(refs, ids))
     })
 
-    remainingRefs = reactive(setdiff(allrefs, c(avoidLabs$refs, currData$refs)))
+    remainingRefs = reactive(.mysetdiff(allrefs, c(avoidLabs$refs, currData$refs)))
 
     output$refTable = renderDT({
       df = data.frame(Refs = remainingRefs())
@@ -333,7 +333,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
     })
 
     observe({ .debug("--ped module: update reference selector")
-      remainingRefs = setdiff(allrefs, c(avoidLabs$refs, currData$refs))
+      remainingRefs = .mysetdiff(allrefs, c(avoidLabs$refs, currData$refs))
       updateSelectInput(session, "setref", choices = c("Select" = "", remainingRefs))
     })
 
@@ -411,7 +411,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
 
       currSel = sel()
       if(id %in% currSel)
-        sel(setdiff(currSel, id))
+        sel(.mysetdiff(currSel, id))
       else
         sel(c(currSel, id))
     })

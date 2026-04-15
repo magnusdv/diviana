@@ -20,7 +20,7 @@ plotSolutionDIVIANA = function(dvi, summary, pednrs = NULL, labs = dvi$missing, 
     fill[[cl]] = c(fill[[cl]], groups[[i]])
   }
   excl = groups$Excluded
-  stillmiss = setdiff(miss, unlist(groups[c("Undisputed", "Match (GLR)", "Symmetric match", "Probable", "Disputed")]))
+  stillmiss = .mysetdiff(miss, unlist(groups[c("Undisputed", "Match (GLR)", "Symmetric match", "Probable", "Disputed")]))
   linecol = list("red" = c(excl, stillmiss))
   carrier = stillmiss
 

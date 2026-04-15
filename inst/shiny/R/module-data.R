@@ -173,7 +173,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
       if(!is.null(rawtable)) {
         cls = names(rawtable)
         if("AMEL" %in% cls)
-          rawtable = rawtable[c("AMEL", setdiff(cls, "AMEL"))]
+          rawtable = rawtable[c("AMEL", .mysetdiff(cls, "AMEL"))]
         mainTable$raw = rawtable
       }
       else if(!is.null(rawdvi))
@@ -466,15 +466,16 @@ prepareGenoDf = function(df, id, selectRows = NULL, excludeCols = NULL) {
       df$Alias = rownames(df)
   }
 
-  if("Sex" %in% names(df))
+  nms = names(df)
+  if("Sex" %in% nms)
     df$Sex = checkSex(df$Sex)
-  else if("AMEL" %in% names(df))
+  else if("AMEL" %in% nms)
     df$Sex = c("?", "M", "F")[amel2sex(df$AMEL) + 1]
   else
     df$Sex = "?"
 
   # Put 'Alias' and 'Sex' first
-  df[, c("Alias", "Sex", setdiff(names(df), c("Alias", "Sex", "AMEL"))), drop = FALSE]
+  df[, c("Alias", "Sex", .mysetdiff(nms, c("Alias", "Sex", "AMEL"))), drop = FALSE]
 }
 
 readRdvi = function(fil) {
