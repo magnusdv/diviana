@@ -9,8 +9,8 @@
 #' @examples
 #' markerSummary(planecrash)
 #'
-markerSummaryDiviana = function(dvi = NULL, locAttrs = NULL) {
-  if(!is.null(dvi)) {
+markerSummaryDiviana = function(locAttrs = NULL, dvi = NULL) { dd <<- dvi
+  if(is.null(locAttrs) && length(dvi$am)) {
     dvi = dvir:::consolidateDVI(dvi)
     locAttrs = pedtools::getLocusAttributes(dvi$am, checkComps = TRUE)
   }
@@ -42,6 +42,13 @@ markerSummaryDiviana = function(dvi = NULL, locAttrs = NULL) {
   })
 
   res = do.call(rbind, reslist)
+
+  if(!is.null(dvi)) {
+    usedinAM = if(length(dvi$am)) res$Marker %in% pedtools::name(dvi$am) else NA
+    usedinPM = if(length(dvi$pm)) res$Marker %in% pedtools::name(dvi$pm) else NA
+    res = cbind(AM = usedinAM, PM = usedinPM, res)
+  }
+
   rownames(res) = NULL
   res
 }

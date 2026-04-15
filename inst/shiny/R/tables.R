@@ -94,7 +94,15 @@ formatResultTable = function(x, usealias = FALSE, aliasPM = NULL, style = 6) {
 
 # Marker summary table ----------------------------------------------------
 
-
+styleBool = function(x, keep = TRUE) ifelse(
+  x,
+  "<span style='color:green;font-weight:600'>✓</span>",
+  ifelse(
+    keep,
+    "<span style='color:red;font-weight:500'>✗</span>",
+    "<span style='color:red;font-weight:500;font-size:90%'>✗</span>"
+  )
+)
 
 formatDatabaseTable = function(df) {
   req(!is.null(df))
@@ -104,18 +112,38 @@ formatDatabaseTable = function(df) {
       df[[cl]] = NULL
   }
 
+  df$keep = df$AM | df$PM
+  if(all(is.na(df$keep)))
+    df$keep = TRUE
+  df$AM = styleBool(df$AM, keep = df$keep)
+  df$PM = styleBool(df$PM, keep = df$keep)
+
   DT::datatable(df,
     class = "stripe nowrap",
-    #escape = FALSE,
+    escape = .mysetdiff(names(df), c("AM", "PM")),
     selection = "single",
     options = list(
       dom = "t",
       paging = FALSE,
       ordering = FALSE,
-      autoWidth = T,
-      scrollY = if(nrow(df) > 10) "550px" else NULL
+      autoWidth = TRUE,
+      scrollY = if(nrow(df) > 10) "550px" else NULL,
+      columnDefs = list(list(targets = "keep", visible = FALSE),
+                        list(className = 'dt-center', targets = c("AM", "PM")))
     )) |>
-    DT::formatStyle("Model", borderLeft = "2px solid #ddd")
+    DT::formatStyle("Model", borderLeft = "2px solid #ddd") |>
+    DT::formatStyle(
+      names(df) |> .mysetdiff(c("AM", "PM")),
+      valueColumns = "keep",
+      target = "row",
+      color = DT::styleEqual(c(TRUE, FALSE), c(NA, "#999")),
+      fontStyle = DT::styleEqual(c(TRUE, FALSE), c("normal", "italic")),
+      fontSize = DT::styleEqual(c(TRUE, FALSE), c(NA, "90%"))
+    ) |>
+    DT::formatStyle(
+      names(df), valueColumns = "keep", target = "row",
+      lineHeight = DT::styleEqual(c(TRUE, FALSE), c(NA, "90%"))
+    )
 }
 
 
@@ -362,11 +390,11 @@ formatLRmatrix = function(m, LRthresh = 1e4, usealias = FALSE,
 
 # Used in the main app: Insert missing row/columns
 completeMatrix = function(m, rownames, colnames) {
-  rr = setdiff(rownames, rownames(m))
+  rr = .mysetdiff(rownames, rownames(m))
   if(length(rr))
     m = rbind(m, matrix(NA, nrow = length(rr), ncol = ncol(m), dimnames = list(rr, NULL)))
 
-  cc = setdiff(colnames, colnames(m))
+  cc = .mysetdiff(colnames, colnames(m))
   if(length(cc))
     m = cbind(m, matrix(NA, nrow = nrow(m), ncol = length(cc), dimnames = list(NULL, cc)))
 
