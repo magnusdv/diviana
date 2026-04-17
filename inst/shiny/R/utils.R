@@ -259,3 +259,46 @@ getLabfun = function(dvi, hide, alias, aliasAM) {
     labs
   }
 }
+
+# Fast version of pedtools::setMarkers()
+# Assumes alleleMatrix is pre-split, has row names, and corresponds exactly to loci.
+setMarkersDiviana = function(x, alleleMatrix, loci) {
+  if(is.pedList(x)) {
+    y = lapply(x, function(comp) setMarkersDiviana(comp, alleleMatrix, loci))
+    return(y)
+  }
+
+  if(is.null(alleleMatrix))
+    return(x)
+
+  if(is.null(rownames(alleleMatrix)))
+    stop2("Allele matrix must have row names corresponding to sample IDs")
+
+  if(ncol(alleleMatrix) != 2*length(loci))
+     stop2("Number of columns in allele matrix must be twice the database size")
+
+  ids = x$ID
+  sex = x$SEX
+
+  # Genotyped indivs
+  typed = rownames(alleleMatrix) |> .myintersect(ids)
+  typedIdx = match(typed, ids)
+
+  # template allele matrix
+  mTmp = matrix(0L, ncol = 2, nrow = length(ids))
+
+  # Create marker objects
+  mlist = lapply(seq_along(loci), function(k) {
+    loc = loci[[k]]
+    als = alleleMatrix[typed, (2*k-1):(2*k), drop = FALSE]
+    m = mTmp
+    m[typedIdx, ] = match(als, loc$alleles, nomatch = 0L)
+
+    newMarker(m, alleles = loc$alleles, afreq = loc$afreq, name = loc$name,
+              mutmod = loc$mutmod, pedmembers = ids, sex = sex)
+  })
+
+  class(mlist) = "markerList"
+  x$MARKERS = mlist
+  x
+}
