@@ -726,9 +726,10 @@ server = function(input, output, session) {
 
   observeEvent(input$ampmkappa, { .debug("ampm-kappa")
     am = req(mainAM())
-    pm = mainPM()
-    idMatr = pedtools:::fast.grid(list(typedMembers(am), names(pm)))
-    commonMarkers = intersect(name(am), name(pm))
+    pm = req(mainPM())
+    #print(am); print(pm)
+    idMatr = pedtools:::fast.grid(list(typedMembers(am), names(pm))) |> req()
+    commonMarkers = intersect(name(am), name(pm)) |> req()
     allcmps = c(selectMarkers(am, commonMarkers), selectMarkers(pm, commonMarkers))
     k = forrel::ibdEstimate(allcmps, ids = idMatr, verbose = FALSE)
     kappa$ampm = as.data.frame(k)
