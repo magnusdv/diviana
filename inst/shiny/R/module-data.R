@@ -149,7 +149,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
     observeEvent(input$importWhat, { .debug2("importWhat =", input$importWhat)
       if(input$importWhat == "samples") {
         s = switch(id, AM = completeDvi$raw$am, PM = completeDvi$raw$pm)
-        mainTable$raw = getGenotypesAndSex(s)
+        mainTable$raw = genosWithAttrs(s, addCols = TRUE, fam = id == "AM")
       }
       else
         mainTable$raw = NULL
@@ -162,12 +162,12 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
 
       rawdvi = rawtable = NULL
       tryCatch(switch(input$filetype,
-        fam   = { rawdvi = dvir::familias2dvir(path, missingFormat = "M[FAM]-[IDX]")},
+        fam   = { rawdvi = dvir::familias2dvir(path, missingFormat = "M[FAM]-[IDX]", verbose = FALSE)},
         rdata = { rawdvi = readRdvi(path)},
         gm    = { rawtable = readGenemapper(path)},
         txt   = { rawtable = readGenoFromTxt(path)},
       ),
-       warning = function(e) print(conditionMessage(e)), #showErr, TODO!
+      warning = function(e) print(conditionMessage(e)), #showErr, TODO!
       error = function(e) fileError(conditionMessage(e)))
 
       if(!is.null(rawtable)) {
@@ -397,7 +397,8 @@ genoDT = function(dat, sel = "none", scrollY = "220px", editable = FALSE) { #pri
   # Prepare DT
   dt = DT::datatable(dat,
     class = "stripe hover nowrap compact",
-    colnames = c("Sample" = 1),
+    #colnames = c("Sample" = 1),
+    rownames = FALSE,
     plugins = "natural",
     selection = sel,
     editable = editable,

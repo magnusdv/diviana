@@ -274,9 +274,9 @@ server = function(input, output, session) {
   dataServerAM = dataServer("AM", externalAM, .debug = .debug)
 
   genoPM = reactive({ .debug("genoPM", dataServerPM$main())
-    g = dataServerPM$main(); g$Family = g$Alias = g$AMEL = g$Sex = NULL; g})
+    g = dataServerPM$main(); print(head(g)); g$Family = g$Sample = g$Alias = g$AMEL = g$Sex = NULL; g})
   genoAM = reactive({ .debug("genoAM", dataServerAM$main())
-    g = dataServerAM$main(); g$Family = g$Alias = g$AMEL = g$Sex = NULL; g})
+    g = dataServerAM$main(); g$Family = g$Sample = g$Alias = g$AMEL = g$Sex = NULL; g})
 
   markersPM = reactive(names(genoPM()))
   markersAM = reactive(names(genoAM()))
@@ -287,16 +287,8 @@ server = function(input, output, session) {
   aliasPM = reactive({g = dataServerPM$main(); .setnames(g$Alias, rownames(g))})
   aliasAM = reactive({g = dataServerAM$main(); .setnames(g$Alias, rownames(g))})
 
-  # Genotype parsing -------------------------------------------------------
-
-  alleleSepPM = reactive(if(!is.null(g <- genoPM())) getAlleleSep(g))
-  alleleSepAM = reactive(if(!is.null(g <- genoAM())) getAlleleSep(g))
-
-  alleleMatPM = reactive(if(!is.null(g <- genoPM()) && !is.null(s <- alleleSepPM()))
-    pedtools:::split_genotype_cols(as.matrix(g), s))
-
-  alleleMatAM = reactive(if(!is.null(g <- genoAM()) && !is.null(s <- alleleSepAM()))
-    pedtools:::split_genotype_cols(as.matrix(g), s))
+  alleleMatPM = reactive(splitCols(genoPM()))
+  alleleMatAM = reactive(splitCols(genoAM()))
 
   # State for loaded/imported DVI data -------------------------------------
 
@@ -523,7 +515,7 @@ server = function(input, output, session) {
 
     a = alleleMatPM()
     loci = locusAttrs()
-
+print(a); print(sexPM())
     if(is.null(a) || is.null(loci))
       return(NULL)
 

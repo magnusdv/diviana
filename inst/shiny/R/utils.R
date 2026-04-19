@@ -186,8 +186,8 @@ getSexFromAMEL = function(g) {
 
 getAlleleSep = function(g) {
   if(ncol(g) == 0) return()
-  if(any(grepl("/", g[[1]], fixed = TRUE))) return("/")
-  if(any(grepl(",", g[[1]], fixed = TRUE))) return(",")
+  if(any(grepl("/", g[,1], fixed = TRUE))) return("/")
+  if(any(grepl(",", g[,1], fixed = TRUE))) return(",")
   return(" ")
 }
 
@@ -206,11 +206,45 @@ rbindSafe = function(df1, df2) {
   rbind(df1[, cols], df2[, cols])
 }
 
-getGenotypesAndSex = function(x) {
-  df = x |> getGenotypes(ids = typedMembers) |> as.data.frame()
-  df$Sex = getSex(x, rownames(df))
+# Expand getGenotypes() adding fam/id/sex as attributes or columns
+genosWithAttrs = function(x, fam = TRUE, addCols = FALSE) {
+  if(is.ped(x))
+    x = list(a = x)
+
+  glist = lapply(x, function(cmp) {
+    typed = typedMembers(cmp)
+    g = getGenotypes(cmp, typed)
+    attr(g, "sex") = getSex(cmp, typed)
+    g
+  })
+
+  df = do.call(rbind, glist) |> as.data.frame()
+  idslist = lapply(glist, rownames)
+
+  famvec = rep(names(x) %||% seq_along(x), lengths(idslist))
+  ids = unlist(idslist, use.names = FALSE)
+  sex = unlist(lapply(glist, attr, "sex"), use.names = FALSE)
+
+  # Add cols in front
+  if(addCols) {
+    old = colnames(df)
+    df$Fam = famvec
+    df$Sample = ids
+    df$Sex = sex
+    df = df[, c(if(fam) "Fam", "Sample", "Sex", old), drop = FALSE]
+  }
+  else {
+    df = structure(df, Fam = if(fam) famvec else NULL, Sample = ids, Sex = sex)
+  }
+
+  rownames(df) = ids
   df
 }
+
+  #df = x |> getGenotypes(ids = typedMembers) |> as.data.frame()
+  #df$Sex = getSex(x, rownames(df))
+  #df
+#}
 
 abbreviatePedrel = function(x, width = 15) {
   x[x == "Unrelated"] = "Unrel"
@@ -262,7 +296,7 @@ getLabfun = function(dvi, hide, alias, aliasAM) {
 
 # Fast version of pedtools::setMarkers()
 # Assumes alleleMatrix is pre-split, has row names, and corresponds exactly to loci.
-setMarkersDiviana = function(x, alleleMatrix, loci) {
+setMarkersDiviana = function(x, alleleMatrix, loci) { #print("--inside setMarkersDiviana")
   if(is.pedList(x)) {
     y = lapply(x, function(comp) setMarkersDiviana(comp, alleleMatrix, loci))
     return(y)
@@ -301,4 +335,38 @@ setMarkersDiviana = function(x, alleleMatrix, loci) {
   class(mlist) = "markerList"
   x$MARKERS = mlist
   x
+}
+
+splitCols = function(x, sep = NULL) { print(x)
+  if(is.null(x))
+    return(NULL)
+
+  if(is.data.frame(x))
+    x = as.matrix(x)
+
+  nc = ncol(x)
+  nr = nrow(x)
+  res = matrix(0, ncol = 2 * nc, nrow = nr, dimnames = list(rownames(x), NULL))
+
+  nas = is.na(x) | x == 0
+  if(all(nas))
+    return(res)
+
+  sep = sep %||% getAlleleSep(x)
+
+  nonNA = x[!nas][1]
+  if(!grepl(sep, nonNA))
+    stop2("Allele separator not found in first non-NA entry of allele matrix: ", nonNA)
+
+  # Replace NA's and missing by 0/0
+  x[nas] = sprintf("0%s0", sep)
+
+  splitvec = unlist(strsplit(x, sep, fixed = TRUE))
+
+  # Odd columns get first allele, even columns get second allele
+  evencols = 2 * seq_len(nc)
+  evenidx = 2 * seq_len(nc * nr)
+  res[, evencols - 1] = splitvec[evenidx - 1]
+  res[, evencols]     = splitvec[evenidx]
+  res
 }
