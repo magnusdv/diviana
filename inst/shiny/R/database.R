@@ -1,38 +1,33 @@
+db2locattrs = function(db, mutparams = NULL) {
+  if(is.null(db))
+    return(NULL)
 
-.updateMutmods = function(loci, mutParams = NULL) {
-  if(is.null(mutParams) || is.null(mutParams$muttype))
-    return(loci)
+  mnames = names(db) |> .setnames()
+  standard = "model" %in% names(mutparams)
+  hasoriginal = mnames %in% names(mutparams) |> .setnames(mnames)
 
-  mnames = names(loci)
+  lapply(mnames, function(m) {
+    alleles = names(db[[m]])
+    afreq = unname(db[[m]])
+    loc = list(name = m, alleles = alleles, afreq = afreq, mutmod = NULL)
 
-  switch(mutParams$muttype,
-    none = {
-      for(m in mnames) loci[[m]]$mutmod = NULL
-    },
-    original = {
-      mods = mutParams$original
-      sharednames = intersect(mnames, names(mods))
-      for(m in sharednames) loci[[m]]$mutmod = mods[[m]]
-    },
-    standard = {
-      args = list(model = mutParams$standardmodel, rate = mutParams$standardrate, validate = TRUE)
-      if(args$model == "stepwise") { args$rate2 = 1e-6; args$range = 0.1 }
+    if(!standard && !hasoriginal[m])
+      return(loc)
 
-      for(m in mnames) {
-        locm = loci[[m]]
-        mutm = tryCatch({
-          do.call(mutationModel, args |> c(locm[c("alleles", "afreq")]))
-        }, error = function(e) {
-          msg = paste0(conditionMessage(e), "<br>Disabling mutation modelling for this marker.")
-          errModal(msg, html = TRUE)
-          NULL
-        })
-        loci[[m]]$mutmod = mutm
-      }
-    }
-  )
+    args = if(standard) mutparams else mutparams[[m]]
+    args$alleles = alleles
+    args$afreq = afreq
 
-  loci
+    loc$mutmod = tryCatch(
+      do.call(mutationModel, args),
+      error = function(e) {
+        msg = paste0(conditionMessage(e), "<br>Disabling the model for: ", m)
+        errModal(msg, html = TRUE)
+        NULL
+    })
+
+    loc
+  })
 }
 
 
@@ -69,7 +64,7 @@
 }
 
 normaliseName = function(x) {
-  tolower(gsub("[-._ ]", "", x))
+  toupper(gsub("[-._ ]", "", x))
 }
 
 # Observed alleles not seen in database

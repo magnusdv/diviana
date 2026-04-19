@@ -19,6 +19,10 @@ addResourcePath("icons", "www/static_icons")
 
 # TODO----------------------------------------------------------------
 
+# Marker summary
+# * indicate markers with added alleles
+# * store original mutmods for faster rendering of original+original
+
 # * Pedbuilder: trashcan -> back arrow?
 # * pedbuilder: slimmer family label; fatter buttons
 # * DVI overview: center plot on screen
@@ -35,7 +39,6 @@ addResourcePath("icons", "www/static_icons")
 
 # PED
 # * Select references: no line wrap
-# * delete ped (done??)
 #
 #
 # TRIANGLES
@@ -260,8 +263,6 @@ server = function(input, output, session) {
 
   pedigrees = reactiveVal(NULL)
   DB = reactiveVal(NULL) # list of freq vectors
-  locusAttrs = reactiveVal(NULL) # list of lists with name, alleles, afreq, mutmod
-
 
   # Import data ------------------------------------------------------------
 
@@ -273,9 +274,12 @@ server = function(input, output, session) {
   dataServerAM = dataServer("AM", externalAM, .debug = .debug)
 
   genoPM = reactive({ .debug("genoPM", dataServerPM$main())
-    g = dataServerPM$main(); g$Alias = g$AMEL = g$Sex = NULL; g})
+    g = dataServerPM$main(); g$Family = g$Alias = g$AMEL = g$Sex = NULL; g})
   genoAM = reactive({ .debug("genoAM", dataServerAM$main())
-    g = dataServerAM$main(); g$Alias = g$AMEL = g$Sex = NULL; g})
+    g = dataServerAM$main(); g$Family = g$Alias = g$AMEL = g$Sex = NULL; g})
+
+  markersPM = reactive(names(genoPM()))
+  markersAM = reactive(names(genoAM()))
 
   sexPM = reactive(match(dataServerPM$main()$Sex, c("M", "F"), nomatch = 0L))
   sexAM = reactive(match(dataServerAM$main()$Sex, c("M", "F"), nomatch = 0L))
@@ -283,131 +287,107 @@ server = function(input, output, session) {
   aliasPM = reactive({g = dataServerPM$main(); .setnames(g$Alias, rownames(g))})
   aliasAM = reactive({g = dataServerAM$main(); .setnames(g$Alias, rownames(g))})
 
-  alleleSepPM = reactive(getAlleleSep(req(genoPM())))
-  alleleSepAM = reactive(getAlleleSep(req(genoAM())))
+  # Genotype parsing -------------------------------------------------------
 
-  mainPM = reactive({ .debug("mainPM")
-    if(is.null(g <- genoPM()))
-      return(NULL)
-    g[g==""] = NA
+  alleleSepPM = reactive(if(!is.null(g <- genoPM())) getAlleleSep(g))
+  alleleSepAM = reactive(if(!is.null(g <- genoAM())) getAlleleSep(g))
 
-    s = pedtools::singletons(rownames(g), sex = sexPM())
-    names(s) = rownames(g)
+  alleleMatPM = reactive(if(!is.null(g <- genoPM()) && !is.null(s <- alleleSepPM()))
+    pedtools:::split_genotype_cols(as.matrix(g), s))
 
-    pm = NULL
-    tryCatch({pm = setMarkers(s, alleleMatrix = g, sep = alleleSepPM())},
-             error = showErr)
-    tryCatch({pm = .setLocusAttrs(pm, loci = locusAttrs(), tag = "PM")},
-             error = showErr)
-    pm
-  })
+  alleleMatAM = reactive(if(!is.null(g <- genoAM()) && !is.null(s <- alleleSepAM()))
+    pedtools:::split_genotype_cols(as.matrix(g), s))
 
-  mainAM = reactive({ .debug("mainAM")
-    if(is.null(g <- genoAM()) || is.null(peddata <- pedigrees()))
-      return(NULL)
-    g[g == ""] = NA
-
-    peds = lapply(peddata, `[[`, "ped")
-
-    am = NULL
-    tryCatch({am = setMarkers(peds, alleleMatrix = g, sep = alleleSepAM())},
-             error = showErr)
-    tryCatch({am = .setLocusAttrs(am, loci = locusAttrs(), tag = "AM")},
-             error = showErr)
-    am
-  })
-
-  mainMissing = reactive(unlist(lapply(pedigrees(), `[[`, "miss"), use.names = FALSE))
-
-  currentDviData = reactive({ .debug("update currentDviData; miss =", mainMissing())
-    dviData(am = mainAM(), pm = mainPM(), missing = mainMissing())
-  })
-
-  observeEvent(currentDviData(), resetAnalysis(resetAnalysis() + 1))
-
-  # Set complete DVI --------------------------------------------------------
+  # State for loaded/imported DVI data -------------------------------------
 
   setCompleteDVI = reactiveVal(NULL)
+  appData = reactiveVal(NULL)
+  loading = reactiveVal(FALSE)
 
-  observeEvent(dataServerAM$completeDvi(), { .debug("AM complete dvi")
-    setCompleteDVI(dataServerAM$completeDvi())}, ignoreNULL = TRUE)
+  dbChoice = reactiveVal("builtin")
+  mutChoice = reactiveVal("none")
 
-  observeEvent(dataServerPM$completeDvi(), { .debug("PM complete dvi:")
-    setCompleteDVI(dataServerPM$completeDvi())}, ignoreNULL = TRUE)
+  ignoreDbInput = reactiveVal(FALSE)
+  ignoreMutInput = reactiveVal(FALSE)
 
-  observeEvent(setCompleteDVI(), { .debug("set complete dvi")
-    dvi = setCompleteDVI() |> dvir:::consolidateDVI(dedup = TRUE)
-    am1 = dvi$am[[1]]
+  normalizeLoadedDvi = function(dvi) { .debug("normalizeLoadedDvi")
+    dvi = dvir:::consolidateDVI(dvi, dedup = TRUE)
+    peds = lapply(dvi$am, function(a) list(ped = a,
+                                           miss = .myintersect(dvi$missing, a$ID),
+                                           refs = typedMembers(a)))
 
-    # Database and custom mutation models
-    db = getFreqDatabase(am1)
-    mut = getLocusAttributes(am1, attribs = "mutmod", simplify = TRUE)
-    externalLoci$db = db
-    externalLoci$mut = mut
-    externalLoci$hasMut = sum(lengths(mut)) > 0 # quick hack to see if list of NULL's
+    mutmods = getLocusAttributes(dvi$am, attribs = "mutmod", simplify = TRUE)
+    mutparams = lapply(mutmods, \(mut) pedmut::getParams(mut, format = 4))
 
-    updateRadioButtons(session, "dbtype", selected = "original")
-    updateRadioButtons(session, "muttype", selected = if(externalLoci$hasMut) "original" else "none")
+    list(am = getGenotypesAndSex(dvi$am),
+         pm = getGenotypesAndSex(dvi$pm),
+         peds = peds,
+         db = getFreqDatabase(dvi$am),
+         mutparams = mutparams,
+         hasMut = sum(lengths(mutparams)) > 0)
+  }
 
-    DB(db)
-    externalAM(getGenotypesAndSex(dvi$am))
-    externalPM(getGenotypesAndSex(dvi$pm))
+  syncRadio = function(id, value, flag) {
+    flag(TRUE)
+    freezeReactiveValue(input, id)
+    updateRadioButtons(session, id, selected = value)
+  }
 
-    peds = lapply(dvi$am, function(a)
-      list(ped = a, miss = .myintersect(dvi$missing, a$ID), refs = typedMembers(a)))
-    pedigrees(peds)
+  observeEvent(input$dbtype, {
+    if(ignoreDbInput()) {
+      ignoreDbInput(FALSE)
+      return()
+    }
+    dbChoice(input$dbtype)
+  }, ignoreInit = TRUE, priority = 100)
 
-    # Reset
+  observeEvent(input$muttype, {
+    if(ignoreMutInput()) {
+      ignoreMutInput(FALSE)
+      return()
+    }
+    mutChoice(input$muttype)
+  }, ignoreInit = TRUE, priority = 100)
+
+  loadDvi = function(dvi) { .debug("loadDvi")
+    dat = normalizeLoadedDvi(dvi)
+    loading(TRUE)
+
+    appData(dat)
+    pedigrees(dat$peds)
+    externalAM(dat$am)
+    externalPM(dat$pm)
+
+    dbChoice("original")
+    mutChoice(if(dat$hasMut) "original" else "none")
+
+    syncRadio("dbtype", "original", ignoreDbInput)
+    syncRadio("muttype", if(dat$hasMut) "original" else "none", ignoreMutInput)
+
+    session$onFlushed(function() loading(FALSE), once = TRUE)
+  }
+
+  observeEvent(setCompleteDVI(), {
+    loadDvi(setCompleteDVI())
     setCompleteDVI(NULL)
   }, ignoreNULL = TRUE)
 
-  # Load example
-  observeEvent(input$example, { .debug("load example:", input$example)
-    dvi = get(req(input$example))
-    setCompleteDVI(dvi)
+  observeEvent(input$example, {
+    loadDvi(get(req(input$example)))
   }, ignoreInit = TRUE)
 
-  # Empty example when other data is loaded
-  observeEvent(c(dataServerAM$sources(), dataServerPM$sources()), { .debug("source changed")
-    src = c(dataServerAM$sources(), dataServerPM$sources())
-    if(!all(src == "Example"))
-      isolate(updateSelectInput(session, "example", selected = ""))
+  # Database and mutation settings ----------------------------------------
+
+  customDB = reactive({ .debug("customDB")
+    path = req(input$customDB$datapath)
+    tryCatch(readFreqDatabase(path, sep = "\t"), error = errModal)
   })
 
-  # Frequency database ------------------------------------------------------
+  selectedDB = reactive({ .debug("selectedDB")
+    if(loading())
+      return(NULL)
 
-  observeEvent(DB(), { .debug("reset locusAttrs with new DB")
-    if(is.null(db0 <- DB())) {
-      locusAttrs(NULL)
-      return()
-    }
-
-    # Extend DB with missing alleles from data (if data is loaded)
-    db = db0
-    am = mainAM()
-    pm = mainPM()
-
-    if(!is.null(am) || !is.null(pm)) {
-      miss = missingAlleles(db0, am, pm)
-      print(miss)
-      for(m in names(miss)) {
-        db[[m]] = .addAlleles(db[[m]], miss[[m]])
-      }
-      n = sum(lengths(miss))
-      if(n > 0)
-        showNotification(sprintf("Added %d missing alleles to database", n))
-    }
-
-    nms = names(db) |> .setnames()
-    loci = lapply(nms, function(m) list(name = m, alleles = names(db[[m]]), afreq = as.numeric(db[[m]])))
-    loci = .updateMutmods(loci, mutParams())
-    locusAttrs(loci)
-  })
-
-
-  observeEvent(list(input$dbtype, input$builtinDB, input$customDB),  { .debug("dbtype:", input$dbtype)
-    type = req(input$dbtype)
-    newdb = switch(type,
+    switch(dbChoice(),
       builtin = switch(req(input$builtinDB),
         "norSTR: Africa" = norSTR::africaDB,
         "norSTR: Europe" = norSTR::europeDB,
@@ -415,37 +395,200 @@ server = function(input, output, session) {
         "NorwegianFrequencies (legacy)" = forrel::NorwegianFrequencies,
         NULL
       ),
-      custom = { .debug("database: custom file", input$customDB$name)
-        path = req(input$customDB$datapath)
-        tryCatch(readFreqDatabase(path, sep = "\t"), error = errModal)
-      },
-      original = externalLoci$db
+      custom = customDB(),
+      original = appData()$db, # NULL ok
+      NULL
     )
-    tryCatch(DB(newdb), error = errModal)
   })
 
-  # Mutation models --------------------------------------------------------
+  mutParams = reactive({ .debug("mutParams")
+    if(loading())
+      return(NULL)
+
+    choice = mutChoice() %||% "none"
+
+    switch(choice,
+      none = NULL,
+      standard = {
+        prm = list(model = settings$standardmodel,
+                   rate = list(female = input$mutrateF, male = input$mutrateM))
+        if(prm$model == "stepwise") {
+          prm$rate2 = 1e-6
+          prm$range = 0.1
+        }
+        prm
+      },
+      original = appData()$mutparams # NULL ok
+    )
+  })
+
+  observedAlleles = reactive({ .debug("observedAlleles")
+    amatAM = alleleMatAM()
+    amatPM = alleleMatPM()
+
+    am = pm = NULL
+
+    if(!is.null(amatAM)) {
+      am = lapply(seq_len(ncol(amatAM)/2), function(k)
+        unique.default(as.character(amatAM[, (2*k-1):(2*k)]) |> .mysetdiff(0)))
+      names(am) = markersAM()
+    }
+
+    if(!is.null(amatPM)) {
+      pm = lapply(seq_len(ncol(amatPM)/2), function(k)
+        unique.default(as.character(amatPM[, (2*k-1):(2*k)]) |> .mysetdiff(0)))
+      names(pm) = markersPM()
+    }
+
+    allmarkers = unique.default(c(names(am), names(pm))) |> .setnames()
+    lapply(allmarkers, function(m) sort.default(unique.default(c(am[[m]], pm[[m]]))))
+  })
+
+  DBext = reactive({  .debug("DBext")
+    db = selectedDB()
+    if(is.null(db))
+      return(NULL)
+
+    obs = observedAlleles()
+    if(!length(obs))
+      return(db)
+
+    dbnms = names(db)
+    midx = match(normaliseName(names(obs)), normaliseName(dbnms), nomatch = 0L)
+    allmiss = vector("list", length(obs))
+    names(allmiss) = names(obs)
+
+    for(i in seq_along(obs)) {
+      j = midx[i]
+      if(j == 0L)
+        next
+
+      miss = .mysetdiff(obs[[i]], names(db[[j]]))
+      if(length(miss)) {
+        dbname = dbnms[j]
+        db[[dbname]] = .addAlleles(db[[j]], miss)
+        allmiss[[i]] = miss
+      }
+    }
+
+    attr(db, "added") = allmiss
+    db
+  })
+
+  observeEvent(DBext(), { .debug("DBext observer")
+    db = DBext()
+    n = sum(lengths(attr(db, "added")))
+    if(n > 0)
+      showNotification(sprintf("Added %d missing alleles to database", n))
+  }, ignoreInit = TRUE)
+
+  locusAttrs = reactive({ .debug("locusAttrs")
+    if(loading())
+      return(NULL)
+
+    db2locattrs(DBext(), mutParams())
+  })
+
+  # Derived DVI objects ----------------------------------------------------
+
+  mainMissing = reactive(unlist(lapply(pedigrees(), `[[`, "miss"), use.names = FALSE))
+
+  mainAM = reactive({ .debug("mainAM")
+    if(loading())
+      return(NULL)
+
+    a = alleleMatAM()
+    peds = pedigrees()
+    loci = locusAttrs()
+
+    if(is.null(a) || !length(peds) || !length(loci))
+      return(NULL)
+
+    idx = match(normaliseName(markersAM()), normaliseName(names(loci)), nomatch = 0L)
+
+    if(any(idx == 0L))
+      return(NULL)
+
+    peds = lapply(peds, `[[`, "ped")
+
+    tryCatch(
+      setMarkersDiviana(peds, alleleMatrix = a, loci = loci[idx]),
+      error = showErr
+    )
+  })
+
+  mainPM = reactive({ .debug("mainPM")
+    if(loading())
+      return(NULL)
+
+    a = alleleMatPM()
+    loci = locusAttrs()
+
+    if(is.null(a) || is.null(loci))
+      return(NULL)
+
+    idx = match(normaliseName(markersPM()), normaliseName(names(loci)), nomatch = 0L)
+    if(any(idx == 0L))
+      return(NULL)
+
+    s = pedtools::singletons(rownames(a), sex = sexPM()) |> .setnames(rownames(a))
+
+    tryCatch(
+      setMarkersDiviana(s, alleleMatrix = a, loci = loci[idx]),
+      error = showErr
+    )
+  })
+
+  currentDviData = reactive({ .debug("currentDviData")
+    if(loading())
+      return(NULL)
+
+    am = mainAM()
+    pm = mainPM()
+    missing = mainMissing()
+
+    if(is.null(am) && is.null(pm))
+      return(NULL)
+
+    if(length(missing) && !all(missing %in% labels(am)))
+      message("Something wrong: missing person not in AM!", toString(missing))
+
+    tryCatch(dviData(am = am, pm = pm, missing = missing),
+      error = function(e) {showErr(conditionMessage(e)); NULL})
+  })
+
+  observeEvent(currentDviData(), {
+    resetAnalysis(resetAnalysis() + 1)
+  })
+
+  observeEvent(dataServerAM$completeDvi(), { .debug("AM complete dvi")
+    setCompleteDVI(dataServerAM$completeDvi())
+  }, ignoreNULL = TRUE)
+
+  observeEvent(dataServerPM$completeDvi(), { .debug("PM complete dvi:")
+    setCompleteDVI(dataServerPM$completeDvi())
+  }, ignoreNULL = TRUE)
+
+  observeEvent(c(dataServerAM$sources(), dataServerPM$sources()), { .debug("source changed")
+    src = c(dataServerAM$sources(), dataServerPM$sources())
+    if(!all(src == "Example"))
+      isolate(updateSelectInput(session, "example", selected = ""))
+  })
 
   observe(shinyjs::toggleState("mutApplyAll", condition = input$muttype == "standard"))
-  observe(toggleState(selector = "input[name='muttype'][value='original']", condition = externalLoci$hasMut))
 
-  mutParams = reactive(list(
-    muttype = input$muttype,
-    standardmodel = settings$standardmodel,
-    standardrate = list(female = input$mutrateF, male = input$mutrateM),
-    original = externalLoci$mut))
-
-  observeEvent(list(input$muttype, input$mutApplyAll), { .debug("Change mutation model:", input$muttype, input$mutApplyAll)
-    loci = req(locusAttrs())
-    newloci = .updateMutmods(loci, mutParams())
-    locusAttrs(newloci)
-    showNotification("Updated mutation parameters", type = "message")
+  observe({
+    dat = appData()
+    toggleState(
+      selector = "input[name='muttype'][value='original']",
+      condition = !is.null(dat) && isTRUE(dat$hasMut)
+    )
   })
 
-  # Database: Marker summary table ------------------------------------------
+  # Database: Marker summary table ----------------------------------------
 
-  output$markersummary = DT::renderDT({
-    mtab = markerSummaryDiviana(locAttrs = locusAttrs(), dvi = currentDviData())
+  output$markersummary = DT::renderDT({ .debug("render marker table")
+    mtab = markerSummaryDiviana(locAttrs = req(locusAttrs()), dvi = currentDviData())
     formatDatabaseTable(mtab)
   })
 
