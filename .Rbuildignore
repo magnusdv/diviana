@@ -3,3 +3,5 @@
 ^notes-private$
 ^README\.Rmd$
 ^Rprof.out$
+^\.positai$
+^\.claude$

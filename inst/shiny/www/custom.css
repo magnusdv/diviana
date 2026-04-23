@@ -66,17 +66,6 @@
 */
 
 
-.modal-content:has(.modal-body.autowide) {
-  width: fit-content !important;
-  height: fit-content !important;
-}
-
-
-/* center the modal horizontally */
-.modal-dialog.autowide { margin: 1.75rem auto; }
-
-
-
 /* Analysis tab -----------------------------------*/
 
 #solve {width: 100%}
