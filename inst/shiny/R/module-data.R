@@ -170,12 +170,8 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
       warning = function(e) print(conditionMessage(e)), #showErr, TODO!
       error = function(e) fileError(conditionMessage(e)))
 
-      if(!is.null(rawtable)) {
-        cls = names(rawtable)
-        if("AMEL" %in% cls)
-          rawtable = rawtable[c("AMEL", .mysetdiff(cls, "AMEL"))]
-        mainTable$raw = rawtable
-      }
+      if(!is.null(rawtable))
+        mainTable$raw = rawtable |> moveColsFirst("AMEL")
       else if(!is.null(rawdvi))
         completeDvi$raw = rawdvi
 
@@ -235,6 +231,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
     # Edit -------------------------------------------------------------------
 
     editdata = reactiveVal(NULL)
+    idEdits = reactiveVal(NULL)
 
     observeEvent(input$editButton, { .debug2("open edit UI")
       editdata(req(mainTable$main))
@@ -248,39 +245,80 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
     })
 
     output$editTable = DT::renderDT({ .debug2("render edit table")
-      genoDT(editdata(), editable = TRUE)
+      genoDT(editdata(), scrollY = "300px", editable = TRUE)
     })
 
     # Preserve manually entered aliases
     observeEvent(input$editTable_cell_edit, { .debug2("edit cell")
       dat = editdata()
       ed = input$editTable_cell_edit
-      i = ed$row
-      j = ed$col
+      i = input$editTable_rows_current[ed$row]
+      j = ed$col + 1L # 0 = rownames
       val = ed$value
+      cl = names(dat)[j]
+
       tryCatch({
-        if(j <= 2 && val == "")
+        # Checks
+        if(cl %in% c("Sample", "Alias") && val == "")
           stop2("Value cannot be empty")
-        if(j == 0) {
-          if(val %in% rownames(dat)[-i])
-            stop2("Duplicate sample name: ", val)
+        if(cl == "Sample" && val %in% dat$Sample[-i])
+          stop2("Duplicate sample name: ", val)
+        if(cl == "Alias" && val %in% dat$Alias[-i])
+          stop2("Duplicate alias: ", val)
+
+        # Update row name to match Sample
+        if(cl == "Sample")
           rownames(dat)[i] = val
-        }
-        else {
-          # A few checks
-          cl = names(dat)[j]
-          if(cl == "Sex" && !val %in% c("F", "M", "?"))
-            stop2("Illegal value; sex must be 'F', 'M' or '?'")
-          if(cl == "Alias" && val %in% dat$Alias[-i])
-            stop2("Duplicate alias: ", val)
-          dat[i,j] = val
-        }
+
+        # Perform edit
+        dat[i, j] = val
         editdata(dat)
       }, error = showErr)
     })
 
+    observeEvent(input$editTable_sex_edit, { .debug2("edit sex")
+      dat = editdata()
+      ed = input$editTable_sex_edit
+      i = match(ed$key, dat$.rowid)
+      dat$Sex[i] = ed$value
+      print(ed)
+      print(dat)
+      editdata(dat)
+    })
+
     observeEvent(input$editSave, {  .debug2("edit save")
-      mainTable$main = editdata()
+      old = mainTable$main
+      new = editdata()
+
+      old = old[order(old$.rowid), , drop = FALSE]
+      new = new[order(new$.rowid), , drop = FALSE]
+
+      idch = old$Sample != new$Sample
+      sexch = old$Sex != new$Sex
+      rows = which(idch | sexch)
+
+      sex012 = match(new$Sex, c("M", "F"), nomatch = 0L)
+
+      changes = if("Fam" %in% names(new) && length(rows)) {
+        lapply(split(rows, new$Fam[rows]), function(i) {
+          ii = i[idch[i]]
+          si = i[sexch[i]]
+          list(ids = .setnames(new$Sample[ii], old$Sample[ii]),
+               sex = .setnames(sex012[si], new$Sample[si]))
+        })
+      }
+      else {
+        ids = if(any(idch))  .setnames(new$Sample[idch], old$Sample[idch]) else NULL
+        sex = if(any(sexch)) .setnames(sex012[sexch], new$Sample[sexch]) else NULL
+        if(length(ids) || length(sex))
+          list(ids = ids, sex = sex)
+        else
+          NULL
+      }
+
+      rownames(new) = new$Sample
+      mainTable$main = new
+      idEdits(changes)
       removeModal()
     })
 
@@ -378,6 +416,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
     # Return reactive variables to main app
     list(main = reactive(mainTable$main),
          completeDvi = reactive(completeDvi$import),
+         idEdits = reactive(idEdits()),
          sources = reactive(sources$all))
   })
 
@@ -386,39 +425,75 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
 
 # Utils -------------------------------------------------------------------
 
-
 # Format DT tables
-genoDT = function(dat, sel = "none", scrollY = "220px", editable = FALSE) { #print(" -genoDT"); print(dat)
+genoDT = function(dat, scrollY = "220px", editable = FALSE) {
 
-  # Main view (not edit): Hide alias column if identical to rownames.
+  # Remove Aliases if identical to rownames (main view only; always show in edit mode)
   if(!editable && identical(dat$Alias, rownames(dat)))
     dat$Alias = NULL
 
-  # Prepare DT
-  dt = DT::datatable(dat,
+  nms = names(dat)
+  .mycols = function(cols) .myintersect(cols, nms)
+
+  if(!"Sex" %in% nms) stop2("Missing sex column")
+  if(!".rowid" %in% nms) stop2("Missing `.rowid` column for DT editing")
+
+  if(editable) {
+    editopt = list(target = "cell", disable = list(columns = .mycols(c("Fam", "Sex"))))
+    key = dat$.rowid
+    dat$Sex = sprintf(
+      "<select class='sex-edit' data-key='%s'><option value='F'%s>Female</option><option value='M'%s>Male</option></select>",
+      key,
+      ifelse(dat$Sex == "F", " selected", ""),
+      ifelse(dat$Sex == "M", " selected", "")
+    )
+  }
+  else {
+    editopt = editable
+  }
+
+  dt = DT::datatable(
+    dat,
     class = "stripe hover nowrap compact",
-    #colnames = c("Sample" = 1),
     rownames = FALSE,
+    escape = if(editable) .mycols(setdiff(nms, "Sex")) else TRUE,
+    callback = if(editable) JS("
+      var id = $(table.table().container()).closest('.html-widget').attr('id') + '_sex_edit';
+      table.on('change', 'select.sex-edit', function() {
+        Shiny.setInputValue(id, {
+          key: this.dataset.key,
+          value: this.value,
+          nonce: Math.random()
+        }, {priority: 'event'});
+      });
+    ") else JS("return table;"),
     plugins = "natural",
-    selection = sel,
-    editable = editable,
+    selection = "none",
+    editable = editopt,
     options = list(
-      dom = 't',
+      dom = "t",
       paging = FALSE,
       scrollX = TRUE,
-      scrollY = if(nrow(dat)>10) scrollY else NULL,
-      columnDefs = list(list(type = "natural", targets = 0:1),
-                        list(orderable = TRUE, targets = 0:1),
-                        list(orderable = FALSE, targets = "_all"))
-    )) |>
-    DT::formatStyle(names(dat), target = "row", lineHeight = "75%")
+      scrollY = if(nrow(dat) > 10) scrollY else NULL,
+      columnDefs = list(
+        list(type = "natural", targets = .mycols(c(".rowid", "Fam", "Sample", "Alias"))),
+        list(orderable = TRUE, targets = .mycols(c("Fam", "Sample", "Alias"))),
+        list(orderable = FALSE, targets = "_all"),
+        list(visible = FALSE, targets = .mycols(".rowid"))
+      )
+    )
+  ) |>
+    DT::formatStyle(nms, target = "row", lineHeight = "75%") |>
+    DT::formatStyle("Sex", borderRight = "1px solid #ccc")
 
-    # Separate and colour Sex column if present
-    if("Sex" %in% names(dat))
-      dt = DT::formatStyle(dt, "Sex", borderRight = '1px solid #ccc',
-                           color = DT::styleEqual(c("F", "M"), c("hotpink", "steelblue")))
-    dt
+  if(editable)
+    dt = DT::formatStyle(dt, .mycols("Fam"), color = "#999")
+  else
+    dt = DT::formatStyle(dt, "Sex", color = DT::styleEqual(c("F", "M"), c("hotpink", "steelblue")))
+
+  dt
 }
+
 
 aliasDT = function(dat, scrollY = "250px") {
   res = DT::datatable(dat, rownames = FALSE, selection = "none",
@@ -453,14 +528,14 @@ prepareGenoDf = function(df, id, selectRows = NULL, excludeCols = NULL) {
   if(is.matrix(df))
     df = as.data.frame(df)
 
-  if(!is.null(selectRows))
+  if(length(selectRows))
     df = df[sort(selectRows), , drop = FALSE]
 
   if(length(excludeCols))
     df = df[, !names(df) %in% excludeCols, drop = FALSE]
 
   if(!"Alias" %in% names(df)) {
-    al = paste0(switch(id, PM = "V", AM = "R"), seq_len(nrow(df)))
+    al = switch(id, PM = "V", AM = "R") |> paste0(seq_len(nrow(df)))
     if(!any(al %in% rownames(df)))
       df$Alias = al
     else
@@ -475,8 +550,18 @@ prepareGenoDf = function(df, id, selectRows = NULL, excludeCols = NULL) {
   else
     df$Sex = "?"
 
-  # Put 'Alias' and 'Sex' first
-  df[, c("Alias", "Sex", .mysetdiff(nms, c("Alias", "Sex", "AMEL"))), drop = FALSE]
+  # Check that row names equal Sample
+  if(!identical(rownames(df), df$Sample)) {
+    warning("Row names do not match Sample column; trying to fix")
+    rownames(df) = df$Sample
+  }
+
+  # Key column for DT editing (not visible)
+  df$.rowid = seq_len(nrow(df))
+
+  df$AMEL = NULL
+  df = df |> moveColsFirst(c("Fam", "Sample", "Alias", "Sex"))
+
 }
 
 readRdvi = function(fil) {

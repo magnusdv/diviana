@@ -67,8 +67,8 @@ ui = bs4Dash::bs4DashPage(
     ),
     navbarMenu(
          id = "navmenu",
-         navbarTab(tabName = "database", text = "DATABASE"),
          navbarTab(tabName = "data", text = "DATA"),
+         navbarTab(tabName = "database", text = "MARKERS"),
          navbarTab(tabName = "relatedness", text = "RELATEDNESS"),
          navbarTab(tabName = "analysis", text = "ANALYSIS")
     ),
@@ -274,9 +274,9 @@ server = function(input, output, session) {
   dataServerAM = dataServer("AM", externalAM, .debug = .debug)
 
   genoPM = reactive({ .debug("genoPM", dataServerPM$main())
-    g = dataServerPM$main(); print(head(g)); g$Family = g$Sample = g$Alias = g$AMEL = g$Sex = NULL; g})
+    g = dataServerPM$main(); g$.rowid = g$Fam = g$Sample = g$Alias = g$AMEL = g$Sex = NULL; g})
   genoAM = reactive({ .debug("genoAM", dataServerAM$main())
-    g = dataServerAM$main(); g$Family = g$Sample = g$Alias = g$AMEL = g$Sex = NULL; g})
+    g = dataServerAM$main(); g$.rowid = g$Fam = g$Sample = g$Alias = g$AMEL = g$Sex = NULL; g})
 
   markersPM = reactive(names(genoPM()))
   markersAM = reactive(names(genoAM()))
@@ -289,6 +289,54 @@ server = function(input, output, session) {
 
   alleleMatPM = reactive(splitCols(genoPM()))
   alleleMatAM = reactive(splitCols(genoAM()))
+
+
+  # React to ID edits ---------------------------------------------------------------------------
+
+  observeEvent(dataServerAM$idEdits(), { .debug("ID edits")
+    changes = req(dataServerAM$idEdits())
+    peds = pedigrees()
+    if(!length(peds))
+      return()
+
+    for(fam in names(changes)) {
+      tryCatch({
+        peddat = peds[[fam]]
+        ped = peddat$ped
+        refs = peddat$refs
+        ch = changes[[fam]]
+
+        # ID labels
+        if(length(ch$ids)) {
+          ped = pedtools::relabel(ped, new = ch$ids)
+          peddat$ped = ped
+
+          if(length(refs)) {
+            j = match(refs, names(ch$ids), nomatch = 0L)
+            refs[j > 0L] = unname(ch$ids[j])
+            peddat$refs = refs
+          }
+        }
+
+        # Sex
+        if(length(ch$sex)) {
+          ids = names(ch$sex)
+          oldsex = getSex(ped, ids)
+          newsex = unname(ch$sex)
+          swap = ids[oldsex != newsex & newsex != 0L & oldsex != 0L]
+          ped = pedtools::swapSex(ped, swap, verbose = FALSE)
+          if(any(oldsex == 0))
+            ped = pedtools::setSex(ped, ids[oldsex == 0], sex = newsex[oldsex == 0])
+
+          peddat$ped = ped
+        }
+
+        peds[[fam]] = peddat
+      }, error = showErr)
+    }
+
+    pedigrees(peds)
+  })
 
   # State for loaded/imported DVI data -------------------------------------
 
@@ -311,8 +359,8 @@ server = function(input, output, session) {
     mutmods = getLocusAttributes(dvi$am, attribs = "mutmod", simplify = TRUE)
     mutparams = lapply(mutmods, \(mut) pedmut::getParams(mut, format = 4))
 
-    list(am = getGenotypesAndSex(dvi$am),
-         pm = getGenotypesAndSex(dvi$pm),
+    list(am = genosWithAttrs(dvi$am, fam = TRUE, addCols = TRUE),
+         pm = genosWithAttrs(dvi$pm, fam = FALSE, addCols = TRUE),
          peds = peds,
          db = getFreqDatabase(dvi$am),
          mutparams = mutparams,
@@ -485,23 +533,22 @@ server = function(input, output, session) {
 
   mainMissing = reactive(unlist(lapply(pedigrees(), `[[`, "miss"), use.names = FALSE))
 
-  mainAM = reactive({ .debug("mainAM")
+  mainAM = reactive({ .debug("mainAM", loading())
     if(loading())
       return(NULL)
 
     a = alleleMatAM()
-    peds = pedigrees()
+    peddata = pedigrees()
     loci = locusAttrs()
 
-    if(is.null(a) || !length(peds) || !length(loci))
+    if(is.null(a) || !length(peddata) || !length(loci))
       return(NULL)
 
     idx = match(normaliseName(markersAM()), normaliseName(names(loci)), nomatch = 0L)
-
     if(any(idx == 0L))
       return(NULL)
 
-    peds = lapply(peds, `[[`, "ped")
+    peds = lapply(peddata, `[[`, "ped")
 
     tryCatch(
       setMarkersDiviana(peds, alleleMatrix = a, loci = loci[idx]),
@@ -509,13 +556,13 @@ server = function(input, output, session) {
     )
   })
 
-  mainPM = reactive({ .debug("mainPM")
+  mainPM = reactive({ .debug("mainPM", loading())
     if(loading())
       return(NULL)
 
     a = alleleMatPM()
     loci = locusAttrs()
-print(a); print(sexPM())
+
     if(is.null(a) || is.null(loci))
       return(NULL)
 
@@ -669,6 +716,7 @@ print(a); print(sexPM())
     famids = names(mainAM())
 
     otherFams = mainAM()[-curped]
+    print(otherFams)
     avoidLabs = list(famids = famids[-curped],
                      vics = names(mainPM()),
                      refs = if(nPed() > 1) typedMembers(otherFams) else NULL,
@@ -774,18 +822,31 @@ print(a); print(sexPM())
     if(nPed() == 0)
       showErr("No pedigrees to show")
     req(nPed() > 0)
+    w = if(nPed() > 5) "1000px" else "800px"
+
     showModal(modalDialog(
-      style = "width: fit-content; height: 600px",
       title = "DVI overview",
-      plotOutput("plotdvi"),
-      easyClose = TRUE,
-      class = "autowide"
+      tags$style(HTML("
+        #shiny-modal .modal-dialog {width: fit-content; max-width: 95vw; margin: 1.75rem auto;}
+        #shiny-modal .modal-body {overflow-x: auto;}
+      ")),
+      plotOutput("plotdvi", width = plotdims()$wpx, height = plotdims()$hpx),
+      easyClose = TRUE
     ))
   })
 
-  plotdims = reactive(dvir:::findPlotDims(mainAM(), npm = length(mainPM())))
+  plotdims = reactive({ .debug("plot dims")
+    dvi = currentDviData()
+    k = sum(pedsize(dvi$am))
+    dims = dvir:::findPlotDims(dvi$am, npm = length(dvi$pm))
+    amdims = dims$amSize |> print()
+    w = min(1000, max(400 + 50*amdims[1], 400 + 20*k))
+    h = min(600, max(200 + 50*amdims[2], 250 + 10*k))
+    list(w = w, h = h, wpx = paste0(w, "px"), hpx = paste0(h, "px"))
+  })
 
   output$plotdvi = renderPlot({ .debug("render Overview plot")
+    print(plotdims())
     dvi = currentDviData()
     req(length(dvi$am) > 0, length(dvi$pm) > 0, length(dvi$missing) > 0)
     labs = c(rownames(genoAM()), rownames(genoPM()), dvi$missing)
@@ -798,9 +859,9 @@ print(a); print(sexPM())
                stop2(msg)
              })
   }, res = 96,
-  width = function() if(nPed() > 5) 1000 else 800,
-  height = function() 600,
-  execOnResize = TRUE)
+  width = function() plotdims()$w,
+  height = function() plotdims()$h,
+  execOnResize = FALSE)
 
 
   # Tab: Triangles ----------------------------------------------------------
@@ -1058,7 +1119,7 @@ print(a); print(sexPM())
 
   observe({
     if(DEVMODE) { .debug("devmode!")
-      #updateSelectInput(session, "example", selected = "planecrash")
+      updateSelectInput(session, "example", selected = "exclusionExample")
       #updateNavbarTabs(session, "navmenu", selected = "database")
     }
   })

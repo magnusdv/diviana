@@ -165,6 +165,14 @@ naReplace = function(v, repl = 0) {
   v
 }
 
+moveColsFirst = function(x, cols) {
+  cols = .myintersect(cols, names(x))
+  if(!length(cols))
+    return(x)
+  neword = c(cols, .mysetdiff(names(x), cols))
+  x[, neword, drop = FALSE]
+}
+
 abbrMat = function(x)
   x[, seq_len(min(3, ncol(x))), drop = FALSE]
 
@@ -175,27 +183,10 @@ amel2sex = function(amel) {
   sex
 }
 
-getSexFromAMEL = function(g) {
-  sex = integer(nrow(g))
-  if(!is.null(g$AMEL)) {
-    sex[g$AMEL == "X/Y"] = 1L
-    sex[g$AMEL == "X/X"] = 2L
-  }
-  sex
-}
-
-getAlleleSep = function(g) {
-  if(ncol(g) == 0) return()
-  if(any(grepl("/", g[,1], fixed = TRUE))) return("/")
-  if(any(grepl(",", g[,1], fixed = TRUE))) return(",")
-  return(" ")
-}
-
 useAlias = function(labs, alias) {
   names(labs) = ifelse(labs %in% names(alias), alias[labs], "")
   labs
 }
-
 
 rbindSafe = function(df1, df2) {
   if(is.null(df1))
@@ -203,7 +194,12 @@ rbindSafe = function(df1, df2) {
   cols = union(names(df1), names(df2))
   df1[.mysetdiff(cols, names(df1))] = NA
   df2[.mysetdiff(cols, names(df2))] = NA
-  rbind(df1[, cols], df2[, cols])
+  res = rbind(df1[, cols], df2[, cols])
+
+  if(".rowid" %in% cols)
+    res$.rowid = seq_len(nrow(res))
+
+  res
 }
 
 # Expand getGenotypes() adding fam/id/sex as attributes or columns
@@ -227,11 +223,10 @@ genosWithAttrs = function(x, fam = TRUE, addCols = FALSE) {
 
   # Add cols in front
   if(addCols) {
-    old = colnames(df)
-    df$Fam = famvec
+    if(fam) df$Fam = famvec
     df$Sample = ids
     df$Sex = sex
-    df = df[, c(if(fam) "Fam", "Sample", "Sex", old), drop = FALSE]
+    df = df |> moveColsFirst(c("Fam", "Sample", "Sex"))
   }
   else {
     df = structure(df, Fam = if(fam) famvec else NULL, Sample = ids, Sex = sex)
@@ -337,7 +332,7 @@ setMarkersDiviana = function(x, alleleMatrix, loci) { #print("--inside setMarker
   x
 }
 
-splitCols = function(x, sep = NULL) { print(x)
+splitCols = function(x, sep = NULL) { #print(x)
   if(is.null(x))
     return(NULL)
 
@@ -352,7 +347,7 @@ splitCols = function(x, sep = NULL) { print(x)
   if(all(nas))
     return(res)
 
-  sep = sep %||% getAlleleSep(x)
+  sep = sep %||% getAlleleSep(x[,1])
 
   nonNA = x[!nas][1]
   if(!grepl(sep, nonNA))
@@ -369,4 +364,10 @@ splitCols = function(x, sep = NULL) { print(x)
   res[, evencols - 1] = splitvec[evenidx - 1]
   res[, evencols]     = splitvec[evenidx]
   res
+}
+
+getAlleleSep = function(v) {
+  for(s in c("/", ",", "-", ";", " "))
+    if(any(grepl(s, v, fixed = TRUE))) return(s)
+  stop2("No separator found: ", v)
 }
