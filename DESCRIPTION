@@ -7,27 +7,29 @@ Authors@R:
            comment = c(ORCID = "0000-0002-9134-4962"))
 Description: A 'shiny' application for disaster victim identification.
 License: GPL (>= 3)
+URL: https://github.com/magnusdv/diviana
+BugReports: https://github.com/magnusdv/diviana/issues
 Depends: 
-    R (>= 4.1)
+    R (>= 4.2)
 Imports:
-    shiny,
-    bs4Dash
+    bs4Dash,
+    shiny
 Suggests:
-    dvir (>= 3.3.2),
-    forrel (>= 1.7.1),
-    pedtools (>= 2.7.1),
+    DT,
+    dvir (>= 3.4.0),
+    forrel,
+    gt,
     openxlsx,
     pedFamilias,
-    pedmut (>= 0.7.1),
-    pedprobr (>= 0.9.4),
+    pedmut,
+    pedprobr,
+    pedtools,
     plotly,
-    shinyjs,
     shinyWidgets,
-    verbalisr (>= 0.7.1)
+    shinyjs,
+    verbalisr
 Encoding: UTF-8
 Language: en-GB
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
-URL: https://github.com/magnusdv/diviana
-BugReports: https://github.com/magnusdv/diviana/issues
