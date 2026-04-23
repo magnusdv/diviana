@@ -281,8 +281,6 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
       ed = input$editTable_sex_edit
       i = match(ed$key, dat$.rowid)
       dat$Sex[i] = ed$value
-      print(ed)
-      print(dat)
       editdata(dat)
     })
 

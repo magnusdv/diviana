@@ -632,7 +632,7 @@ server = function(input, output, session) {
   })
 
   observeEvent(input$chartButton, { .debug("freq chart")
-    i = req(input$markersummary_rows_selected); print(i)
+    i = req(input$markersummary_rows_selected)
     loc = req(locusAttrs()[[i]])
     mname = loc$name
     freqs = .setnames(loc$afreq, loc$alleles)
@@ -716,7 +716,6 @@ server = function(input, output, session) {
     famids = names(mainAM())
 
     otherFams = mainAM()[-curped]
-    print(otherFams)
     avoidLabs = list(famids = famids[-curped],
                      vics = names(mainPM()),
                      refs = if(nPed() > 1) typedMembers(otherFams) else NULL,
@@ -839,14 +838,13 @@ server = function(input, output, session) {
     dvi = currentDviData()
     k = sum(pedsize(dvi$am))
     dims = dvir:::findPlotDims(dvi$am, npm = length(dvi$pm))
-    amdims = dims$amSize |> print()
+    amdims = dims$amSize
     w = min(1000, max(400 + 50*amdims[1], 400 + 20*k))
     h = min(600, max(200 + 50*amdims[2], 250 + 10*k))
     list(w = w, h = h, wpx = paste0(w, "px"), hpx = paste0(h, "px"))
   })
 
   output$plotdvi = renderPlot({ .debug("render Overview plot")
-    print(plotdims())
     dvi = currentDviData()
     req(length(dvi$am) > 0, length(dvi$pm) > 0, length(dvi$missing) > 0)
     labs = c(rownames(genoAM()), rownames(genoPM()), dvi$missing)
