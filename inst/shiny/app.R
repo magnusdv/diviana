@@ -47,7 +47,7 @@ addResourcePath("icons", "www/static_icons")
 #---------------------------------------------
 
 
-DEVMODE = T
+DEVMODE = F
 
 DATASETS = c("example1", "example2", "exclusionExample", "fire", "grave", "icmp", "planecrash")
 
