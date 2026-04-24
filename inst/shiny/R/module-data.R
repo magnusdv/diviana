@@ -172,8 +172,14 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
 
       if(!is.null(rawtable))
         mainTable$raw = rawtable |> moveColsFirst("AMEL")
-      else if(!is.null(rawdvi))
-        completeDvi$raw = rawdvi
+      else if(!is.null(rawdvi)) {
+        if(id == "AM" && !length(rawdvi$am))
+          fileError("No AM samples found in this DVI dataset")
+        else if(id == "PM" && !length(rawdvi$pm))
+          fileError("No PM samples found in this DVI dataset")
+        else
+          completeDvi$raw = rawdvi
+      }
 
       sources$current = input$file$name
     })
@@ -197,7 +203,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
       df
     })
 
-    output$previewTable = DT::renderDT(genoDT(dfFiltered(), sel = "multiple"))
+    output$previewTable = DT::renderDT(genoDT(dfFiltered(), selection = "multiple"))
 
     observeEvent(input$importSave, { .debug2("import save", input$importWhat)
       if(!is.null(completeDvi$raw) && input$importWhat == "everything") {
@@ -424,7 +430,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
 # Utils -------------------------------------------------------------------
 
 # Format DT tables
-genoDT = function(dat, scrollY = "220px", editable = FALSE) {
+genoDT = function(dat, selection = "none", scrollY = "220px", editable = FALSE) {
 
   # Remove Aliases if identical to rownames (main view only; always show in edit mode)
   if(!editable && identical(dat$Alias, rownames(dat)))
@@ -434,10 +440,12 @@ genoDT = function(dat, scrollY = "220px", editable = FALSE) {
   .mycols = function(cols) .myintersect(cols, nms)
 
   if(!"Sex" %in% nms) stop2("Missing sex column")
-  if(!".rowid" %in% nms) stop2("Missing `.rowid` column for DT editing")
+  #if(!".rowid" %in% nms) stop2("Missing `.rowid` column for DT editing")
 
   if(editable) {
-    editopt = list(target = "cell", disable = list(columns = .mycols(c("Fam", "Sex"))))
+    if(!".rowid" %in% nms) stop2("Missing `.rowid` column for DT editing")
+    editopt = list(target = "cell",
+                   disable = list(columns = .mycols(c("Fam", "Sex"))))
     key = dat$.rowid
     dat$Sex = sprintf(
       "<select class='sex-edit' data-key='%s'><option value='F'%s>Female</option><option value='M'%s>Male</option></select>",
@@ -466,7 +474,7 @@ genoDT = function(dat, scrollY = "220px", editable = FALSE) {
       });
     ") else JS("return table;"),
     plugins = "natural",
-    selection = "none",
+    selection = selection,
     editable = editopt,
     options = list(
       dom = "t",

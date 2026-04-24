@@ -352,17 +352,25 @@ server = function(input, output, session) {
 
   normalizeLoadedDvi = function(dvi) { .debug("normalizeLoadedDvi")
     dvi = dvir:::consolidateDVI(dvi, dedup = TRUE)
-    peds = lapply(dvi$am, function(a) list(ped = a,
-                                           miss = .myintersect(dvi$missing, a$ID),
-                                           refs = typedMembers(a)))
+    peds = db = mutparams = NULL
 
-    mutmods = getLocusAttributes(dvi$am, attribs = "mutmod", simplify = TRUE)
-    mutparams = lapply(mutmods, \(mut) pedmut::getParams(mut, format = 4))
+    if(length(dvi$am))
+      db = getFreqDatabase(dvi$am)
+    else if(length(dvi$pm))
+      db = getFreqDatabase(dvi$pm)
+
+    if(length(dvi$am)) {
+      peds = lapply(dvi$am, function(a) list(ped = a,
+                                             miss = .myintersect(dvi$missing, a$ID),
+                                             refs = typedMembers(a)))
+
+      mutmods = getLocusAttributes(dvi$am, attribs = "mutmod", simplify = TRUE)
+      mutparams = lapply(mutmods, \(mut) pedmut::getParams(mut, format = 4))
+    }
 
     list(am = genosWithAttrs(dvi$am, fam = TRUE, addCols = TRUE),
          pm = genosWithAttrs(dvi$pm, fam = FALSE, addCols = TRUE),
-         peds = peds,
-         db = getFreqDatabase(dvi$am),
+         peds = peds, db = db,
          mutparams = mutparams,
          hasMut = sum(lengths(mutparams)) > 0)
   }

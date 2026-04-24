@@ -204,6 +204,9 @@ rbindSafe = function(df1, df2) {
 
 # Expand getGenotypes() adding fam/id/sex as attributes or columns
 genosWithAttrs = function(x, fam = TRUE, addCols = FALSE) {
+  if(!length(x))
+    return()
+
   if(is.ped(x))
     x = list(a = x)
 
