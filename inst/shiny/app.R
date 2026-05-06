@@ -221,7 +221,9 @@ ui = bs4Dash::bs4DashPage(
                     tabPanel(title = "PM", gt::gt_output("pmcentric")),
                     tabPanel(title = "LR matrix", gt::gt_output("lrmatrix")),
                     tabPanel(title = "Exclusions", gt::gt_output("exmatrix")),
-                    tabPanel(title = "log", verbatimTextOutput("solvelog"))
+                    tabPanel(title = "Joint", uiOutput("jointtabs")),
+                    tabPanel(title = "Log", div(style = "height: 600px; overflow: auto",
+                                                verbatimTextOutput("solvelog")))
          )
       ),
 
@@ -955,7 +957,7 @@ server = function(input, output, session) {
 
   # Tab: Analysis ---------------------------------------------------------------
 
-  solutionTable = reactiveValues(AM = NULL, PM = NULL, LR = NULL, EX = NULL)
+  solutionTable = reactiveValues(AM = NULL, PM = NULL, LR = NULL, EX = NULL, JT = NULL)
   logMessage = reactiveVal("")
 
   observeEvent(input$solve, { .debug("solve")
@@ -963,9 +965,10 @@ server = function(input, output, session) {
     req(length(dvi$am) > 0, length(dvi$pm) > 0, length(dvi$missing) > 0)
     res = NULL
     tryCatch({
-      res = captureOutput(dviSolve, dvi, threshold = input$LRthresh, maxIncomp = input$maxIncomp,
-                    ignoreSex = input$ignoresex, verbose = TRUE, debug = DEVMODE,#,input$debug,
-                    detailedOutput = TRUE)
+      res = captureOutput(dviSolve, dvi, threshold = input$LRthresh,
+                          maxIncomp = input$maxIncomp,
+                          ignoreSex = input$ignoresex, verbose = TRUE,
+                          debug = DEVMODE, detailedOutput = TRUE)
       },
       error = function(e) {
         msg = conditionMessage(e)
@@ -982,6 +985,7 @@ server = function(input, output, session) {
     solutionTable$PM = res$result$PM
     solutionTable$LR = res$result$LRmatrix
     solutionTable$EX = res$result$exclusionMatrix
+    solutionTable$JT = res$result$jointTable
     logMessage(res$log)
   })
 
@@ -997,7 +1001,7 @@ server = function(input, output, session) {
     solutionTable$PM = data.frame(Sample = vics, Missing = e2, Family = e2,
                                   LR = e2, GLR = e2, Conclusion = e2, Comment = e2)
     # LR and exclusion matrices
-    solutionTable$LR = solutionTable$EX = NULL
+    solutionTable$LR = solutionTable$EX = solutionTable$JT = NULL
   })
 
   output$amcentric = gt::render_gt({  .debug("render result AM")
@@ -1019,6 +1023,29 @@ server = function(input, output, session) {
     m = req(solutionTable$EX) |> completeMatrix(names(dvi$pm), dvi$missing)
     formatExclusionMatrix(m, input$maxIncomp, settings$useAliases, aliasPM = aliasPM())
   }, height = 600)
+
+  output$jointtabs = renderUI({ .debug("render joint tables")
+    dvi = currentDviData()
+    JT = solutionTable$JT
+
+    if(!length(JT))
+      return(tags$em("No joint tables"))
+
+    labs = names(JT)
+
+    tabs = lapply(seq_along(JT), \(i) {
+      id = paste0("joint-", i)
+      local({
+        ii = i
+        gttab = formatJointTab(JT[[ii]], vics = names(dvi$pm), miss = dvi$missing,
+                               usealias = settings$useAliases, aliasPM = aliasPM())
+        output[[id]] = gt::render_gt(gttab)
+      })
+      tabPanel(labs[i], div(style = "height: 560px; overflow: auto", gt::gt_output(id)))
+    })
+
+    do.call(tabsetPanel, tabs)
+  })
 
   output$solvelog = renderText({ .debug("render result log")
     logMessage()[-1] |> paste0(collapse = "\n")

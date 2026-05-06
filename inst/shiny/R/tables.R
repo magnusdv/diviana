@@ -67,12 +67,9 @@ formatResultTable = function(x, usealias = FALSE, aliasPM = NULL, style = 6) {
 
   tab = tab |>
     sub_missing(missing_text = "") |>
-    fmt_scientific(c("LR", "GLR"), n_sigfig = 3, exp_style = "e",
-                   force_sign_n = TRUE) |>
-    fmt_number("LR", decimals = 2,
-               rows = LR >= 0.1 & LR < 1000) |>
-    fmt_number("GLR", decimals = 2,
-               rows = GLR >= 0.1 & GLR < 1000) |>
+    fmt_scientific(c("LR", "GLR"), decimals = 2, exp_style = "e", force_sign_n = TRUE) |>
+    fmt_number("LR",  decimals = 2, rows = LR >= 0.1 & LR < 1000) |>
+    fmt_number("GLR", decimals = 2, rows = GLR >= 0.1 & GLR < 1000) |>
     cols_add(colour = COLS_BG[Conclusion]) |>
     cols_hide("colour") |>
     tab_style(
@@ -386,6 +383,48 @@ formatLRmatrix = function(m, LRthresh = 1e4, usealias = FALSE,
   }
 
   tbl
+}
+
+formatJointTab = function(x, vics, miss, usealias = FALSE, aliasPM = NULL) {
+  clnms = colnames(x)
+  vcol = clnms %in% vics
+  mcol = clnms %in% miss
+  if(usealias && !is.null(aliasPM))
+    colnames(x)[vcol] = aliasPM[clnms[vcol]]
+
+  nr = nrow(x)
+  nc = ncol(x)
+  wraptxt = if(any(colnames(x) > 7)) NULL else "nowrap"
+
+  gt(x) |>
+    opt_row_striping() |>
+    tab_options(
+      table.align = "left",
+      data_row.padding = if(nr > 15) px(1) else px(2),
+      table.font.size = if(nc > 15) "90%" else "95%",
+      container.overflow.x = TRUE,
+      container.overflow.y = TRUE,
+      #container.width = pct(100),
+      #table.width = pct(100),
+    ) |>
+    tab_style(
+      style = cell_text(weight = "bold", whitespace = wraptxt),
+      locations = list(cells_column_labels())
+    ) |>
+    fmt_number("loglik", decimals = 2) |>
+    fmt_scientific("LR", decimals = 2, exp_style = "e") |>
+    tab_style(
+      style = cell_fill(color = "#E6E6FA"),
+      locations = cells_column_labels(which(mcol))
+    ) |>
+    tab_style(
+      style = cell_fill(color = "#FFE5B4"),
+      locations = cells_column_labels(which(vcol))
+    ) |>
+    tab_style(
+      style = cell_text(align = "center"),
+      locations = list(cells_body(), cells_column_labels())
+    )
 }
 
 # Used in the main app: Insert missing row/columns
