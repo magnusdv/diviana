@@ -96,7 +96,8 @@ ui = bs4Dash::bs4DashPage(
     tags$head(tags$script(src = "scripts.js")),
 
     useShinyjs(),
-    useBusyIndicators(spinners = FALSE, pulse = TRUE),
+    useBusyIndicators(spinners = FALSE, pulse = TRUE, fade = FALSE),
+    busyIndicatorOptions(pulse_height = "10px"),
 
    tabItems(
 
