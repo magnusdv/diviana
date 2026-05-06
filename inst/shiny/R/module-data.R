@@ -341,8 +341,9 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
           column(6,
             radioButtons(ns("aliasMethod"), "Choose method:",
                          choices = list("Sequence with prefix" = "prefix",
-                                        "Remove strings" = "remove",
-                                        "Extract string" = "extract"),
+                                        "Cut at first" = "cut",
+                                        "Remove text" = "remove",
+                                        "Extract text" = "extract"),
                          selected = "prefix")
           ),
           column(6,
@@ -373,7 +374,12 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
         res = paste0(inp, seq_along(origs))
       }
       else tryCatch({ # catch invalid regexpr
-        if(method == "remove") {
+        if(method == "cut") {
+          r = regexpr(inp, origs, fixed = TRUE)
+          res = origs
+          res[r > 0] = substr(origs[r > 0], 1, r[r > 0] - 1)
+        }
+        else if(method == "remove") {
           pattern = strsplit(inp, ",")[[1]] |> paste(collapse = "|")
           res = gsub(pattern, "", origs)
         }
@@ -396,6 +402,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
       ns = session$ns
       switch(input$aliasMethod,
              prefix = textInput(ns("prefix"), "Prefix:", value = switch(id, PM = "V", AM = "R", "ID")),
+             cut = textInput(ns("cut"), "Any character or space:"),
              remove = textInput(ns("remove"), "Strings (separate w/comma):"),
              extract = textInput(ns("extract"), "Regex pattern to match:"))
     })
