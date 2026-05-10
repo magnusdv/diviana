@@ -271,66 +271,58 @@ server = function(input, output, session) {
 
   externalPM = reactiveVal(NULL)
   externalAM = reactiveVal(NULL)
+  assignedRefs = reactiveVal(NULL)
   externalLoci = reactiveValues(db = NULL, mut = NULL, hasMut = FALSE) # `mut` becomes named list
 
   dataServerPM = dataServer("PM", externalPM, .debug = .debug)
-  dataServerAM = dataServer("AM", externalAM, .debug = .debug)
+  dataServerAM = dataServer("AM", externalAM, assignedRefs, .debug = .debug)
 
-  genoPM = reactive({ .debug("genoPM", dataServerPM$main())
-    g = dataServerPM$main(); g$.rowid = g$Fam = g$Sample = g$Alias = g$AMEL = g$Sex = NULL; g})
   genoAM = reactive({ .debug("genoAM", dataServerAM$main())
     g = dataServerAM$main(); g$.rowid = g$Fam = g$Sample = g$Alias = g$AMEL = g$Sex = NULL; g})
+  genoPM = reactive({ .debug("genoPM", dataServerPM$main())
+    g = dataServerPM$main(); g$.rowid = g$Fam = g$Sample = g$Alias = g$AMEL = g$Sex = NULL; g})
 
-  markersPM = reactive(names(genoPM()))
   markersAM = reactive(names(genoAM()))
+  markersPM = reactive(names(genoPM()))
 
-  sexPM = reactive(match(dataServerPM$main()$Sex, c("M", "F"), nomatch = 0L))
-  sexAM = reactive(match(dataServerAM$main()$Sex, c("M", "F"), nomatch = 0L))
+  sexAM = reactive({g = dataServerAM$main(); .setnames(match(g$Sex, c("M", "F"), 0L), rownames(g))})
+  sexPM = reactive({g = dataServerPM$main(); .setnames(match(g$Sex, c("M", "F"), 0L), rownames(g))})
 
-  aliasPM = reactive({g = dataServerPM$main(); .setnames(g$Alias, rownames(g))})
   aliasAM = reactive({g = dataServerAM$main(); .setnames(g$Alias, rownames(g))})
+  aliasPM = reactive({g = dataServerPM$main(); .setnames(g$Alias, rownames(g))})
 
-  alleleMatPM = reactive(splitCols(genoPM()))
   alleleMatAM = reactive(splitCols(genoAM()))
-
+  alleleMatPM = reactive(splitCols(genoPM()))
 
   # React to ID edits ---------------------------------------------------------------------------
 
   observeEvent(dataServerAM$idEdits(), { .debug("ID edits")
     changes = req(dataServerAM$idEdits())
+    idch = changes$ids  # named vector
+    sxch = changes$sex  # named vector
     peds = pedigrees()
-    if(!length(peds))
-      return()
 
-    for(fam in names(changes)) {
+    for(fam in names(peds)) {
+      peddat = peds[[fam]]
+      ped = peddat$ped
+
       tryCatch({
-        peddat = peds[[fam]]
-        ped = peddat$ped
-        refs = peddat$refs
-        ch = changes[[fam]]
 
-        # ID labels
-        if(length(ch$ids)) {
-          ped = pedtools::relabel(ped, new = ch$ids)
-          peddat$ped = ped
-
-          if(length(refs)) {
-            j = match(refs, names(ch$ids), nomatch = 0L)
-            refs[j > 0L] = unname(ch$ids[j])
-            peddat$refs = refs
-          }
+        if(length(idch)) {
+          peddat$ped = pedtools::relabel(ped, new = idch)
+          j = match(peddat$refs, names(idch), nomatch = 0L)
+          if(any(j > 0L))
+            peddat$refs[j > 0L] = unname(idch[j])
         }
 
-        # Sex
-        if(length(ch$sex)) {
-          ids = names(ch$sex)
-          oldsex = getSex(ped, ids)
-          newsex = unname(ch$sex)
-          swap = ids[oldsex != newsex & newsex != 0L & oldsex != 0L]
+        if(length(sxch)) {
+          ids = names(sxch)
+          oldsex = pedtools::getSex(ped, ids)
+          newsex = unname(sxch)
+          swap = ids[oldsex * newsex == 2]  # one is 1 and the other 2
           ped = pedtools::swapSex(ped, swap, verbose = FALSE)
           if(any(oldsex == 0))
             ped = pedtools::setSex(ped, ids[oldsex == 0], sex = newsex[oldsex == 0])
-
           peddat$ped = ped
         }
 

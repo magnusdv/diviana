@@ -15,7 +15,7 @@ dataUI = function(id, title = paste(id, "data")) {
   )
 }
 
-dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
+dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = reactiveVal(), .debug = NULL) {
   .debug2 = if(!is.null(.debug)) function(...) .debug(sprintf("-%s data:", id), ...)
 
   moduleServer(id, function(input, output, session) { .debug2("server")
@@ -35,7 +35,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
         return()
       }
       else {
-        mainTable$main = externalData() |> prepareGenoDf(id = id)
+        mainTable$main = externalData() |> standardiseGenoData(id = id)
         completeDvi$raw = completeDvi$import = NULL
       }
     }, ignoreInit = TRUE, ignoreNULL = FALSE)
@@ -59,9 +59,9 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
                                     `Text file` = "txt",
                                     `dviData (.RData/.rds)` = "rdata"),
                         selected = filetypeSaved(),
-                        choicesOpt = list(disabled = c(FALSE, TRUE, TRUE, FALSE),
-                                          style = c("", rep("color: gray !important;", 2), ""),
-                                          icon = c("", rep("fa-ban", 2), "")),
+                        choicesOpt = list(disabled = c(FALSE, FALSE, TRUE, FALSE),
+                                          style = c("", "", "color: gray !important;", ""),
+                                          icon = c("", "", "fa-ban", "")),
                         options = pickerOptions(style = "btn-outline-primary",
                                                 iconBase = "fas"))),
           column(8,
@@ -121,7 +121,8 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
     output$tableContent = renderUI({ .debug2("update raw table")
       req(mainTable$raw)
       tagList(
-        em("If you only want to import some of the samples, select them before clicking Save."),
+        em("If you only want to import some of the samples, select them before clicking Save.",
+           style = "color: tomato;"),
         DT::DTOutput(ns("previewTable")),
         if(input$filetype == "gm") {
           div(style = "margin:5px 0;",
@@ -149,7 +150,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
     observeEvent(input$importWhat, { .debug2("importWhat =", input$importWhat)
       if(input$importWhat == "samples") {
         s = switch(id, AM = completeDvi$raw$am, PM = completeDvi$raw$pm)
-        mainTable$raw = genosWithAttrs(s, addCols = TRUE, fam = id == "AM")
+        mainTable$raw = genosWithAttrs(s, addCols = c("Sample", "Sex"))
       }
       else
         mainTable$raw = NULL
@@ -159,7 +160,6 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
       req(input$file)
       path = input$file$datapath
       fileError(NULL)
-
       rawdvi = rawtable = NULL
       tryCatch(switch(input$filetype,
         fam   = { rawdvi = dvir::familias2dvir(path, missingFormat = "M[FAM]-[IDX]", verbose = FALSE)},
@@ -203,7 +203,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
       df
     })
 
-    output$previewTable = DT::renderDT(genoDT(dfFiltered(), selection = "multiple"))
+    output$previewTable = DT::renderDT(previewGenoDT(dfFiltered()))
 
     observeEvent(input$importSave, { .debug2("import save", input$importWhat)
       if(!is.null(completeDvi$raw) && input$importWhat == "everything") {
@@ -213,9 +213,9 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
         return()
       }
       # If not complete DVI
-      df = prepareGenoDf(dfFiltered(), id,
-                         selectRows = input$previewTable_rows_selected,
-                         excludeCols = input$excludeCols)
+      df = standardiseGenoData(dfFiltered(), id,
+                               selectRows = input$previewTable_rows_selected,
+                               excludeCols = input$excludeCols)
       if(input$action == "replace") {
         mainTable$main = df
         sources$all = sources$current
@@ -227,7 +227,9 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
       removeModal()
     })
 
-    output$mainTable = DT::renderDT(genoDT(req(mainTable$main), scrollY = "370px"), server = FALSE)
+    output$mainTable = DT::renderDT({
+      genoDT(req(mainTable$main), mode = "main", flavour = id, assigned = assignedRefs(), scrollY = "370px")
+    }, server = FALSE)
 
     output$sourcefield = renderUI({
       src = unlist(lapply(req(sources$all), function(s) as.character(em(s))))
@@ -251,7 +253,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
     })
 
     output$editTable = DT::renderDT({ .debug2("render edit table")
-      genoDT(editdata(), scrollY = "300px", editable = TRUE)
+      genoDT(editdata(), mode = "edit", flavour = id, scrollY = "300px")
     })
 
     # Preserve manually entered aliases
@@ -303,22 +305,10 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
 
       sex012 = match(new$Sex, c("M", "F"), nomatch = 0L)
 
-      changes = if("Fam" %in% names(new) && length(rows)) {
-        lapply(split(rows, new$Fam[rows]), function(i) {
-          ii = i[idch[i]]
-          si = i[sexch[i]]
-          list(ids = .setnames(new$Sample[ii], old$Sample[ii]),
-               sex = .setnames(sex012[si], new$Sample[si]))
-        })
-      }
-      else {
-        ids = if(any(idch))  .setnames(new$Sample[idch], old$Sample[idch]) else NULL
-        sex = if(any(sexch)) .setnames(sex012[sexch], new$Sample[sexch]) else NULL
-        if(length(ids) || length(sex))
-          list(ids = ids, sex = sex)
-        else
-          NULL
-      }
+      ids = if(any(idch)) .setnames(new$Sample[idch], old$Sample[idch]) else NULL
+      sex = if(any(sexch)) .setnames(sex012[sexch], new$Sample[sexch]) else NULL
+
+      changes = if(length(ids) || length(sex)) list(ids = ids, sex = sex) else NULL
 
       rownames(new) = new$Sample
       mainTable$main = new
@@ -436,8 +426,152 @@ dataServer = function(id, externalData = reactiveVal(NULL), .debug = NULL) {
 
 # Utils -------------------------------------------------------------------
 
+previewGenoDT = function(dat) {
+  DT::datatable(
+    dat,
+    class = "stripe hover nowrap compact",
+    rownames = !"Sample" %in% colnames(dat),
+    escape = TRUE,
+    plugins = "natural",
+    selection = "multiple",
+    options = list(
+      dom = "t",
+      ordering = FALSE,
+      paging = FALSE,
+      scrollX = TRUE,
+      scrollY = if(nrow(dat) > 10) "220px" else NULL
+    )
+  ) |>
+    DT::formatStyle(names(dat), target = "row", lineHeight = "75%")
+}
+
+
+formatGenoView = function(dat, mode, flavour = NULL, fam = NULL) {
+
+  if(mode == "main" && flavour == "AM") {
+    f = fam[dat$Sample]
+    dat$Fam = ifelse(is.na(f), "", f)
+    dat = moveColsFirst(dat, c("Fam", "Sample", "Alias", "Sex"))
+  }
+
+  if(mode == "main" && identical(dat$Alias, rownames(dat)))
+    dat$Alias = NULL
+
+  if(mode == "edit" && "Sex" %in% names(dat)) {
+    dat$Sex = sprintf(
+      "<select class='sex-edit' data-key='%s'><option value='F'%s>Female</option><option value='M'%s>Male</option></select>",
+      dat$.rowid,
+      ifelse(dat$Sex == "F", " selected", ""),
+      ifelse(dat$Sex == "M", " selected", "")
+    )
+  }
+
+  dat
+}
+
+genoDT = function(dat, mode = c("main", "edit"), flavour = NULL, assigned = NULL, scrollY = NULL) {
+  mode = match.arg(mode)
+  dat = formatGenoView(dat, mode, flavour = flavour, fam = assigned)
+
+  nms = names(dat)
+  .cols = function(cols) .myintersect(cols, nms)
+  .colIdx = function(cols) {
+    i = match(cols, nms, nomatch = 0L)
+    i[i > 0L] - 1L
+  }
+
+  editopt = switch(mode, main = FALSE,
+    edit = list(target = "cell", disable = list(columns = .colIdx(c("Fam", "Sex"))))
+  )
+
+  callback = if(mode == "edit") DT::JS("
+    var id = $(table.table().container()).closest('.html-widget').attr('id') + '_sex_edit';
+    table.on('change', 'select.sex-edit', function() {
+      Shiny.setInputValue(id, {
+        key: this.dataset.key,
+        value: this.value,
+        nonce: Math.random()
+      }, {priority: 'event'});
+    });
+  ") else JS("return table;")
+
+  dt = DT::datatable(
+    dat,
+    class = "stripe hover nowrap compact",
+    rownames = FALSE,
+    escape = if(mode == "edit") .mysetdiff(nms, "Sex") else TRUE,
+    callback = callback,
+    plugins = "natural",
+    selection = "none",
+    editable = editopt,
+    options = list(
+      dom = "t",
+      paging = FALSE,
+      scrollX = TRUE,
+      scrollY = if(nrow(dat) > 10) scrollY else NULL,
+      columnDefs = list(
+        list(type = "natural", targets = .cols(c("Fam", "Sample", "Alias"))),
+        list(orderable = TRUE, targets = .cols(c("Fam", "Sample", "Alias"))),
+        list(orderable = FALSE, targets = "_all"),
+        list(visible = FALSE, targets = .cols(".rowid"))
+      )
+    )
+  ) |>
+    DT::formatStyle(names(dat), target = "row", lineHeight = "75%") |>
+    DT::formatStyle(.cols("Sex"), borderRight = "1px solid #ccc") |>
+    DT::formatStyle(.cols("Fam"), fontWeight = "bold", color = "darkblue")
+
+  if(mode == "main")
+    dt = dt |> DT::formatStyle(.cols("Sex"), color = DT::styleEqual(c("F", "M"),
+                                                                    c("hotpink", "steelblue")))
+  dt
+}
+
+standardiseGenoData = function(df, id, selectRows = NULL, excludeCols = NULL) { print("standardise geno df")
+  if(is.null(df))
+    return()
+
+  if(is.matrix(df))
+    df = as.data.frame(df)
+
+  if(length(selectRows))
+    df = df[sort(selectRows), , drop = FALSE]
+
+  if(length(excludeCols))
+    df = df[, !names(df) %in% excludeCols, drop = FALSE]
+
+  nms = names(df)
+  rownms = rownames(df)
+
+  if(!"Sample" %in% nms && !is.null(rownms))
+    df$Sample = rownms
+
+  if(!identical(rownms, df$Sample)) {
+    rownames(df) = rownms = df$Sample
+  }
+
+  if(!"Alias" %in% nms) {
+    al = switch(id, PM = "V", AM = "R") |> paste0(seq_len(nrow(df)))
+    df$Alias = if(!any(al %in% rownms)) al else rownms
+  }
+
+  if("Sex" %in% nms)
+    df$Sex = checkSex(df$Sex)
+  else if("AMEL" %in% nms) {
+    df$Sex = c("?", "M", "F")[amel2sex(df$AMEL) + 1]
+    df$AMEL = NULL
+  }
+  else
+    df$Sex = "?"
+
+  # Key column for DT editing (not visible)
+  df$.rowid = seq_len(nrow(df))
+
+  moveColsFirst(df, c(".rowid", "Fam", "Sample", "Alias", "Sex"))
+}
+
 # Format DT tables
-genoDT = function(dat, selection = "none", scrollY = "220px", editable = FALSE) {
+genoDTold = function(dat, scrollY = "220px", editable = FALSE) {
 
   # Remove Aliases if identical to rownames (main view only; always show in edit mode)
   if(!editable && identical(dat$Alias, rownames(dat)))
@@ -446,20 +580,19 @@ genoDT = function(dat, selection = "none", scrollY = "220px", editable = FALSE) 
   nms = names(dat)
   .mycols = function(cols) .myintersect(cols, nms)
 
-  if(!"Sex" %in% nms) stop2("Missing sex column")
-  #if(!".rowid" %in% nms) stop2("Missing `.rowid` column for DT editing")
-
   if(editable) {
     if(!".rowid" %in% nms) stop2("Missing `.rowid` column for DT editing")
     editopt = list(target = "cell",
                    disable = list(columns = .mycols(c("Fam", "Sex"))))
     key = dat$.rowid
-    dat$Sex = sprintf(
-      "<select class='sex-edit' data-key='%s'><option value='F'%s>Female</option><option value='M'%s>Male</option></select>",
-      key,
-      ifelse(dat$Sex == "F", " selected", ""),
-      ifelse(dat$Sex == "M", " selected", "")
-    )
+    if("Sex" %in% nms) {
+      dat$Sex = sprintf(
+        "<select class='sex-edit' data-key='%s'><option value='F'%s>Female</option><option value='M'%s>Male</option></select>",
+        key,
+        ifelse(dat$Sex == "F", " selected", ""),
+        ifelse(dat$Sex == "M", " selected", "")
+      )
+    }
   }
   else {
     editopt = editable
@@ -497,12 +630,12 @@ genoDT = function(dat, selection = "none", scrollY = "220px", editable = FALSE) 
     )
   ) |>
     DT::formatStyle(nms, target = "row", lineHeight = "75%") |>
-    DT::formatStyle("Sex", borderRight = "1px solid #ccc")
+    DT::formatStyle(.mycols("Sex"), borderRight = "1px solid #ccc")
 
   if(editable)
     dt = DT::formatStyle(dt, .mycols("Fam"), color = "#999")
   else
-    dt = DT::formatStyle(dt, "Sex", color = DT::styleEqual(c("F", "M"), c("hotpink", "steelblue")))
+    dt = DT::formatStyle(dt, .mycols("Sex"), color = DT::styleEqual(c("F", "M"), c("hotpink", "steelblue")))
 
   dt
 }
@@ -528,53 +661,10 @@ checkSex = function(x) {
   x[x == 2] = "F"
   bad = !x %in% c("F", "M", "?")
   if(any(bad)) {
-    warning(paste("Illegal values in the Sex column:", toString(unique(sx[bad]))))
+    warning("Illegal values in the Sex column:", toString(unique(sx[bad])))
     x[bad] = "?"
   }
   x
-}
-
-prepareGenoDf = function(df, id, selectRows = NULL, excludeCols = NULL) {
-  if(is.null(df))
-    return()
-
-  if(is.matrix(df))
-    df = as.data.frame(df)
-
-  if(length(selectRows))
-    df = df[sort(selectRows), , drop = FALSE]
-
-  if(length(excludeCols))
-    df = df[, !names(df) %in% excludeCols, drop = FALSE]
-
-  if(!"Alias" %in% names(df)) {
-    al = switch(id, PM = "V", AM = "R") |> paste0(seq_len(nrow(df)))
-    if(!any(al %in% rownames(df)))
-      df$Alias = al
-    else
-      df$Alias = rownames(df)
-  }
-
-  nms = names(df)
-  if("Sex" %in% nms)
-    df$Sex = checkSex(df$Sex)
-  else if("AMEL" %in% nms)
-    df$Sex = c("?", "M", "F")[amel2sex(df$AMEL) + 1]
-  else
-    df$Sex = "?"
-
-  # Check that row names equal Sample
-  if(!identical(rownames(df), df$Sample)) {
-    warning("Row names do not match Sample column; trying to fix")
-    rownames(df) = df$Sample
-  }
-
-  # Key column for DT editing (not visible)
-  df$.rowid = seq_len(nrow(df))
-
-  df$AMEL = NULL
-  df = df |> moveColsFirst(c("Fam", "Sample", "Alias", "Sex"))
-
 }
 
 readRdvi = function(fil) {
