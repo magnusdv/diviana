@@ -162,7 +162,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
                              miss = currData$miss,
                              refs = currData$refs,
                              refOrigName = currData$refOrigName,
-                             clearSel = TRUE) {
+                             clearSel = FALSE) {
 
       .debug2("update data")
       currData$ped = req(ped)
@@ -212,7 +212,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
     observeEvent(input$parents, { .debug2("add parents")
       id = req(sel())
       newped = tryCatch({
-        updatePedData(ped = .addParents(currData$ped, id, avoid = avoid))
+        updatePedData(ped = .addParents(currData$ped, id, avoid = avoid), clearSel = TRUE)
       }, error = showErr)
     })
 
@@ -255,7 +255,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
         showErr("Reference cannot be set as missing: ", intersect(currData$refs, ids))
         return()
       }
-      updatePedData(miss = c(currData$miss, ids)) # dups ok here
+      updatePedData(miss = c(currData$miss, ids), clearSel = TRUE) # dups ok here
     })
 
     observeEvent(input$nonmissing, { .debug2("set nonmissing")
