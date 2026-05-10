@@ -90,24 +90,6 @@ mylink = function(text, href, .noWS = "outside", ...) {
   reorderPed(newped, ord)
 }
 
-.addSibOLD = function(x, id, sex, avoid = NULL) {
-  if(length(id) > 1)
-    stop2("Too many individuals are selected. Current selection: ", sortIds(x, id), "<br><br>",
-          "To add a sibling, please select exactly one individual.")
-
-  newids = .generateLabs(x, 3, avoid = avoid)
-
-  if(id %in% founders(x)) {
-    fa = newids[1]; mo = newids[2]; child = newids[3]
-    x = addParents(x, id, father = fa, mother = mo, verbose = FALSE)
-  }
-  else {
-    fa = father(x, id); mo = mother(x, id); child = newids[1]
-  }
-
-  addChildren(x, father = fa, mother = mo, ids = child, sex = sex, verbose = FALSE)
-}
-
 
 removeSel = function(ped, ids) {
   newped = tryCatch(
