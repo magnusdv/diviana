@@ -18,28 +18,22 @@ suppressMessages(suppressPackageStartupMessages({
 addResourcePath("icons", "www/static_icons")
 
 # TODO----------------------------------------------------------------
-
-# Marker summary
+# DATA
+# * Accordion effect
+#
+# MARKERS
 # * indicate markers with added alleles
 # * store original mutmods for faster rendering of original+original
-
-# * Pedbuilder: trashcan -> back arrow?
-# * pedbuilder: slimmer family label; fatter buttons
-# * DVI overview: center plot on screen
-# * Update plots when editing AM names
 #
-# AM data
-# * Family column
+# PED
+# * slimmer family label; fatter buttons
+# * Fix width: !important
+# * Use default MP labels (settings)
 #
 # DATA
 # * Genemapper wide + Relationship
 # * Download dviData (not only debug)
 # * Plot fires twice!!!
-# * Sex: Update plots when edit, and vice versa?
-
-# PED
-# * Select references: no line wrap
-#
 #
 # TRIANGLES
 # * Triangle plots: Latex labels
