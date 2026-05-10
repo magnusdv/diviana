@@ -363,8 +363,8 @@ server = function(input, output, session) {
       mutparams = lapply(mutmods, \(mut) pedmut::getParams(mut, format = 4))
     }
 
-    list(am = genosWithAttrs(dvi$am, fam = TRUE, addCols = TRUE),
-         pm = genosWithAttrs(dvi$pm, fam = FALSE, addCols = TRUE),
+    list(am = genosWithAttrs(dvi$am, addCols = c("Sample", "Sex")),
+         pm = genosWithAttrs(dvi$pm, addCols = c("Sample", "Sex")),
          peds = peds, db = db,
          mutparams = mutparams,
          hasMut = sum(lengths(mutparams)) > 0)
@@ -536,6 +536,13 @@ server = function(input, output, session) {
 
   mainMissing = reactive(unlist(lapply(pedigrees(), `[[`, "miss"), use.names = FALSE))
 
+  observeEvent(pedigrees(), {
+    assigned = lapply(pedigrees(), `[[`, "refs")
+    assVec = .setnames(rep(names(assigned), lengths(assigned)), unlist(assigned, use.names = FALSE))
+    .debug("assignedRefs:", assVec)
+    assignedRefs(assVec)
+  })
+
   mainAM = reactive({ .debug("mainAM", loading())
     if(loading())
       return(NULL)
@@ -684,23 +691,20 @@ server = function(input, output, session) {
   curPed = cardCounter("pedcard", nPed)
 
   observeEvent(input$newped, { .debug("new pedigree")
-    allrefs = rownames(genoAM())
-    if(is.null(allrefs)) {
-      showErr("Reference data must be loaded before creating pedigrees.")
-      return()
-    }
     isNewPed(TRUE)
     uniqueID = uniquify("quickpedModule")
 
     avoidLabs = list(famids = names(mainAM()),
                      vics = names(mainPM()),
-                     refs = if(nPed() > 0) typedMembers(mainAM()) else NULL,
+                     refs = if(nPed() > 0) typedMembers(mainAM()) else NULL, # TODO: use assignedRefs()?
                      miss = mainMissing(),
                      labs = labels(mainAM()))
 
     pedigreeServer(uniqueID, resultVar = pedFromModule, initialDat = NULL,
                    famid = paste0("F", nPed() + 1),
-                   allrefs = allrefs, avoidLabs = avoidLabs,
+                   allrefs = rownames(genoAM()),
+                   refsex = sexAM(),
+                   avoidLabs = avoidLabs,
                    currentModal = currentModal,
                    .debug = .debug)
   })
@@ -715,7 +719,6 @@ server = function(input, output, session) {
     isNewPed(FALSE)
     curr = req(pedigrees()[[curped]])
     uniqueID = uniquify("quickpedModule")
-    allrefs = rownames(genoAM())
     famids = names(mainAM())
 
     otherFams = mainAM()[-curped]
@@ -727,7 +730,8 @@ server = function(input, output, session) {
 
     pedigreeServer(uniqueID, resultVar = pedFromModule, initialDat = curr,
                    famid = famids[curped],
-                   allrefs = allrefs,
+                   allrefs = rownames(genoAM()),
+                   refsex = sexAM(),
                    avoidLabs = avoidLabs,
                    currentModal = currentModal,
                    .debug = .debug)
@@ -1145,8 +1149,9 @@ server = function(input, output, session) {
 
   observe({
     if(DEVMODE) { .debug("devmode!")
-      updateSelectInput(session, "example", selected = "exclusionExample")
-      #updateNavbarTabs(session, "navmenu", selected = "database")
+      updateSelectInput(session, "AM-filetype", selected = "gm")
+      #updateSelectInput(session, "example", selected = "icmp")
+      #updateNavbarTabs(session, "navmenu", selected = "analysis")
     }
   })
 

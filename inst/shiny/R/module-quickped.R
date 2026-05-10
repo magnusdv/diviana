@@ -1,5 +1,5 @@
 
-pedigreeUI = function(id, famid = "F1", references = NULL) {
+pedigreeUI = function(id, famid = "F1") {
   ns = NS(id)
 
   ### Button factory
@@ -53,7 +53,7 @@ pedigreeUI = function(id, famid = "F1", references = NULL) {
 
        div(class = "aligned-row-wide", style = "font-weight: bold; margin-bottom: -8px; margin-top: 12px;",
            p("References", style = "margin-bottom:0"),
-           myBtn("untyped", myIcon("trash-can", align = "-0.1em"),
+           myBtn("untyped", myIcon("circle-left", align = "-0.1em"),
                  width = "auto", tt = "right",
                  style = "padding:0 3px 0 0; background-color:inherit; border: none"),
        ),
@@ -76,16 +76,21 @@ pedigreeUI = function(id, famid = "F1", references = NULL) {
     column(width = 9,
            plotOutput(ns("plot"), click = ns("ped_click"), dblclick = ns("ped_dblclick"),
                       width = "auto", height = "auto"),
-           p("Double-click pedigree symbols to edit names",
-             style = "font-size:small; margin-top: 0; margin-bottom: 0"),
+           div(
+             style = "display:flex; align-items:center; justify-content:space-between; font-size:small;",
+             p("Double-click symbols to edit names", style = "margin-top: 0; margin-bottom: 0"),
+             checkboxInput(ns("showall"), "Show all names", value = FALSE, width = "auto")
+           ),
            uiOutput(ns("editlabel")),
     ),
   )
 }
 
 pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
-                          allrefs = NULL, avoidLabs = NULL, currentModal = NULL,
+                          allrefs = NULL, refsex = NULL, avoidLabs = NULL, currentModal = NULL,
                           .debug = NULL) {
+
+  .debug2 = if(is.null(.debug)) function(...) NULL else function(...) .debug("-ped module:", ...)
 
   avoid = c(allrefs, avoidLabs$vics, avoidLabs$labs)
   avoidFamids = .mysetdiff(avoidLabs$famids, famid)
@@ -93,7 +98,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
   if(is.null(initialDat)) {
     ids = .generateLabs(character(0), 3, avoid = avoid)
     initialDat = list(ped = nuclearPed(father = ids[1], mother = ids[2], children = ids[3]),
-                      famid = famid, miss = character(), refs = character())
+                      famid = famid, miss = character(), refs = character(), refOrigName = character())
   }
 
   moduleServer(id, function(input, output, session) {
@@ -113,9 +118,14 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
     # Modal creation and invocation
     showModal({
       mod = modalDialog(
-        title = div(class = "aligned-row-wide", "Pedigree builder", helpBtn("help-ped") |> wrap_tooltip("pedhelp", "left")),
-        tags$head(tags$style(HTML("@media (min-width: 576px) {.modal-dialog { max-width: 600px !important; }}"))),
-        pedigreeUI(id, famid, allrefs),   # use the UI function here
+        title = div(class = "aligned-row-wide", "Pedigree builder",
+                    helpBtn("help-ped") |> wrap_tooltip("pedhelp", "left")),
+        class = "pedmodal", # TODO!
+        tags$head(tags$style(HTML("
+          @media (min-width: 576px) {
+            .modal-dialog { max-width: 600px !important; }
+          }"))),
+        pedigreeUI(id, famid),
         footer = tagList(
           actionButton(ns("cancel"), "Cancel"),
           actionButton(ns("save"), "Save")
@@ -127,7 +137,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
 
     # Return (or cancel) ------------------------------------------------------
 
-    observeEvent(input$save, { .debug("--ped module: save")
+    observeEvent(input$save, { .debug2("save")
       if(currData$famid %in% avoidFamids) {
         showErr("Family label is already in use by another family")
         return()
@@ -140,7 +150,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       resultVar(reactiveValuesToList(currData))
     })
 
-    observeEvent(input$cancel, { .debug("--ped module: cancel")
+    observeEvent(input$cancel, { .debug2("cancel")
       removeModal()
       resultVar(NULL)
     })
@@ -150,12 +160,16 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
     updatePedData = function(ped = currData$ped,
                              famid = currData$famid,
                              miss = currData$miss,
-                             refs = currData$refs, clearSel = TRUE) {
-      .debug("--ped module: update data")
+                             refs = currData$refs,
+                             refOrigName = currData$refOrigName,
+                             clearSel = TRUE) {
+
+      .debug2("update data")
       currData$ped = req(ped)
       currData$famid = trimws(famid)
       currData$miss = .myintersect(ped$ID, miss)
       currData$refs = .myintersect(ped$ID, refs)
+      currData$refOrigName = refOrigName
 
       # Update (or clear) selection
       sel(if(clearSel) character(0) else .myintersect(ped$ID, sel()))
@@ -166,11 +180,13 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
 
     # Modify pedigree ---------------------------------------------------------
 
-    observeEvent(input$famid, { .debug("--ped module: edit family name")
-      updatePedData(famid = input$famid, clearSel = FALSE)
+    famidDeb = reactive(input$famid) |> debounce(200)
+
+    observeEvent(famidDeb(), { .debug2("edit family name")
+      updatePedData(famid = famidDeb(), clearSel = FALSE)
     }) |> debounce(200)
 
-    observeEvent(input$child, { .debug("--ped module: add child")
+    observeEvent(input$child, { .debug2("add child")
       newped = tryCatch(
         .addChild(currData$ped, req(sel()), sex = 1, avoid = avoid),
         error = showErr)
@@ -179,49 +195,49 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       updatePedData(ped = newped, clearSel = FALSE)
     })
 
-    observeEvent(input$sibleft, { .debug("--ped: left sibling")
+    observeEvent(input$sibleft, { .debug2("left sibling")
       id = req(sel())
       tryCatch({
         updatePedData(ped = .addSib(currData$ped, id, side = "left", avoid = avoid))
       }, error = showErr)
     })
 
-    observeEvent(input$sibright, { .debug("--ped: right sibling")
+    observeEvent(input$sibright, { .debug2("right sibling")
       id = req(sel())
       tryCatch({
         updatePedData(ped = .addSib(currData$ped, id, side = "right", avoid = avoid))
       }, error = showErr)
     })
 
-    observeEvent(input$parents, { .debug("--ped module: add parents")
+    observeEvent(input$parents, { .debug2("add parents")
       id = req(sel())
       newped = tryCatch({
         updatePedData(ped = .addParents(currData$ped, id, avoid = avoid))
       }, error = showErr)
     })
 
-    observeEvent(input$sex1, {    .debug("--ped: sex1")
+    observeEvent(input$sex1, {    .debug2("sex1")
       ids = req(sel())
       tryCatch({
-        updatePedData(ped = changeSex(currData$ped, ids, sex = 1))
+        updatePedData(ped = changeSex(currData$ped, ids, sex = 1, refuse = currData$refs))
       }, error = showErr)
     })
 
-    observeEvent(input$sex2, {    .debug("--ped: sex2")
+    observeEvent(input$sex2, {    .debug2("sex2")
       ids = req(sel())
       tryCatch({
-        updatePedData(ped = changeSex(currData$ped, ids, sex = 2))
+        updatePedData(ped = changeSex(currData$ped, ids, sex = 2, refuse = currData$refs))
       }, error = showErr)
     })
 
-    observeEvent(input$sex0, {    .debug("--ped: sex0")
+    observeEvent(input$sex0, {    .debug2("sex0")
       ids = req(sel())
       tryCatch({
-        updatePedData(ped = changeSex(currData$ped, ids, sex = 0))
+        updatePedData(ped = changeSex(currData$ped, ids, sex = 0, refuse = currData$refs))
       }, error = showErr)
     })
 
-    observeEvent(input$remove, { .debug("--ped module: remove")
+    observeEvent(input$remove, { .debug2("remove")
       ids = req(sel())
       newped = tryCatch(removeSel(currData$ped, ids), error = showErr)
       req(is.ped(newped))
@@ -233,7 +249,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
 
     # Set status --------------------------------------------------------------
 
-    observeEvent(input$missing, { .debug("--ped module: set missing")
+    observeEvent(input$missing, { .debug2("set missing")
       ids = req(sel())
       if(any(ids %in% currData$refs)) {
         showErr("Reference cannot be set as missing: ", intersect(currData$refs, ids))
@@ -242,12 +258,12 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       updatePedData(miss = c(currData$miss, ids)) # dups ok here
     })
 
-    observeEvent(input$nonmissing, { .debug("--ped module: set nonmissing")
+    observeEvent(input$nonmissing, { .debug2("set nonmissing")
       ids = req(sel())
       updatePedData(miss = .mysetdiff(currData$miss, ids))
     })
 
-    observeEvent(input$untyped, { .debug("--ped module: set untyped")
+    observeEvent(input$untyped, { .debug2("set untyped")
       ids = req(sel())
       oldped = currData$ped
       refs = currData$refs
@@ -261,30 +277,29 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       newids[orig] = ron[orig]
       empt = newids == ""
       newids[empt] = .generateLabs(oldped, n = length(empt), avoid = avoid)
+
       newped = relabel(oldped, new = newids)
-
-      # TODO: Move to updatepeddata
+      newrefs = .mysetdiff(refs, ids)
       newron = ron[!names(ron) %in% ids]
-      currData$refOrigName = newron
 
-      updatePedData(ped = newped, refs = .mysetdiff(refs, ids))
+      updatePedData(ped = newped, refs = newrefs, refOrigName = newron)
     })
 
     remainingRefs = reactive(.mysetdiff(allrefs, c(avoidLabs$refs, currData$refs)))
 
-    output$refTable = renderDT({
-      df = data.frame(Refs = remainingRefs())
+    output$refTable = renderDT({ .debug2("render ref table:", remainingRefs())
+      df = data.frame(Refs = remainingRefs() %||% character())
       datatable(df, rownames = FALSE,
                 class = "compact stripe",
                 selection = "single",
                 colnames = "",
                 options = list(dom = 't', pageLength = -1, scrollY = "200px",
                              scrollCollapse = TRUE, ordering = FALSE,
-                             language = list(zeroRecords = "No further AM samples"))) |>
+                             language = list(zeroRecords = "No unassigned refs!"))) |>
         DT::formatStyle(names(df),
                         target = "row",
-                        lineHeight = "75%",
-                        fontSize = "85%",
+                        lineHeight = "80%",
+                        fontSize = "90%",
                         whiteSpace = "nowrap"
         )
     })
@@ -301,47 +316,29 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       }
 
       ref = remainingRefs()[input$refTable_rows_selected]
-      #req(!ref %in% currData$refs)
+
+      sex = getSex(currData$ped, id)
+      if(sex != refsex[ref]) {
+        showErr(sprintf("Sex mismatch! Reference '%s' is %s", ref, c("male", "female")[refsex[ref]]))
+        return()
+      }
+
       newped = relabel(currData$ped, old = id, new = ref)
       newrefs = c(currData$refs, ref)
 
       ron = currData$refOrigName
       ron[ref] = id
-      currData$refOrigName = ron
 
-      updatePedData(ped = newped, refs = newrefs)
+      updatePedData(ped = newped, refs = newrefs, refOrigName = ron)
     })
 
-    observeEvent(input$setref, { .debug("--ped module: set reference")
-      id = req(sel())
-      ref = req(input$setref)
-
-      if(length(id) > 1)
-        showErr("Please select a single individual")
-      if(id %in% currData$miss)
-        showErr("A missing person cannot be a reference")
-
-      req(!ref %in% currData$refs)
-      newped = relabel(currData$ped, old = id, new = ref)
-      newrefs = c(currData$refs, ref)
-
-      ron = currData$refOrigName
-      ron[ref] = id
-      currData$refOrigName = ron
-
-      updatePedData(ped = newped, refs = newrefs)
-    })
-
-    observe({ .debug("--ped module: update reference selector")
-      remainingRefs = .mysetdiff(allrefs, c(avoidLabs$refs, currData$refs))
-      updateSelectInput(session, "setref", choices = c("Select" = "", remainingRefs))
-    })
 
     # Undo/reset --------------------------------------------------------------
 
-    observeEvent(input$undo, { .debug("--ped module: undo")
+    observeEvent(input$undo, { .debug2("undo")
       stack = previousStack()
       len = length(stack)
+      req(len > 1)
 
       last = stack[[len - 1]]
       for(nm in names(last))
@@ -351,7 +348,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       previousStack(stack[-len])
     })
 
-    observeEvent(input$reset, { .debug("--ped module: reset")
+    observeEvent(input$reset, { .debug2("reset")
       first = previousStack()[[1]]
 
       for(nm in names(first))
@@ -368,14 +365,14 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
 
     # Plot --------------------------------------------------------------------
 
-    output$plot = renderPlot({ .debug("--ped module: plot")
+    output$plot = renderPlot({ .debug2("plot")
       x = req(currData$ped)
-
       famid = currData$famid
       miss = currData$miss
       refs = currData$refs
+      labs = if(input$showall) x$ID else c(miss, refs)
       dat = tryCatch(
-        plot(x, title = famid, margins = 2, labs = c(miss, refs),
+        plot(x, title = famid, margins = 2, labs = labs,
              hatched = refs, cex = 1.2, cex.main = 1.5,
              col = list(red = miss, blue = sel()),
              lwd = list(`1.2` = miss, `2` = sel()),
@@ -400,7 +397,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       as.data.frame(mat)
     })
 
-    observeEvent(input$ped_click, { .debug("--ped module: click")
+    observeEvent(input$ped_click, { .debug2("click")
       posDf = positionDf()
       idInt = nearPoints(posDf, input$ped_click, xvar = "x", yvar = "y",
                          threshold = 20, maxpoints = 1)$idInt
@@ -418,7 +415,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
 
     editId = reactiveVal(NULL)
 
-    observeEvent(input$ped_dblclick, { .debug("--ped module: dblclick")
+    observeEvent(input$ped_dblclick, { .debug2("dblclick")
       posDf = positionDf()
       idInt = nearPoints(posDf, input$ped_dblclick, xvar = "x", yvar = "y",
                          threshold = 20, maxpoints = 1)$idInt
@@ -435,8 +432,6 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
 
       click_x = input$ped_dblclick$coords_css$x
       click_y = input$ped_dblclick$coords_css$y
-      plotW = session$clientData[[sprintf("output_%s_width", ns("plot"))]]
-      plotH = session$clientData[[sprintf("output_%s_height", ns("plot"))]]
 
       output$editlabel = renderUI(div(
         slimTextInput(ns("customlabel"), label = "Enter new name:", value = id, style = "width:auto",
@@ -474,25 +469,27 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
 
     observeEvent(input$cancellabel, { output$editlabel = renderUI(NULL) })
 
-    observeEvent(input$savelabel, { .debug("--ped module: savelabel")
+    observeEvent(input$savelabel, { .debug2("savelabel")
       id = req(editId())
-      newlab = input$customlabel
+      newlab = input$customlabel |> trimws() |> req()
       ped = currData$ped
       miss = currData$miss
 
       # Check if label should be avoided
-      err = NULL
       if(newlab %in% allrefs)
-        err = showErr(sprintf("The name '%s' is already in use by a reference individual", newlab))
-      else if(newlab %in% avoidLabs$vics)
-        err = showErr(sprintf("The name '%s' is already in use by a victim sample", newlab))
-      else if(newlab %in% avoidLabs$miss)
-        err = showErr(sprintf("The name '%s' is used by a missing person in another family", newlab))
-      else if(id %in% miss && newlab %in% avoidLabs$labs)
-        err = showErr(sprintf("The name '%s' is already in use in another family", newlab))
+        return(showErr(sprintf("The name '%s' is already in use by a reference individual", newlab)))
+      if(newlab %in% avoidLabs$vics)
+        return(showErr(sprintf("The name '%s' is already in use by a victim sample", newlab)))
+      if(newlab %in% avoidLabs$miss)
+        return(showErr(sprintf("The name '%s' is used by a missing person in another family", newlab)))
+      if(id %in% miss && newlab %in% avoidLabs$labs)
+        return(showErr(sprintf("The name '%s' is already in use in another family", newlab)))
 
-      if(!is.null(err) || id == newlab)
+      # If no change, just exit
+      if(id == newlab) {
+        output$editlabel = renderUI(NULL)
         return()
+      }
 
       newped = tryCatch(relabel(ped, old = id, new = newlab),
                         error = showErr)

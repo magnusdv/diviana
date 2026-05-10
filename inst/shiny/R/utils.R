@@ -185,7 +185,7 @@ rbindSafe = function(df1, df2) {
 }
 
 # Expand getGenotypes() adding fam/id/sex as attributes or columns
-genosWithAttrs = function(x, fam = TRUE, addCols = FALSE) {
+genosWithAttrs = function(x, addCols = c("Sample", "Sex"), addAttrs = "Fam") {
   if(!length(x))
     return()
 
@@ -201,30 +201,27 @@ genosWithAttrs = function(x, fam = TRUE, addCols = FALSE) {
 
   df = do.call(rbind, glist) |> as.data.frame()
   idslist = lapply(glist, rownames)
+  add = c(addCols, addAttrs)
 
-  famvec = rep(names(x) %||% seq_along(x), lengths(idslist))
-  ids = unlist(idslist, use.names = FALSE)
-  sex = unlist(lapply(glist, attr, "sex"), use.names = FALSE)
+  vecs = list(
+    Fam = rep(names(x) %||% seq_along(x), lengths(idslist)),
+    Sample = unlist(idslist, use.names = FALSE),
+    Sex = unlist(lapply(glist, attr, "sex"), use.names = FALSE)
+  )
 
-  # Add cols in front
-  if(addCols) {
-    if(fam) df$Fam = famvec
-    df$Sample = ids
-    df$Sex = sex
-    df = df |> moveColsFirst(c("Fam", "Sample", "Sex"))
-  }
-  else {
-    df = structure(df, Fam = if(fam) famvec else NULL, Sample = ids, Sex = sex)
-  }
+  # Add columns in front
+  for(cl in addCols)
+    df[[cl]] = vecs[[cl]]
+  df = moveColsFirst(df, addCols)
 
-  rownames(df) = ids
+  # Add attributes
+  for(cl in addAttrs)
+    attr(df, cl) = vecs[[cl]]
+
+  rownames(df) = vecs$Sample
   df
 }
 
-  #df = x |> getGenotypes(ids = typedMembers) |> as.data.frame()
-  #df$Sex = getSex(x, rownames(df))
-  #df
-#}
 
 abbreviatePedrel = function(x, width = 15) {
   x[x == "Unrelated"] = "Unrel"
@@ -247,7 +244,12 @@ abbreviatePedrel = function(x, width = 15) {
 }
 
 
-changeSex = function(ped, ids, sex) {
+changeSex = function(ped, ids, sex, refuse = NULL) {
+
+  j = .myintersect(ids, refuse)
+  if(length(j) && any(getSex(ped, j) != sex)) {
+    stop2("The sex of ref samples can only be changed in the AM data table")
+  }
 
   if(sex == 0) {
     if(!all(ids %in% leaves(ped)))
@@ -256,9 +258,7 @@ changeSex = function(ped, ids, sex) {
     return(newped)
   }
 
-  # By now: sex is 1 or 2
   currentSex = getSex(ped, ids)
-
   ped |>
     swapSex(ids[currentSex == (3-sex)], verbose = FALSE) |>
     setSex(ids[currentSex == 0], sex = sex)
