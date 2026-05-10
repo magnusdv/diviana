@@ -24,8 +24,8 @@ This is where you tell the program ___who is missing___ and their relation to th
     - <code>`r mySvg("arrow-left", align = "-0.2em")`Sib</code> to add a sibling to the left
     - `Remove` to remove the individual and its descendants
 * To **deselect** individuals, either click on them again, or use `r mySvg("hand-pointer-strikethrough", height = 1.2)` to deselect all.
-* Click <code style="background-color:orange;">UNDO</code> to take back the last action,
-or <code style="background-color:orangered;">RESET</code> to start over.
+* Click <code style="background-color:orange; font-weight:bolder; padding:0 5px">UNDO</code> to take back the last action,
+or <code style="background-color:orangered; font-weight:bolder; padding:0 5px">RESET</code> to start over.
 
 #### 2. Missing persons
 
@@ -37,13 +37,15 @@ or <code style="background-color:orangered;">RESET</code> to start over.
 
 #### 3. Reference individuals
 
-* **Select** a pedigree member you want to link to a reference sample.
-* **Click** the corresponding entry in the *References* list.
-* To **unassign** references, select them in the pedigree and click the trash can 
-`r mySvg("trash-can", height = 1.2, align = "-0.1em")`.
+AM individuals that have not been assigned are in the *References* list.
 
-*Result:* Reference individuals appear with hatched symbols in the pedigree.  
-AM individuals that have not been assigned anywhere, are given in the *References* list.
+* First **select** a pedigree member you want to link to a reference sample.
+* Then **click** the corresponding entry in the *References* list.
+* To **unassign** references, select them in the pedigree and click the arrow
+`r mySvg("circle-left", height = 1.2, align = "-0.1em")`.
+
+*Result:* Assigned references appear with hatched symbols in the pedigree.  
+
 
 #### 4. Save
 
