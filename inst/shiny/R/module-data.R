@@ -28,6 +28,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
 
     observeEvent(externalData(), { .debug2("set external", externalData())
       ext = externalData()
+
       if(identical(ext, "reset")) {
         mainTable$main = mainTable$raw = completeDvi$raw = completeDvi$import = NULL
         sources$all = sources$current = NULL
@@ -35,7 +36,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         return()
       }
       else {
-        mainTable$main = externalData() |> standardiseGenoData(id = id)
+        mainTable$main = externalData() |> standardiseGenoData(flavour = id)
         completeDvi$raw = completeDvi$import = NULL
       }
     }, ignoreInit = TRUE, ignoreNULL = FALSE)
@@ -55,13 +56,14 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         fluidRow(
           column(4,
             pickerInput(ns("filetype"), label = NULL, width = "100%",
-                        choices = c(Familias = "fam", Genemapper = "gm",
+                        choices = c(Familias = "fam",
+                                    Genemapper = "gm",
                                     `Text file` = "txt",
                                     `dviData (.RData/.rds)` = "rdata"),
                         selected = filetypeSaved(),
-                        choicesOpt = list(disabled = c(FALSE, FALSE, TRUE, FALSE),
-                                          style = c("", "", "color: gray !important;", ""),
-                                          icon = c("", "", "fa-ban", "")),
+                        choicesOpt = list(disabled = c(FALSE, FALSE, FALSE, FALSE),
+                                          style = c("", "", "", ""), # color: gray !important;
+                                          icon = c("", "", "", "")), # "fa-ban"
                         options = pickerOptions(style = "btn-outline-primary",
                                                 iconBase = "fas"))),
           column(8,
@@ -213,7 +215,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         return()
       }
       # If not complete DVI
-      df = standardiseGenoData(dfFiltered(), id,
+      df = standardiseGenoData(dfFiltered(), flavour = id,
                                selectRows = input$previewTable_rows_selected,
                                excludeCols = input$excludeCols)
       if(input$action == "replace") {
@@ -331,7 +333,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
           column(6,
             radioButtons(ns("aliasMethod"), "Choose method:",
                          choices = list("Sequence with prefix" = "prefix",
-                                        "Cut at first" = "cut",
+                                        "Keep until first" = "cut",
                                         "Remove text" = "remove",
                                         "Extract text" = "extract"),
                          selected = "prefix")
@@ -449,8 +451,12 @@ previewGenoDT = function(dat) {
 formatGenoView = function(dat, mode, flavour = NULL, fam = NULL) {
 
   if(mode == "main" && flavour == "AM") {
-    f = fam[dat$Sample]
-    dat$Fam = ifelse(is.na(f), "", f)
+    if(is.null(fam))
+      dat$Fam = ""
+    else {
+      f = fam[dat$Sample]
+      dat$Fam = ifelse(is.na(f), "", f)
+    }
     dat = moveColsFirst(dat, c("Fam", "Sample", "Alias", "Sex"))
   }
 
@@ -508,7 +514,7 @@ genoDT = function(dat, mode = c("main", "edit"), flavour = NULL, assigned = NULL
       dom = "t",
       paging = FALSE,
       scrollX = TRUE,
-      scrollY = if(nrow(dat) > 10) scrollY else NULL,
+      scrollY = if(nrow(dat) > 14) scrollY else NULL,
       columnDefs = list(
         list(type = "natural", targets = .cols(c("Fam", "Sample", "Alias"))),
         list(orderable = TRUE, targets = .cols(c("Fam", "Sample", "Alias"))),
@@ -527,7 +533,7 @@ genoDT = function(dat, mode = c("main", "edit"), flavour = NULL, assigned = NULL
   dt
 }
 
-standardiseGenoData = function(df, id, selectRows = NULL, excludeCols = NULL) { print("standardise geno df")
+standardiseGenoData = function(df, flavour, selectRows = NULL, excludeCols = NULL) {
   if(is.null(df))
     return()
 
@@ -543,6 +549,10 @@ standardiseGenoData = function(df, id, selectRows = NULL, excludeCols = NULL) { 
   nms = names(df)
   rownms = rownames(df)
 
+  # Don't include fam here; taken care of in formatGenoView
+  #if(flavour == "AM" && !"Fam" %in% nms)
+  #  df$Fam = ""
+
   if(!"Sample" %in% nms && !is.null(rownms))
     df$Sample = rownms
 
@@ -551,7 +561,7 @@ standardiseGenoData = function(df, id, selectRows = NULL, excludeCols = NULL) { 
   }
 
   if(!"Alias" %in% nms) {
-    al = switch(id, PM = "V", AM = "R") |> paste0(seq_len(nrow(df)))
+    al = switch(flavour, PM = "V", AM = "R") |> paste0(seq_len(nrow(df)))
     df$Alias = if(!any(al %in% rownms)) al else rownms
   }
 
