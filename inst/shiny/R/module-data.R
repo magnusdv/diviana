@@ -251,7 +251,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       showModal(modalDialog(
         title = "Edit mode", size = "l",
         p("Edit the table by double clicking on the cells. Press 'Save' to confirm changes."),
-        DT::DTOutput(ns("editTable"), height = "300px"),
+        DT::DTOutput(ns("editTable"), height = "320px"),
         footer = tagList(modalButton("Cancel"),
                          actionButton(ns("editSave"), "Save"))
       ))
@@ -267,7 +267,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       ed = input$editTable_cell_edit
       i = input$editTable_rows_current[ed$row]
       j = ed$col + 1L # 0 = rownames
-      val = ed$value
+      val = trimws(ed$value)
       cl = names(dat)[j]
 
       tryCatch({
@@ -346,8 +346,15 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
             uiOutput(ns("aliasErrorUI"))
           )
         ),
-        DT::dataTableOutput(ns("aliasTable")),
-        footer = tagList(modalButton("Cancel"), actionButton(ns("aliasSave"), "Save"))
+        div(style = "margin-top: 10px;", DT::DTOutput(ns("aliasTable"))),
+        footer = tagList(
+          tagAppendAttributes(
+            actionButton(ns("aliasReplace"), HTML("Replace originals<br>with aliases"), warning = "info"),
+            class = "btn-xs",
+            style = "float:left; margin-right:auto; color:tomato; font-size:80%; font-weight:550; line-height:1.1; border-radius: 12px; padding: 2px 6px;"
+          ),
+          modalButton("Cancel"),
+          actionButton(ns("aliasSave"), "Save",status = "success"))
       ))
     })
 
@@ -410,6 +417,19 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     observeEvent(input$aliasSave, { .debug2("alias save")
       dat = mainTable$main
       dat$Alias = generateAliases()
+      mainTable$main = dat
+      removeModal()
+    })
+
+    observeEvent(input$aliasReplace, { .debug2("alias replace")
+      dat = mainTable$main
+      al = generateAliases()
+
+      changes = list(ids = .setnames(al, dat$Sample))
+      idEdits(changes)
+
+      dat$Alias = dat$Sample = al
+      rownames(dat) = al
       mainTable$main = dat
       removeModal()
     })
@@ -493,16 +513,7 @@ genoDT = function(dat, mode = c("main", "edit"), flavour = NULL, assigned = NULL
     edit = list(target = "cell", disable = list(columns = .colIdx(c("Fam", "Sex"))))
   )
 
-  callback = if(mode == "edit") DT::JS("
-    var id = $(table.table().container()).closest('.html-widget').attr('id') + '_sex_edit';
-    table.on('change', 'select.sex-edit', function() {
-      Shiny.setInputValue(id, {
-        key: this.dataset.key,
-        value: this.value,
-        nonce: Math.random()
-      }, {priority: 'event'});
-    });
-  ") else JS("return table;")
+  callback = if(mode == "edit") DT::JS("sexEditCallback(table);") else DT::JS("return table;")
 
   dt = DT::datatable(
     dat,
@@ -517,7 +528,7 @@ genoDT = function(dat, mode = c("main", "edit"), flavour = NULL, assigned = NULL
       dom = "t",
       paging = FALSE,
       scrollX = TRUE,
-      scrollY = "370px",
+      scrollY = scrollY,
       scrollCollapse = TRUE,
       columnDefs = list(
         list(type = "natural", targets = .cols(c("Fam", "Sample", "Alias"))),
@@ -586,11 +597,16 @@ standardiseGenoData = function(df, flavour, selectRows = NULL, excludeCols = NUL
 
 
 aliasDT = function(dat, scrollY = "250px") {
-  res = DT::datatable(dat, rownames = FALSE, selection = "none",
-                      class = "stripe hover nowrap compact",
-                      options = list(dom = 't', scrollX = TRUE,
-                                     scrollY = scrollY, paging = FALSE))
-  res = DT::formatStyle(res, names(dat), target = "row", lineHeight = "75%")
+  res = DT::datatable(dat,
+                      rownames = FALSE,
+                      selection = "none",
+                      class = "stripe hover compact",
+                      options = list(dom = 't',
+                                     scrollX = FALSE,
+                                     scrollY = scrollY,
+                                     scrollCollapse = TRUE,
+                                     paging = FALSE)) |>
+    DT::formatStyle(names(dat), target = "row", lineHeight = "80%")
 
   # Highlight empty or duplicated aliases
   bad = c("", unique.default(dat$Alias[duplicated.default(dat$Alias)]))
