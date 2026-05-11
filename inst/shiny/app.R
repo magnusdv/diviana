@@ -288,11 +288,12 @@ server = function(input, output, session) {
     sxch = changes$sex  # named vector
     peds = pedigrees()
 
-    for(fam in names(peds)) {
-      peddat = peds[[fam]]
-      ped = peddat$ped
+    tryCatch({
 
-      tryCatch({
+      for(fam in names(peds)) {
+        peddat = peds[[fam]]
+        ped = peddat$ped
+
 
         if(length(idch)) {
           peddat$ped = pedtools::relabel(ped, new = idch)
@@ -306,6 +307,9 @@ server = function(input, output, session) {
           oldsex = pedtools::getSex(ped, ids)
           newsex = unname(sxch)
           swap = ids[oldsex * newsex == 2]  # one is 1 and the other 2
+          spouses = pedtools::spouses(ped, swap)
+          if(any(spouses %in% mainMissing()))
+            stop2("Cannot change sex for reference individuals with missing spouses.")
           ped = pedtools::swapSex(ped, swap, verbose = FALSE)
           if(any(oldsex == 0))
             ped = pedtools::setSex(ped, ids[oldsex == 0], sex = newsex[oldsex == 0])
@@ -313,10 +317,10 @@ server = function(input, output, session) {
         }
 
         peds[[fam]] = peddat
-      }, error = showErr)
-    }
+      }
 
-    pedigrees(peds)
+      pedigrees(peds)
+    }, error = showErr)
   })
 
   # State for loaded/imported DVI data -------------------------------------
