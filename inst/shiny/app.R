@@ -23,7 +23,6 @@ addResourcePath("icons", "www/static_icons")
 # TODO----------------------------------------------------------------
 #
 # DATA
-# * Accordion effect
 # * Alias dialog button: "Replace original IDs with the aliases"
 # * Download dviData (not only debug)
 #
@@ -104,7 +103,7 @@ ui = bs4Dash::bs4DashPage(
 
    tabItem("data",
       fluidRow(
-        column(width = 7, dataUI("AM"), dataUI("PM")),
+        column(width = 7, div(id = "data-accordion", dataUI("AM"), dataUI("PM"))),
         column(
           width = 5, id = "pedcol",
           bs4Card(width = NULL, collapsible = FALSE,

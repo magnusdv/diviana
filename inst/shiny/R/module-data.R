@@ -1,12 +1,12 @@
 
 dataUI = function(id, title = paste(id, "data")) {
   ns = NS(id)
-  bs4Card(width = NULL, title = title, collapsible = TRUE,
-    DT::DTOutput(ns("mainTable"), width = "fit-content"), #, height = "400px"),
+  bs4Card(width = NULL, title = title, collapsible = TRUE, collapsed = FALSE,
+    DT::DTOutput(ns("mainTable")),
     tags$head(tags$style(HTML(
-      sprintf("#%s {width:fit-content; max-height: 400px; max-width: 100%%;}", ns("mainTable"))))),
-    br(),
-    shiny::uiOutput(ns("sourcefield")),
+      sprintf("#%s {width:fit-content; max-width: 100%%;}", ns("mainTable"))))),
+    #br(),
+    shiny::uiOutput(ns("sourcefield"), style = "margin-top: 10px;"),
     footer = div(class = "btn-group",
       actionButton(ns("importButton"), label = tagList(myIcon("file-arrow-up", align = "-0.1em"), "Import")),
       actionButton(ns("editButton"), label = tagList(myIcon("edit", align = "-0.1em"), "Edit")),
@@ -235,7 +235,10 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
 
     output$sourcefield = renderUI({
       src = unlist(lapply(req(sources$all), function(s) as.character(em(s))))
-      HTML(paste0(c("Sources: ", src), collapse = if(length(src) == 1) " " else "<br/>"))
+      if(length(src) == 1)
+        HTML(paste0(c("Sources: ", src), collapse = " "))
+      else
+        tags$div(style = "line-height: 1.1;", HTML(paste(c("Sources:", src), collapse = "<br>")))
     })
 
     # Edit -------------------------------------------------------------------
