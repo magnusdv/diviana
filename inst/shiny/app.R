@@ -8,36 +8,41 @@ suppressMessages(suppressPackageStartupMessages({
   library(pedtools)
   library(pedmut)
   library(forrel)
+  library(diviana)
   library(dvir)
   library(verbalisr)
   library(plotly)
   library(openxlsx)
 }))
 
+VERSION = packageDescription("diviana")$Version
+
 # Add path to icons
 addResourcePath("icons", "www/static_icons")
 
 # TODO----------------------------------------------------------------
+#
 # DATA
 # * Accordion effect
+# * Alias dialog button: "Replace original IDs with the aliases"
+# * Download dviData (not only debug)
 #
 # MARKERS
 # * indicate markers with added alleles
 # * store original mutmods for faster rendering of original+original
 #
 # PED
-# * slimmer family label; fatter buttons
+# * Slimmer family label; fatter buttons
 # * Fix width: !important
 # * Use default MP labels (settings)
-#
-# DATA
-# * Genemapper wide + Relationship
-# * Download dviData (not only debug)
-# * Plot fires twice!!!
 #
 # TRIANGLES
 # * Triangle plots: Latex labels
 # * Triangle AM: Select family
+#
+# ANALYSIS
+# * Fix excel download
+#
 #---------------------------------------------
 
 
@@ -95,6 +100,31 @@ ui = bs4Dash::bs4DashPage(
 
    tabItems(
 
+   # Tab: DATA - AM, PM, pedigrees -----------------------------------------------
+
+   tabItem("data",
+      fluidRow(
+        column(width = 7, dataUI("AM"), dataUI("PM")),
+        column(
+          width = 5, id = "pedcol",
+          bs4Card(width = NULL, collapsible = FALSE,
+            title = cardNavigation("pedcard", "Pedigrees"),
+            plotOutput("pedplot", width = "auto", height = "auto"),
+            footer = div(class = "aligned-row-wide",
+              div(class = "btn-group",
+                actionButton("newped", label = tagList(icon("plus"), "New")) |> wrap_tooltip("newped"),
+                actionButton("editped", label = tagList(icon("edit"), "Edit")) |> wrap_tooltip("editped"),
+                actionButton("delped", label = tagList(icon("trash-can"), "Delete") ) |> wrap_tooltip("delped")
+              ),
+              actionBttn("plotdviButton", "Overview", style = "jelly", size = "s", color = "success") |>
+                wrap_tooltip("dviplot")
+            )
+          ),
+          bs4InfoBoxOutput("dvisummary", width = 12)
+        ),
+      )
+   ),
+
    # Tab: Marker database -------------------------------------------
 
    tabItem("database",
@@ -131,48 +161,11 @@ ui = bs4Dash::bs4DashPage(
 
     br(),
 
-    p("This is DIVIANA version", "0.3.1", "(",
+    p("This is DIVIANA version", VERSION, "(",
       mylink("changelog", "https://github.com/magnusdv/diviana/blob/master/NEWS.md"), ").",
       "DIVIANA is still under development. If you experience problems, please file an issue ",
       mylink("here", "https://github.com/magnusdv/diviana/issues"), ".")
    ),
-
-   # Tab: AM/PM data and pedigrees -----------------------------------------------
-
-   tabItem("data",
-      fluidRow(
-        column(width = 7, dataUI("AM"), dataUI("PM")),
-        column(
-          width = 5, id = "pedcol",
-          bs4Card(width = NULL, collapsible = FALSE,
-            title = cardNavigation("pedcard", "Pedigrees"),
-            plotOutput("pedplot", width = "auto", height = "auto"),
-            footer = div(class = "aligned-row-wide",
-              div(class = "btn-group",
-                actionButton("newped", label = tagList(icon("plus"), "New")) |> wrap_tooltip("newped"),
-                actionButton("editped", label = tagList(icon("edit"), "Edit")) |> wrap_tooltip("editped"),
-                actionButton("delped", label = tagList(icon("trash-can"), "Delete") ) |> wrap_tooltip("delped")
-              ),
-              actionBttn("plotdviButton", "Overview", style = "jelly", size = "s", color = "success") |>
-                wrap_tooltip("dviplot")
-            )
-          ),
-          bs4InfoBoxOutput("dvisummary", width = 12)
-        ),
-      )
-   ),
-
-    # column(width = 2, id = "labcol", class = "col-xs-12 col-lg-4",
-    #   conditionalPanel(condition = "input.debug",
-    #     div(style = "font-size:smaller; line-height:normal; background-color:white; height:300px; overflow-y:auto; border: 1px solid #ccc",
-    #       verbatimTextOutput("debugOutput")),
-    #     div(style = "font-size:smaller; line-height:normal; border: 1px solid #ccc; margin-top: 5px; position:relative;",
-    #         div(downloadButton("downloaddata", label = "dviData", width = "100%", class = "btn btn-primary btn-sm", style = "background-color: lightblue;"),
-    #             style = "position:absolute; top: 5px; right: 5px;"),
-    #         verbatimTextOutput("debugElements")
-    #         ),
-    #   )
-    # )
 
 
   # Tab: Relatedness ---------------------------------------------------------

@@ -514,7 +514,8 @@ genoDT = function(dat, mode = c("main", "edit"), flavour = NULL, assigned = NULL
       dom = "t",
       paging = FALSE,
       scrollX = TRUE,
-      scrollY = if(nrow(dat) > 14) scrollY else NULL,
+      scrollY = "370px",
+      scrollCollapse = TRUE,
       columnDefs = list(
         list(type = "natural", targets = .cols(c("Fam", "Sample", "Alias"))),
         list(orderable = TRUE, targets = .cols(c("Fam", "Sample", "Alias"))),
@@ -578,76 +579,6 @@ standardiseGenoData = function(df, flavour, selectRows = NULL, excludeCols = NUL
   df$.rowid = seq_len(nrow(df))
 
   moveColsFirst(df, c(".rowid", "Fam", "Sample", "Alias", "Sex"))
-}
-
-# Format DT tables
-genoDTold = function(dat, scrollY = "220px", editable = FALSE) {
-
-  # Remove Aliases if identical to rownames (main view only; always show in edit mode)
-  if(!editable && identical(dat$Alias, rownames(dat)))
-    dat$Alias = NULL
-
-  nms = names(dat)
-  .mycols = function(cols) .myintersect(cols, nms)
-
-  if(editable) {
-    if(!".rowid" %in% nms) stop2("Missing `.rowid` column for DT editing")
-    editopt = list(target = "cell",
-                   disable = list(columns = .mycols(c("Fam", "Sex"))))
-    key = dat$.rowid
-    if("Sex" %in% nms) {
-      dat$Sex = sprintf(
-        "<select class='sex-edit' data-key='%s'><option value='F'%s>Female</option><option value='M'%s>Male</option></select>",
-        key,
-        ifelse(dat$Sex == "F", " selected", ""),
-        ifelse(dat$Sex == "M", " selected", "")
-      )
-    }
-  }
-  else {
-    editopt = editable
-  }
-
-  dt = DT::datatable(
-    dat,
-    class = "stripe hover nowrap compact",
-    rownames = FALSE,
-    escape = if(editable) .mycols(setdiff(nms, "Sex")) else TRUE,
-    callback = if(editable) JS("
-      var id = $(table.table().container()).closest('.html-widget').attr('id') + '_sex_edit';
-      table.on('change', 'select.sex-edit', function() {
-        Shiny.setInputValue(id, {
-          key: this.dataset.key,
-          value: this.value,
-          nonce: Math.random()
-        }, {priority: 'event'});
-      });
-    ") else JS("return table;"),
-    plugins = "natural",
-    selection = selection,
-    editable = editopt,
-    options = list(
-      dom = "t",
-      paging = FALSE,
-      scrollX = TRUE,
-      scrollY = if(nrow(dat) > 10) scrollY else NULL,
-      columnDefs = list(
-        list(type = "natural", targets = .mycols(c(".rowid", "Fam", "Sample", "Alias"))),
-        list(orderable = TRUE, targets = .mycols(c("Fam", "Sample", "Alias"))),
-        list(orderable = FALSE, targets = "_all"),
-        list(visible = FALSE, targets = .mycols(".rowid"))
-      )
-    )
-  ) |>
-    DT::formatStyle(nms, target = "row", lineHeight = "75%") |>
-    DT::formatStyle(.mycols("Sex"), borderRight = "1px solid #ccc")
-
-  if(editable)
-    dt = DT::formatStyle(dt, .mycols("Fam"), color = "#999")
-  else
-    dt = DT::formatStyle(dt, .mycols("Sex"), color = DT::styleEqual(c("F", "M"), c("hotpink", "steelblue")))
-
-  dt
 }
 
 

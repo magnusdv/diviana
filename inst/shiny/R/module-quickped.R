@@ -120,17 +120,18 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       mod = modalDialog(
         title = div(class = "aligned-row-wide", "Pedigree builder",
                     helpBtn("help-ped") |> wrap_tooltip("pedhelp", "left")),
-        class = "pedmodal", # TODO!
         tags$head(tags$style(HTML("
           @media (min-width: 576px) {
-            .modal-dialog { max-width: 600px !important; }
+            .pedmodal > .modal-dialog { max-width: 600px !important; }
           }"))),
         pedigreeUI(id, famid),
         footer = tagList(
           actionButton(ns("cancel"), "Cancel"),
           actionButton(ns("save"), "Save")
         )
-      )
+      ) |>
+        tagAppendAttributes(class = "pedmodal")
+
       currentModal(mod)
       mod
     })
