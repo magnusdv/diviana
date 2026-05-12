@@ -6,7 +6,7 @@ dataUI = function(id, title = paste(id, "data")) {
     tags$head(tags$style(HTML(
       sprintf("#%s {width:fit-content; max-width: 100%%;}", ns("mainTable"))))),
     #br(),
-    shiny::uiOutput(ns("sourcefield"), style = "margin-top: 10px;"),
+    shiny::uiOutput(ns("sourcefield")),
     footer = div(class = "btn-group",
       actionButton(ns("importButton"), label = tagList(myIcon("file-arrow-up", align = "-0.1em"), "Import")),
       actionButton(ns("editButton"), label = tagList(myIcon("edit", align = "-0.1em"), "Edit")),
@@ -15,7 +15,9 @@ dataUI = function(id, title = paste(id, "data")) {
   )
 }
 
-dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = reactiveVal(), .debug = NULL) {
+dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = reactiveVal(),
+                      missingIDs = reactiveVal(), .debug = NULL) {
+
   .debug2 = if(!is.null(.debug)) function(...) .debug(sprintf("-%s data:", id), ...)
 
   moduleServer(id, function(input, output, session) { .debug2("server")
@@ -264,6 +266,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     # Preserve manually entered aliases
     observeEvent(input$editTable_cell_edit, { .debug2("edit cell")
       dat = editdata()
+      missing = missingIDs()
       ed = input$editTable_cell_edit
       i = input$editTable_rows_current[ed$row]
       j = ed$col + 1L # 0 = rownames
@@ -271,13 +274,16 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       cl = names(dat)[j]
 
       tryCatch({
-        # Checks
         if(cl %in% c("Sample", "Alias") && val == "")
-          stop2("Value cannot be empty")
+          stop2("Name cannot be empty")
         if(cl == "Sample" && val %in% dat$Sample[-i])
           stop2("Duplicate sample name: ", val)
         if(cl == "Alias" && val %in% dat$Alias[-i])
           stop2("Duplicate alias: ", val)
+        if(cl == "Sample" && val %in% missing)
+          stop2("Name is already in use by a missing person:", val)
+        if(cl == "Alias" && val %in% missing)
+          stop2("Alias is already in use by a missing person:", val)
 
         # Update row name to match Sample
         if(cl == "Sample")

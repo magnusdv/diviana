@@ -252,16 +252,17 @@ server = function(input, output, session) {
 
   pedigrees = reactiveVal(NULL)
   DB = reactiveVal(NULL) # list of freq vectors
+  mainMissing = reactiveVal(NULL)
 
   # Import data ------------------------------------------------------------
 
-  externalPM = reactiveVal(NULL)
   externalAM = reactiveVal(NULL)
+  externalPM = reactiveVal(NULL)
   assignedRefs = reactiveVal(NULL)
   externalLoci = reactiveValues(db = NULL, mut = NULL, hasMut = FALSE) # `mut` becomes named list
 
-  dataServerPM = dataServer("PM", externalPM, .debug = .debug)
-  dataServerAM = dataServer("AM", externalAM, assignedRefs, .debug = .debug)
+  dataServerAM = dataServer("AM", externalAM, assignedRefs, missingIDs = mainMissing, .debug = .debug)
+  dataServerPM = dataServer("PM", externalPM, missingIDs = mainMissing, .debug = .debug)
 
   genoAM = reactive({ .debug("genoAM", dataServerAM$main())
     g = dataServerAM$main(); g$.rowid = g$Fam = g$Sample = g$Alias = g$AMEL = g$Sex = NULL; g})
@@ -284,40 +285,13 @@ server = function(input, output, session) {
 
   observeEvent(dataServerAM$idEdits(), { .debug("ID edits")
     changes = req(dataServerAM$idEdits())
-    idch = changes$ids  # named vector
-    sxch = changes$sex  # named vector
-    peds = pedigrees()
+    missing = mainMissing()
+    if(sum(lengths(changes)) == 0)
+      return()
 
     tryCatch({
-
-      for(fam in names(peds)) {
-        peddat = peds[[fam]]
-        ped = peddat$ped
-
-
-        if(length(idch)) {
-          peddat$ped = pedtools::relabel(ped, new = idch)
-          j = match(peddat$refs, names(idch), nomatch = 0L)
-          if(any(j > 0L))
-            peddat$refs[j > 0L] = unname(idch[j])
-        }
-
-        if(length(sxch)) {
-          ids = names(sxch)
-          oldsex = pedtools::getSex(ped, ids)
-          newsex = unname(sxch)
-          swap = ids[oldsex * newsex == 2]  # one is 1 and the other 2
-          spouses = pedtools::spouses(ped, swap)
-          if(any(spouses %in% mainMissing()))
-            stop2("Cannot change sex for reference individuals with missing spouses.")
-          ped = pedtools::swapSex(ped, swap, verbose = FALSE)
-          if(any(oldsex == 0))
-            ped = pedtools::setSex(ped, ids[oldsex == 0], sex = newsex[oldsex == 0])
-          peddat$ped = ped
-        }
-
-        peds[[fam]] = peddat
-      }
+      peds = lapply(pedigrees(), function(peddat)
+        editPeddata(peddat, idch = changes$ids, sxch = changes$sex, missing = missing))
 
       pedigrees(peds)
     }, error = showErr)
@@ -524,13 +498,15 @@ server = function(input, output, session) {
 
   # Derived DVI objects ----------------------------------------------------
 
-  mainMissing = reactive(unlist(lapply(pedigrees(), `[[`, "miss"), use.names = FALSE))
-
   observeEvent(pedigrees(), {
     assigned = lapply(pedigrees(), `[[`, "refs")
-    assVec = .setnames(rep(names(assigned), lengths(assigned)), unlist(assigned, use.names = FALSE))
+    assVec = .setnames(rep(names(assigned), lengths(assigned)),
+                       unlist(assigned, use.names = FALSE))
     .debug("assignedRefs:", assVec)
     assignedRefs(assVec)
+
+    miss = unlist(lapply(pedigrees(), `[[`, "miss"), use.names = FALSE)
+    mainMissing(miss)
   })
 
   mainAM = reactive({ .debug("mainAM", loading())
