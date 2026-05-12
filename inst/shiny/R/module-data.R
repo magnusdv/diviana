@@ -84,7 +84,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         footer = tagList(div(class = "aligned-row-wide",
           radioButtons(ns("action"), NULL, inline = TRUE,
                        choices = c("Replace existing data" = "replace", "Add" = "add")),
-          div(modalButton("Cancel"), actionButton(ns("importSave"), "Save"))))
+          div(modalButton("Cancel"), actionButton(ns("importSave"), "Save", status = "success"))))
       ))
     })
 
@@ -236,11 +236,14 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     }, server = FALSE)
 
     output$sourcefield = renderUI({
-      src = unlist(lapply(req(sources$all), function(s) as.character(em(s))))
-      if(length(src) == 1)
-        HTML(paste0(c("Sources: ", src), collapse = " "))
-      else
-        tags$div(style = "line-height: 1.1;", HTML(paste(c("Sources:", src), collapse = "<br>")))
+      src = vapply(sources$all, \(s) as.character(em(s)), character(1))
+      if(!length(src))
+        return(NULL)
+
+      tags$div(
+        style = "margin-top: 10px; line-height: 1.1;",
+        HTML(paste(c("Sources:", src), collapse = if(length(src) == 1) " " else "<br>"))
+      )
     })
 
     # Edit -------------------------------------------------------------------
@@ -255,7 +258,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         p("Edit the table by double clicking on the cells. Press 'Save' to confirm changes."),
         DT::DTOutput(ns("editTable"), height = "320px"),
         footer = tagList(modalButton("Cancel"),
-                         actionButton(ns("editSave"), "Save"))
+                         actionButton(ns("editSave"), "Save", status = "success"))
       ))
     })
 
