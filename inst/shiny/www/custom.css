@@ -10,6 +10,10 @@
 /* Card main content: Default vertical padding too large (1.25rem) */
 .card-body { padding: 0.75rem 1.25rem; }
 
+.card.bs4Dash.card-outline-tabs > .card-header .nav-tabs .nav-link.active {
+  font-weight: 600;
+}
+
 .checkbox label > span { font-weight: normal;}
 .checkbox label { margin-bottom:0}
 

@@ -23,7 +23,6 @@ addResourcePath("icons", "www/static_icons")
 # TODO----------------------------------------------------------------
 #
 # DATA
-# * Alias dialog button: "Replace original IDs with the aliases"
 # * Download dviData (not only debug)
 #
 # MARKERS
@@ -31,6 +30,7 @@ addResourcePath("icons", "www/static_icons")
 # * store original mutmods for faster rendering of original+original
 #
 # PED
+# * Reference list ugly when long
 # * Slimmer family label; fatter buttons
 # * Fix width: !important
 # * Use default MP labels (settings)
@@ -121,7 +121,11 @@ ui = bs4Dash::bs4DashPage(
           ),
           bs4InfoBoxOutput("dvisummary", width = 12)
         ),
-      )
+      ),
+      p(sprintf("This is DIVIANA version %s.", VERSION),
+        #"(", mylink("changelog", "https://github.com/magnusdv/diviana/blob/master/NEWS.md"), ").",
+        "Bug reports and issues are welcome ",
+        mylink("here", "https://github.com/magnusdv/diviana/issues"), ".")
    ),
 
    # Tab: Marker database -------------------------------------------
@@ -157,13 +161,6 @@ ui = bs4Dash::bs4DashPage(
         ),
       ),
     ),
-
-    br(),
-
-    p("This is DIVIANA version", VERSION, "(",
-      mylink("changelog", "https://github.com/magnusdv/diviana/blob/master/NEWS.md"), ").",
-      "DIVIANA is still under development. If you experience problems, please file an issue ",
-      mylink("here", "https://github.com/magnusdv/diviana/issues"), ".")
    ),
 
 
@@ -185,7 +182,7 @@ ui = bs4Dash::bs4DashPage(
              actionBttn("solve", label = "SOLVE", icon = icon("calculator"),
                         color = "primary", style = "jelly") |>
                wrap_tooltip("solve"),
-             br(), hr(),
+             br(),br(),
              h4("Settings"),
              numericInput("LRthresh", "LR threshold", value = 10000,min = 1) |>
                wrap_tooltip("LRthresh"),

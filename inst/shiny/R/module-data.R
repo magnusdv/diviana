@@ -5,8 +5,8 @@ dataUI = function(id, title = paste(id, "data")) {
     DT::DTOutput(ns("mainTable")),
     tags$head(tags$style(HTML(
       sprintf("#%s {width:fit-content; max-width: 100%%;}", ns("mainTable"))))),
-    #br(),
-    shiny::uiOutput(ns("sourcefield")),
+
+    uiOutput(ns("sourcefield")),
     footer = div(class = "btn-group",
       actionButton(ns("importButton"), label = tagList(myIcon("file-arrow-up", align = "-0.1em"), "Import")),
       actionButton(ns("editButton"), label = tagList(myIcon("edit", align = "-0.1em"), "Edit")),
