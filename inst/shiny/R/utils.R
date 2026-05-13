@@ -223,26 +223,6 @@ genosWithAttrs = function(x, addCols = c("Sample", "Sex"), addAttrs = "Fam") {
 }
 
 
-abbreviatePedrel = function(x, width = 15) {
-  x[x == "Unrelated"] = "Unrel"
-  x[x == "Mother-daughter"] = "Mother-dau"
-  x[x == "Father-daughter"] = "Father-dau"
-
-  if(!any(long <- (nchar(x) > width)))
-    return(x)
-
-  x[long] = sub(" &.*", " &", x[long])
-  if(!any(long <- (nchar(x) > width)))
-    return(x)
-
-  x[long] = sub("--.*", "/", x[long])
-  if(!any(long <- (nchar(x) > width)))
-    return(x)
-
-  x[long] = paste0(substr(x[long], 1, width-2), "..")
-  x
-}
-
 
 changeSex = function(ped, ids, sex, refuse = NULL) {
 

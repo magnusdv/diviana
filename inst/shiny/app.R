@@ -170,7 +170,7 @@ ui = bs4Dash::bs4DashPage(
   # Tab: Relatedness ---------------------------------------------------------
 
   tabItem("relatedness", fluidRow(
-    triangleCard("AM - AM", idpref = "am"), # TODO: plotOutput("ampairped", width = "auto", height = "400px")
+    triangleCard("AM - AM", idpref = "am"),
     triangleCard("AM - PM", idpref = "ampm"),
     triangleCard("PM - PM", idpref = "pm")
   )),
@@ -838,83 +838,57 @@ server = function(input, output, session) {
   # Tab: Triangles ----------------------------------------------------------
 
   kappa = reactiveValues(am = NULL, pm = NULL, ampm = NULL)
-
-  output$amtable = DT::renderDT(formatCP(kappa$am, settings$useAliases, alias1 = aliasAM()),
-                                server = FALSE)
-  output$ampmtable = DT::renderDT(formatCP(kappa$ampm, settings$useAliases, alias1 = aliasAM(), alias2 = aliasPM()), server = FALSE)
-  output$pmtable = DT::renderDT(formatCP(kappa$pm, settings$useAliases, alias1 = aliasPM()), server = FALSE)
-
   observeEvent(settings$acrossComps, {kappa$am = NULL}, ignoreInit = TRUE)
 
-  observeEvent(input$amkappa, { .debug("am-kappa")
-    kappa$am = CPnoplot(req(mainAM()), acrossComps = settings$acrossComps)
-  })
+  # Number of typed in each fam (NULL -> integer0)
+  nRefs = reactive(lengths(lapply(mainAM(), pedtools::typedMembers)))
 
-  output$amtriangle = renderPlotly({ .debug("am triangle")
-    df = kappa$am[input$amtable_rows_all, , drop = FALSE]
-    p = forrel::plotCP(df, plotType = "plotly", xlab = "", ylab = "")
-    p$x$source = "amtriangle"
-    p
-  })
+  output$amMsg   = renderUI(cpMessage(kappa$am, "am", nref = nRefs(), across = settings$acrossComps))
+  output$pmMsg   = renderUI(cpMessage(kappa$pm, "pm", nvic = length(mainPM())))
+  output$ampmMsg = renderUI(cpMessage(kappa$ampm, "ampm", nref = nRefs(), nvic = length(mainPM())))
 
-  # lastClick = reactiveVal(NULL)
-  #
-  # # TODO: show peds in modal!
-  # output$ampairped = renderPlot({ .debug("am-triangle-pedigree")
-  #   p = req(event_data("plotly_click", source = "amtriangle"))
-  #   if(identical(p, isolate(lastClick())))
-  #     return(NULL)
-  #   lastClick(p)
-  #   idx = req(p$customdata)
-  #   dat = kappa$am[idx, ]
-  #   ids = c(dat$id1, dat$id2)
-  #
-  #   # TODO: simplify everything below
-  #   fams = unique(getComponent(mainAM(), ids))
-  #   peddata = pedigrees()[fams]
-  #   peds = lapply(peddata, function(d) d$ped)
-  #   miss = unlist(lapply(peddata, function(d) d$miss))
-  #   refs = unlist(lapply(peddata, function(d) d$refs))
-  #   tit = sprintf("%s vs. %s:\n%s", ids[1], ids[2],
-  #                 verbalise(peds, ids) |> format(simplify = TRUE))
-  #
-  #   # Colours (from forrel::checkpairwise)
-  #   cols = c("Parent-offspring" = "2", "Full siblings" = "3",
-  #            "Half/Uncle/Grand" = "4", "First cousins/etc" = "5",
-  #            "Other" = "6", "Unrelated" = "7") # "Other" = "#C8A2C8"
-  #   idscol = .setnames(list(ids), cols[as.character(dat$relgroup)])
-  #
-  #   plot(peds, cex = 1.2, title = tit, foldLabs = 10, hatched = refs,
-  #        fill = c(idscol, list("gray50" = setdiff(refs, ids))), col = idscol,
-  #        lwd = list("2.2" = ids), margins = c(2,1.5,5,1.5), autoScale = TRUE)
-  #   box("outer")
-  # },
-  # execOnResize = TRUE, res = 72)
+  output$amTable = DT::renderDT(
+    formatCP(kappa$am, settings$useAliases, alias1 = aliasAM()), server = FALSE)
 
-  observeEvent(input$ampmkappa, { .debug("ampm-kappa")
+  output$pmTable = DT::renderDT(
+    formatCP(kappa$pm, settings$useAliases, alias1 = aliasPM()), server = FALSE)
+
+  output$ampmTable = DT::renderDT(
+    formatCP(kappa$ampm, settings$useAliases, alias1 = aliasAM(), alias2 = aliasPM()),
+    server = FALSE)
+
+  observeEvent(input$amKappaCalc, { .debug("AM kappa calculate")
+    kappa$am = CPnoplot(req(mainAM()), acrossComps = settings$acrossComps) })
+
+  observeEvent(input$pmKappaCalc, { .debug("PM kappa calculate")
+    kappa$pm = CPnoplot(req(mainPM())) })
+
+  observeEvent(input$ampmKappaCalc, { .debug("AM-PM kappa calculate")
     am = req(mainAM())
     pm = req(mainPM())
-    #print(am); print(pm)
     idMatr = pedtools:::fast.grid(list(typedMembers(am), names(pm))) |> req()
-    commonMarkers = intersect(name(am), name(pm)) |> req()
+    commonMarkers = .myintersect(name(am), name(pm)) |> req()
     allcmps = c(selectMarkers(am, commonMarkers), selectMarkers(pm, commonMarkers))
     k = forrel::ibdEstimate(allcmps, ids = idMatr, verbose = FALSE)
     kappa$ampm = as.data.frame(k)
   })
 
-  output$ampmtriangle = renderPlotly({ .debug("ampm-triangle");
-    df = kappa$ampm[input$ampmtable_rows_all, , drop = FALSE]
-    forrel::showInTriangle(df, plotType = "plotly", xlab = "", ylab = "",
-                           pch = 16, col = "pink", cex = 1.2)
+  output$amTriangle = renderPlotly({ .debug("am triangle")
+    input$amTable_search # trigger on search/filter
+    df = kappa$am[isolate(input$amTable_rows_all), , drop = FALSE]
+    forrel::plotCP(df, plotType = "plotly", xlab = "", ylab = "")
   })
 
-  observeEvent(input$pmkappa, { .debug("pm-kappa")
-    kappa$pm = CPnoplot(req(mainPM()))
+  output$pmTriangle = renderPlotly({ .debug("pm-triangle")
+    input$pmTable_search # trigger on search/filter
+    df = kappa$pm[isolate(input$pmTable_rows_all), , drop = FALSE]
+    forrel::plotCP(df, plotType = "plotly", xlab = "", ylab = "", errtxt = "Potential relationship")
   })
-  output$pmtriangle = renderPlotly({ .debug("pm-triangle")
-    df = kappa$pm[input$pmtable_rows_all, , drop = FALSE]
-    forrel::plotCP(df, plotType = "plotly", xlab = "", ylab = "",
-                   errtxt = "Potential relationship")
+
+  output$ampmTriangle = renderPlotly({ .debug("ampm-triangle");
+    input$ampmTable_search # trigger on search/filter
+    df = kappa$ampm[isolate(input$ampmTable_rows_all), , drop = FALSE]
+    forrel::showInTriangle(df, plotType = "plotly", xlab = "", ylab = "", pch = 16, col = "pink", cex = 1.2)
   })
 
   # Tab: Analysis ---------------------------------------------------------------

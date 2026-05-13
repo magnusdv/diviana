@@ -32,26 +32,6 @@ textInput2 = function(inputId, value) {
 }
 
 
-# Wrapper for the three triangle cards
-triangleCard = function(title, idpref) {
-  id = paste0(idpref, c("kappa", "triangle", "table"))
-  calcBtn = actionButton(id[1], "Calculate", class = "btn-sm",
-                         icon = icon("play"), style = "margin-left: 30px;")
-  #if(idpref == "am")
-  #  calcBtn = div(class = "aligned-row",
-  #                div(checkboxInput("acrossComps", HTML("Across<br>components"), width = "auto"), style = "font-size: small;"),
-  #                calcBtn)
-
-  bs4Dash::bs4Card(
-    width = 4,
-    collapsible = FALSE,
-    title = div(class = "aligned-row-wide", title, calcBtn),
-    plotlyOutput(id[2], width = "100%", height = "350px"),
-    hr(),
-    DT::DTOutput(id[3]))
-}
-
-
 inlineRadioButtons = function(inputId, label, ...) {
   radios = radioButtons(inputId, label = NULL, inline = TRUE, ...)
   div(class = "aligned-row", strong(label, style = "padding-right:20px"), radios)
