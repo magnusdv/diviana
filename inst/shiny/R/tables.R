@@ -45,8 +45,12 @@ formatResultTable = function(x, usealias = FALSE, aliasPM = NULL, style = 6) {
     return(emptyGT)
   }
 
-  if(usealias && !is.null(aliasPM) && !all(is.na(x$Sample)))
-    x$Sample = aliasPM[x$Sample]
+  if(usealias && !is.null(aliasPM) && !all(is.na(x$Sample))) {
+    spl = strsplit(x$Sample, "/", fixed = TRUE)
+    len1 = lengths(spl) == 1
+    x$Sample[len1] = aliasPM[x$Sample[len1]] # this handles NAs!
+    x$Sample[!len1] = vapply(spl[!len1], \(s) paste(aliasPM[s], collapse = "/"), character(1))
+  }
 
   tab = gt(x) |>
     #opt_interactive(use_sorting = T, use_compact_mode = T, use_resizers = T,
