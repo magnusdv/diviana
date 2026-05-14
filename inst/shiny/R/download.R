@@ -1,18 +1,22 @@
 
 downloadTables = function(results, filename) {
   nvic = nrow(results$LR)
-  #results$PM$LR = safeFormat(results$PM$LR)
-  #results$PM$GLR = safeFormat(results$PM$GLR)
-  #results$LR[] = safeFormat(results$LR)
-  names(results) = c("resultsAM", "resultsPM", "LR matrix", "Exclusions")
+  results$AM$LR = safeFormat(results$PM$LR)
+  results$AM$GLR = safeFormat(results$PM$GLR)
+  results$PM$LR = safeFormat(results$PM$LR)
+  results$PM$GLR = safeFormat(results$PM$GLR)
+  results$LR[] = safeFormat(results$LR)
+  results$JT = results$JT[[1]] # TODO: fix to handle > 1
 
-  hs = createStyle(textDecoration = "bold")
-  wb = buildWorkbook(results, headerStyle = hs, colWidths = "auto",
-                     rowNames = list(FALSE,FALSE,TRUE,TRUE))
-  addStyle(wb, 3, cols = 1, rows = 1+seq_len(nvic), style = hs, stack = TRUE)
-  addStyle(wb, 4, cols = 1, rows = 1+seq_len(nvic), style = hs, stack = TRUE)
+  names(results) = c("resultsAM", "resultsPM", "LR matrix", "Exclusions", "Joint")
 
-  saveWorkbook(wb, file = filename, overwrite = TRUE)
+  hs = openxlsx::createStyle(textDecoration = "bold")
+  wb = openxlsx::buildWorkbook(results, headerStyle = hs, colWidths = "auto",
+                               rowNames = list(FALSE,FALSE,TRUE,TRUE, FALSE))
+  openxlsx::addStyle(wb, 3, cols = 1, rows = 1+seq_len(nvic), style = hs, stack = TRUE)
+  openxlsx::addStyle(wb, 4, cols = 1, rows = 1+seq_len(nvic), style = hs, stack = TRUE)
+
+  openxlsx::saveWorkbook(wb, file = filename, overwrite = TRUE)
   invisible(wb)
 }
 

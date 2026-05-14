@@ -997,7 +997,7 @@ server = function(input, output, session) {
   # Download solution tables ------------------------------------------------
 
   output$downloadTables = downloadHandler(
-    filename = function() sprintf("foo_%s.xlsx", Sys.Date()),
+    filename = function() sprintf("diviana-%s.xlsx", Sys.Date()),
     content = function(file) { .debug("download")
       req(solutionTable$AM)
       dvi = req(currentDviData())
