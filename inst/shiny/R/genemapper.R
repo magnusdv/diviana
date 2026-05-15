@@ -49,7 +49,7 @@ readGenoFromTxt = function(file) {
 
   # Convert sample ID columns to row names
   trycols = list()
-  for(a in c("Family", "Sample", "Relationship")) {
+  for(a in c("Family", "Sample", "Relationship", "Kinship")) {
     i = grep(a, names(x), ignore.case = TRUE)
     trycols[[a]] = if(length(i) > 0) i else 0
   }
