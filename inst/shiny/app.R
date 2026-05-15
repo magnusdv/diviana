@@ -324,9 +324,11 @@ server = function(input, output, session) {
       mutparams = lapply(mutmods, \(mut) pedmut::getParams(mut, format = 4))
     }
 
+    # appData containing all info to reconstruct the dvi state
     list(am = genosWithAttrs(dvi$am, addCols = c("Sample", "Sex")),
          pm = genosWithAttrs(dvi$pm, addCols = c("Sample", "Sex")),
-         peds = peds, db = db,
+         peds = peds,
+         db = db,
          mutparams = mutparams,
          hasMut = sum(lengths(mutparams)) > 0)
   }
@@ -384,7 +386,23 @@ server = function(input, output, session) {
 
   customDB = reactive({ .debug("customDB")
     path = req(input$customDB$datapath)
-    tryCatch(readFreqDatabase(path, sep = "\t"), error = errModal)
+    print(path)
+    tryCatch({
+      if(identical(tools::file_ext(path), "fam")) {
+        y = pedFamilias::readFam(path, verbose = FALSE)
+        if(length(y) && is.ped(y[[1]]))
+          getFreqDatabase(y[[1]])
+        else if(length(y[[1]]) && is.ped(y[[1]][[1]]))
+          getFreqDatabase(y[[1]][[1]])
+        else { # if database only
+          names(y) = vapply(y, function(lst) lst$name, FUN.VALUE = "")
+          lapply(y, function(lst) .setnames(lst$afreq, lst$alleles))
+        }
+      }
+      else {
+        readFreqDatabase(path, sep = "\t")
+      }
+    }, error = errModal)
   })
 
   selectedDB = reactive({ .debug("selectedDB")
