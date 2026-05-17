@@ -1,25 +1,30 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# Diviana
+# DIVIANA
 
-Diviana is a Shiny app for complex *Disaster victim identification*. In
+DIVIANA is a Shiny app for complex *Disaster victim identification*. In
 particular it handles references families with multiple missing persons.
 
-## Installation
+Try the online version of DIVIANA here:
+<https://magnusdv.shinyapps.io/diviana/>
 
-Diviana is currently under development and not yet available on CRAN.
+## Running DIVIANA locally
 
-To install the latest version from GitHub, use:
+If you are working with sensitive data, you should not use the online
+app, but run DIVIANA locally on your computer. To set this up, first
+install the R package from GitHub as follows:
 
 ``` r
 # install.packages("remotes")
-paks = paste0("magnusdv/", c("pedtools", "ribd", "forrel", "dvir", "verbalisr", "diviana"))
-remotes::install_github(paks, dependencies = TRUE)
+remotes::install_github("magnusdv/diviana", dependencies = TRUE)
 ```
 
-Once the installations are complete, you can launch the app with:
+Once the installations are complete, you may launch the app with a
+single command:
 
 ``` r
 diviana::launchApp()
 ```
+
+<img src="man/figures/screenshot.png" alt="" width="100%" />
