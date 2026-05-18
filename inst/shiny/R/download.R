@@ -1,12 +1,18 @@
 
 downloadTables = function(results, filename) {
-  nvic = nrow(results$LR)
-  results$AM$LR = safeFormat(results$PM$LR)
-  results$AM$GLR = safeFormat(results$PM$GLR)
-  results$PM$LR = safeFormat(results$PM$LR)
+
+  results$AM$LR  = safeFormat(results$AM$LR)
+  results$AM$GLR = safeFormat(results$AM$GLR)
+
+  results$PM$LR  = safeFormat(results$PM$LR)
   results$PM$GLR = safeFormat(results$PM$GLR)
+
+  nvic = nrow(results$LR)
+
   results$LR[] = safeFormat(results$LR)
-  results$JT = results$JT[[1]] # TODO: fix to handle > 1
+
+  if(length(results$JT))
+    results$JT = results$JT[[1]] # TODO: fix to handle > 1
 
   names(results) = c("resultsAM", "resultsPM", "LR matrix", "Exclusions", "Joint")
 
