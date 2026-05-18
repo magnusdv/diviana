@@ -178,7 +178,7 @@ formatFreqTable = function(freqs) {
           paging = FALSE,
           ordering = FALSE,
           scrollX = FALSE,
-          scrollY = if(nrow(df) > 15) "310px" else NULL,
+          scrollY = "310px", #if(nrow(df) > 15) "310px" else NULL,
           scrollCollapse = TRUE,
           columnDefs = list(list(className = 'dt-left', targets = "_all"))
         )

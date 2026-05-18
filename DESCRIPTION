@@ -16,12 +16,12 @@ Imports:
     shiny
 Suggests:
     DT,
-    dvir (>= 3.4.0),
+    dvir (>= 3.4.1),
     forrel,
     gt,
     openxlsx,
     pedFamilias,
-    pedmut,
+    pedmut (>= 0.9.1),
     pedprobr,
     pedtools,
     plotly,

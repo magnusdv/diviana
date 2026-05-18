@@ -87,18 +87,21 @@ formatCP = function(tab, usealias = FALSE, alias1 = NULL, alias2 = alias1, sortb
   skipcols = c("N", "kappa0", "kappa1", "kappa2", "relgroup", "err")
   tab = tab[!names(tab) %in% skipcols]
 
-  if("pedrel" %in% names(tab))
-    tab$pedrel = abbreviatePedrel(tab$pedrel)
+  if("pedrel" %in% names(tab)) {
+    names(tab)[names(tab) == "pedrel"] = "Ped"
+    tab$Ped = abbreviatePedrel(tab$Ped)
+  }
 
   .dtstyleCP(tab)
 }
 
 .dtstyleCP = function(df) {
-  scrollY = if(nrow(df)>10) "220px" else NULL
-  .pick = function(...) intersect(c(...), names(df))
+
+  colnms = names(df)
+  .pick = function(...) .myintersect(c(...), colnms)
 
   # Order by pval if present
-  pvalIdx = match("pval", names(df), nomatch = 0)
+  pvalIdx = match("pval", colnms, nomatch = 0)
   ord = if(pvalIdx > 0) list(pvalIdx - 1, 'asc') else NULL
 
   DT::datatable(df,
@@ -110,15 +113,17 @@ formatCP = function(tab, usealias = FALSE, alias1 = NULL, alias2 = alias1, sortb
                 options = list(dom = "ft",
                                paging = FALSE,
                                language = list(search = "Filter: "),
-                               scrollY = scrollY, scrollX = TRUE,
+                               scrollX = TRUE,
+                               scrollY = if(nrow(df) > 10) "220px" else NULL,
+                               scrollCollapse = TRUE,
                                order = ord,
                                columnDefs = list(
                                  list(type = "natural", targets = 0:1),
                                  list(className = "dt-left", targets = "_all"))
                                )
                 ) |>
-  DT::formatStyle(names(df), target = "row", lineHeight = "75%") |>
-  DT::formatStyle(.pick("pedrel"), fontSize = "80%") |>
+  DT::formatStyle(colnms, target = "row", lineHeight = "75%") |>
+  DT::formatStyle(.pick("Ped"), fontSize = "80%") |>
   formatRound(.pick("k0", "k1", "k2"), digits = 2) |>
   formatRound(.pick("pval"), digits = 3, zero.print = "<0.001") |>
   formatSignif(.pick("GLR"), digits = 3)
