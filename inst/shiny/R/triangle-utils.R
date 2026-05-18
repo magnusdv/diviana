@@ -2,17 +2,18 @@
 triangleCard = function(title, idpref) {
   id = paste0(idpref, c("KappaCalc", "Triangle", "Msg", "Table"))
 
-  calcBtn = actionButton(id[1], "Calculate", class = "btn-sm",
-                         icon = icon("play"), style = "margin-left: 30px;")
-  #if(idpref == "am")
-  #  calcBtn = div(class = "aligned-row",
-  #                div(checkboxInput("acrossComps", HTML("Across<br>components"), width = "auto"), style = "font-size: small;"),
-  #                calcBtn)
+  calcBtn = actionButton(id[1], "Calculate", class = "btn-sm", icon = icon("play"))#, style = "margin-left: 30px;")
+
+  if(idpref == "am")
+    across = div(checkboxInput("acrossComps", HTML("Across families"), width = "auto"),
+                 style = "font-size: small; font-variant: all-small-caps")
+  else
+    across = NULL
 
   bs4Dash::bs4Card(
     width = 4,
     collapsible = FALSE,
-    title = div(class = "aligned-row-wide", title, calcBtn),
+    title = div(class = "aligned-row-wide", title, across, calcBtn),
     plotlyOutput(id[2], width = "100%", height = "350px"),
     hr(),
     uiOutput(id[3]),
