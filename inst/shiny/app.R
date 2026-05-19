@@ -198,14 +198,15 @@ ui = bs4Dash::bs4DashPage(
 
       # Report table: AM and PM tabs --------------------------------------------
       column(5, class = "col-xl-6",
-         bs4TabCard(title = "Identifications", width = NULL, type = "tabs", side = "right",
+         bs4TabCard(title = div("Identifications", style = "padding-right:10px;"),
+                    width = NULL, type = "tabs", side = "right",
                     collapsible = FALSE,
                     tabPanel(title = "AM", gt::gt_output("amcentric")),
                     tabPanel(title = "PM", gt::gt_output("pmcentric")),
-                    tabPanel(title = "LR matrix", gt::gt_output("lrmatrix")),
-                    tabPanel(title = "Exclusions", gt::gt_output("exmatrix")),
+                    tabPanel(title = "LR", gt::gt_output("lrmatrix")),
+                    tabPanel(title = "EX", gt::gt_output("exmatrix")),
                     tabPanel(title = "Joint", uiOutput("jointtabs")),
-                    tabPanel(title = "Log", div(style = "height: 600px; overflow: auto",
+                    tabPanel(title = "Log", div(style = "max-height: 600px; overflow: auto",
                                                 verbatimTextOutput("solvelog")))
          )
       ),
@@ -956,28 +957,35 @@ server = function(input, output, session) {
   })
 
   output$amcentric = gt::render_gt({  .debug("render result AM")
-    formatResultTable(req(solutionTable$AM), settings$useAliases, aliasPM = aliasPM())
+    formatResultTable(req(solutionTable$AM), title = "AM-centered result table",
+                      settings$useAliases, aliasPM = aliasPM())
   }, height = 600)
 
   output$pmcentric = gt::render_gt({  .debug("render result PM")
-    formatResultTable(req(solutionTable$PM), settings$useAliases, aliasPM = aliasPM())
+    formatResultTable(req(solutionTable$PM), title = "PM-centered result table",
+                      settings$useAliases, aliasPM = aliasPM())
   }, height = 600)
 
   output$lrmatrix = gt::render_gt({ .debug("render LR matrix")
     dvi = currentDviData()
     m = req(solutionTable$LR) |> completeMatrix(names(dvi$pm), dvi$missing)
-    formatLRmatrix(m, input$LRthresh, settings$useAliases, aliasPM = aliasPM())
+    formatLRmatrix(m, title = "Pairwise LR matrix",
+                   input$LRthresh, settings$useAliases, aliasPM = aliasPM())
   }, height = 600)
 
   output$exmatrix = gt::render_gt({ .debug("render exclusion matrix")
     dvi = currentDviData()
     m = req(solutionTable$EX) |> completeMatrix(names(dvi$pm), dvi$missing)
-    formatExclusionMatrix(m, input$maxIncomp, settings$useAliases, aliasPM = aliasPM())
+    formatExclusionMatrix(m, title = "Pairwise exclusion matrix",
+                          input$maxIncomp, settings$useAliases, aliasPM = aliasPM())
   }, height = 600)
 
   output$jointtabs = renderUI({ .debug("render joint tables")
     dvi = currentDviData()
     JT = solutionTable$JT
+
+    if(is.null(JT))
+      return(NULL)
 
     if(!length(JT))
       return(tags$em("No joint tables"))

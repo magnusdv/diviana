@@ -34,7 +34,7 @@ COLS_BG = c(
 redText = c("Nonidentifiable", "No match", "Inconclusive")
 
 
-formatResultTable = function(x, usealias = FALSE, aliasPM = NULL, style = 6) {
+formatResultTable = function(x, title = NULL, usealias = FALSE, aliasPM = NULL, style = 6) {
 
   if(is.character(x)) {
     emptyGT = gt(data.frame(Message = x)) |>
@@ -53,17 +53,16 @@ formatResultTable = function(x, usealias = FALSE, aliasPM = NULL, style = 6) {
   }
 
   tab = gt(x) |>
-    #opt_interactive(use_sorting = T, use_compact_mode = T, use_resizers = T,
-    #                             use_text_wrapping = F) |>
+    .addTitle(title) |>
     opt_stylize(style = style,
                 add_row_striping = TRUE) |>
     tab_options(
       data_row.padding = px(2),
+      table.align = "left",
+      table.width = pct(100),
       container.overflow.x = TRUE,
       container.overflow.y = TRUE,
-      table.align = "left",
-      container.width = pct(100),
-      table.width = pct(100),
+      container.width = pct(100)
     )
 
   if(!nrow(x))
@@ -91,7 +90,24 @@ formatResultTable = function(x, usealias = FALSE, aliasPM = NULL, style = 6) {
   tab
 }
 
+.addTitle = function(tab, title = NULL) {
+  if(is.null(title))
+    return(tab)
 
+  tab |>
+    tab_header(title = title) |>
+    tab_options(
+      container.padding.y = px(0)
+    ) |>
+    tab_style(
+      style = list(
+        gt::cell_text(align = "left", size = "medium", style = "italic", weight = "normal"),
+        gt::cell_borders(style = NULL),
+        "padding-bottom: 8px; padding-top: 0;"
+      ),
+      locations = gt::cells_title()
+    )
+}
 
 # Marker summary table ----------------------------------------------------
 
@@ -223,7 +239,7 @@ formatMatrix = function(m) {
     )
 }
 
-formatExclusionMatrix = function(m, maxIncomp = 2, usealias = FALSE,
+formatExclusionMatrix = function(m, title = NULL, maxIncomp = 2, usealias = FALSE,
                                  aliasPM = NULL, transpose = FALSE) {
   if(usealias && !is.null(aliasPM))
     rownames(m) = aliasPM[rownames(m)]
@@ -237,6 +253,7 @@ formatExclusionMatrix = function(m, maxIncomp = 2, usealias = FALSE,
   naCols = colnames(m)[colSums(naMat) == nrow(m)]
 
   tbl = formatMatrix(m) |>
+    .addTitle(title) |>
     tab_style(
       style = cell_text(color = "red"),
       locations = list(cells_column_labels(colsEx), cells_stub(rowsEx))
@@ -275,7 +292,7 @@ formatExclusionMatrix = function(m, maxIncomp = 2, usealias = FALSE,
 }
 
 
-formatLRmatrix = function(m, LRthresh = 1e4, usealias = FALSE,
+formatLRmatrix = function(m, title = NULL, LRthresh = 1e4, usealias = FALSE,
                           aliasPM = NULL, transpose = FALSE) {
   if(usealias && !is.null(aliasPM))
     rownames(m) = aliasPM[rownames(m)]
@@ -287,6 +304,7 @@ formatLRmatrix = function(m, LRthresh = 1e4, usealias = FALSE,
   naCols = colnames(m)[colSums(naMat) == nrow(m)]
 
   tbl = formatMatrix(m) |>
+    .addTitle(title) |>
     tab_style(
       style = cell_text(color = "gray60"),
       locations = list(cells_column_labels(naCols), cells_stub(naRows))
