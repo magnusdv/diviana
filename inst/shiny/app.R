@@ -845,8 +845,12 @@ server = function(input, output, session) {
     tryCatch(plotDVI(dvi, style = 2, labs = labfun),
              error = function(e) {
                msg = conditionMessage(e)
-               if(grepl("Cannot fit|no room", msg)) msg = "Sorry - the plot is too big!"
-               stop2(msg)
+               if(grepl("Cannot fit|no room", msg))
+                 msg = "Sorry - the plot is too big!"
+               else
+                 msg = c("Sorry, cannot plot this.", msg)
+               plot.new()
+               text(0.5, 0.5, paste(strwrap(msg, width = 60), collapse = "\n"), cex = 1.2)
              })
   }, res = 96,
   width = function() plotdims()$w,
