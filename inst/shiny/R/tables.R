@@ -144,7 +144,8 @@ formatDatabaseTable = function(df) {
       paging = FALSE,
       ordering = FALSE,
       autoWidth = TRUE,
-      scrollY = if(nrow(df) > 10) "550px" else NULL,
+      scrollY = "500px",
+      scrollCollapse = TRUE,
       columnDefs = list(list(targets = "keep", visible = FALSE),
                         list(className = 'dt-center', targets = c("AM", "PM")))
     )) |>
@@ -159,7 +160,7 @@ formatDatabaseTable = function(df) {
     ) |>
     DT::formatStyle(
       names(df), valueColumns = "keep", target = "row",
-      lineHeight = DT::styleEqual(c(TRUE, FALSE), c(NA, "90%"))
+      lineHeight = DT::styleEqual(c(TRUE, FALSE), c("100%", "90%"))
     )
 }
 

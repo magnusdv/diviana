@@ -615,7 +615,10 @@ server = function(input, output, session) {
   # Database: Marker summary table ----------------------------------------
 
   output$markersummary = DT::renderDT({ .debug("render marker table")
-    mtab = markerSummaryDiviana(locAttrs = req(locusAttrs()), dvi = currentDviData())
+    loc = locusAttrs()
+    if(is.null(loc))
+      return(NULL)
+    mtab = markerSummaryDiviana(loc, dvi = currentDviData())
     formatDatabaseTable(mtab)
   })
 

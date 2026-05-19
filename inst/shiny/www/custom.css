@@ -14,8 +14,9 @@
   font-weight: 600;
 }
 
-.checkbox label > span { font-weight: normal;}
-.checkbox label { margin-bottom:0}
+.dataTables_scrollBody {
+  overflow-y: auto !important;
+}
 
 .selectize-dropdown {line-height: 1.2em}
 
@@ -78,11 +79,16 @@
 #solve {height:67px;}
 #downloadTables_bttn {font-size:large; padding:6px}
 
+.checkbox label > span { font-weight: normal;}
+.checkbox label { margin-bottom:0}
+
 /* Checkbox alignment fix ---- */
 .shiny-input-container .checkbox > label {
   display: inline-flex;
   align-items: center;
   gap: 0.35em;
+  font-weight: normal;
+  margin: 0;
 }
 
 .shiny-input-container .checkbox > label > input[type="checkbox"] {
