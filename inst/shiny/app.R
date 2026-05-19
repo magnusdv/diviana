@@ -533,8 +533,10 @@ server = function(input, output, session) {
       return(NULL)
 
     idx = match(normaliseName(markersAM()), normaliseName(names(loci)), nomatch = 0L)
-    if(any(idx == 0L))
+    if(any(idx == 0L)) {
+      showErr("Aborting - database does not contain these AM markers: ", markersAM()[idx == 0L])
       return(NULL)
+    }
 
     peds = lapply(peddata, `[[`, "ped")
 
@@ -555,9 +557,10 @@ server = function(input, output, session) {
       return(NULL)
 
     idx = match(normaliseName(markersPM()), normaliseName(names(loci)), nomatch = 0L)
-    if(any(idx == 0L))
+    if(any(idx == 0L)) {
+      showErr("Aborting - database does not contain these PM markers: ", markersPM()[idx == 0L])
       return(NULL)
-
+    }
     s = pedtools::singletons(rownames(a), sex = sexPM()) |> .setnames(rownames(a))
 
     tryCatch(
