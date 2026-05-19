@@ -75,4 +75,5 @@
 
 /* Analysis tab -----------------------------------*/
 
-#solve {width: 100%}
+#solve {height:67px;}
+#downloadTables_bttn {font-size:large; padding:6px}

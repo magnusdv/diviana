@@ -180,9 +180,9 @@ ui = bs4Dash::bs4DashPage(
       # Buttons: Solve! --------------------------------------------
       column(width = 2, class = "col-xl-1",
              actionBttn("solve", label = "SOLVE", icon = icon("calculator"),
-                        color = "primary", style = "jelly") |>
+                        color = "primary", block = TRUE, style = "material-flat") |>
                wrap_tooltip("solve"),
-             br(),br(),
+             hr(),
              h4("Settings"),
              numericInput("LRthresh", "LR threshold", value = 10000,min = 1) |>
                wrap_tooltip("LRthresh"),
@@ -191,9 +191,9 @@ ui = bs4Dash::bs4DashPage(
                wrap_tooltip("maxIncomp"),
              br(),
              checkboxInput("ignoresex", "Ignore Sex", value = FALSE),
-             hr(), br(),
-             downloadButton('downloadTables', "Download", class = "btn btn-warning",
-                            style = "width:100%") |> wrap_tooltip("downloadRes")
+             hr(),
+             downloadBttn('downloadTables', "Results", style = "material-flat", block = TRUE,
+                          color = "warning") |> wrap_tooltip("downloadRes")
       ),
 
       # Report table: AM and PM tabs --------------------------------------------
