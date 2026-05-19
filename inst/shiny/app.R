@@ -384,7 +384,6 @@ server = function(input, output, session) {
 
   customDB = reactive({ .debug("customDB")
     path = req(input$customDB$datapath)
-    print(path)
     tryCatch({
       if(identical(tools::file_ext(path), "fam")) {
         y = pedFamilias::readFam(path, verbose = FALSE)
