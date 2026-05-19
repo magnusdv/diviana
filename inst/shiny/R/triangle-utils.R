@@ -5,8 +5,8 @@ triangleCard = function(title, idpref) {
   calcBtn = actionButton(id[1], "Calculate", class = "btn-sm", icon = icon("play"))#, style = "margin-left: 30px;")
 
   if(idpref == "am")
-    across = div(checkboxInput("acrossComps", HTML("Across families"), width = "auto"),
-                 style = "font-size: small; font-variant: all-small-caps")
+    across = div(checkboxInput("acrossComps", HTML("Across<br>families"), width = "auto"),
+                 style = "font-size: 90%; font-variant: all-small-caps; line-height:0.75")
   else
     across = NULL
 

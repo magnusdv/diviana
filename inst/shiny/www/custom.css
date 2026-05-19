@@ -77,3 +77,16 @@
 
 #solve {height:67px;}
 #downloadTables_bttn {font-size:large; padding:6px}
+
+/* Checkbox alignment fix ---- */
+.shiny-input-container .checkbox > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+}
+
+.shiny-input-container .checkbox > label > input[type="checkbox"] {
+  position: static;
+  margin: 0;
+  transform: translateY(1px);
+}
