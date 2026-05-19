@@ -2,10 +2,7 @@
 dataUI = function(id, title = paste(id, "data")) {
   ns = NS(id)
   bs4Card(width = NULL, title = title, collapsible = TRUE, collapsed = FALSE,
-    DT::DTOutput(ns("mainTable")),
-    tags$head(tags$style(HTML(
-      sprintf("#%s {width:fit-content; max-width: 100%%;}", ns("mainTable"))))),
-
+    uiOutput(ns("mainTableUI")),
     uiOutput(ns("sourcefield")),
     footer = div(class = "btn-group",
       actionButton(ns("importButton"), label = tagList(myIcon("file-arrow-up", align = "-0.1em"), "Import")),
@@ -231,8 +228,12 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       removeModal()
     })
 
+    output$mainTableUI = renderUI(
+      if(!is.null(mainTable$main)) DT::DTOutput(ns("mainTable")) else NULL
+    )
+
     output$mainTable = DT::renderDT({
-      genoDT(req(mainTable$main), mode = "main", flavour = id, assigned = assignedRefs(), scrollY = "370px")
+      genoDT(mainTable$main, mode = "main", flavour = id, assigned = assignedRefs(), scrollY = "370px")
     }, server = FALSE)
 
     output$sourcefield = renderUI({
@@ -508,6 +509,9 @@ formatGenoView = function(dat, mode, flavour = NULL, fam = NULL) {
 }
 
 genoDT = function(dat, mode = c("main", "edit"), flavour = NULL, assigned = NULL, scrollY = NULL) {
+  if(is.null(dat))
+    return(NULL)
+
   mode = match.arg(mode)
   dat = formatGenoView(dat, mode, flavour = flavour, fam = assigned)
 

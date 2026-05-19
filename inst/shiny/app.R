@@ -39,9 +39,6 @@ addResourcePath("icons", "www/static_icons")
 # * Triangle plots: Latex labels
 # * Triangle AM: Select family
 #
-# ANALYSIS
-# * Fix excel download
-#
 #---------------------------------------------
 
 
@@ -99,7 +96,7 @@ ui = bs4Dash::bs4DashPage(
 
    tabItems(
 
-   # Tab: DATA - AM, PM, pedigrees -----------------------------------------------
+   # Tab: DATA -- AM, PM, pedigrees -----------------------------------------------
 
    tabItem("data",
       fluidRow(
@@ -692,6 +689,7 @@ server = function(input, output, session) {
   })
 
   observeEvent(input$editped, { .debug("edit current pedigree")
+
     curped = curPed()
     if(curped == 0) {
       showErr("No pedigree to edit.")
@@ -1086,6 +1084,7 @@ server = function(input, output, session) {
     externalLoci$db = externalLoci$mut = NULL
     externalLoci$hasMut = FALSE
     pedigrees(NULL)
+    mainMissing(NULL)
     DB(NULL)
     isolate(updateSelectInput(session, "example", selected = ""))
     updateRadioButtons(session, "dbtype", selected = character(0))
@@ -1105,7 +1104,7 @@ server = function(input, output, session) {
 
   observeEvent(resetAnalysis(), { .debug("reset results")
     kappa$am = kappa$pm = kappa$ampm = NULL
-    solutionTable$AM = solutionTable$PM = solutionTable$LR = solutionTable$EX = NULL
+    solutionTable$AM = solutionTable$PM = solutionTable$LR = solutionTable$EX = solutionTable$JT = NULL
     logMessage(NULL)
   }, ignoreInit = TRUE)
 
