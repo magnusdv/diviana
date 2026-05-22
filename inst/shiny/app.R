@@ -22,12 +22,10 @@ addResourcePath("icons", "www/static_icons")
 
 # TODO----------------------------------------------------------------
 #
-# DATA
-# * Download dviData (not only debug)
-#
 # MARKERS
 # * indicate markers with added alleles
 # * store original mutmods for faster rendering of original+original
+# * Handle cases where custom db is missing some markers (warn, but allow)
 #
 # PED
 # * Reference list ugly when long
