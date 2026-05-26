@@ -185,6 +185,9 @@ ui = bs4Dash::bs4DashPage(
              numericInput("maxIncomp", "Exclusion limit", min = 0, step = 1, value = 2)|>
                wrap_tooltip("maxIncomp"),
              br(),
+             numericInput("pairLRmin", "Pairing LRmin", value = 0, min = 0)|>
+               wrap_tooltip("pairLRmin"),
+             br(),
              checkboxInput("ignoresex", "Ignore Sex", value = FALSE),
              hr(),
              downloadBttn('downloadTables', "Results", style = "material-flat", block = TRUE,
@@ -924,6 +927,8 @@ server = function(input, output, session) {
     tryCatch({
       res = captureOutput(dviSolve, dvi, threshold = input$LRthresh,
                           maxIncomp = input$maxIncomp,
+                          limit = input$pairLRmin,
+                          maxAssign = settings$maxAssign,
                           ignoreSex = input$ignoresex, verbose = TRUE,
                           debug = DEVMODE, detailedOutput = TRUE)
       },
@@ -1045,6 +1050,7 @@ server = function(input, output, session) {
 
   settings = reactiveValues(hideUnimportantLabs = TRUE,
                             useAliases = TRUE,
+                            maxAssign = 1e5,
                             standardmodel = "equal")
 
   observeEvent(input$settings, {
@@ -1063,8 +1069,13 @@ server = function(input, output, session) {
         br(),
         h4("Mutation model"),
         awesomeRadio("standardmodel", "Model family for `Standard` models",
-                     choices = c("Equal" = "equal", "Proportional" = "proportional", "Stepwise" = "stepwise"),
+                     choices = c("Equal" = "equal", "Proportional" = "proportional",
+                                 "Stepwise" = "stepwise"),
                      selected = settings$standardmodel, inline = TRUE, width = "auto"),
+        br(),
+        h4("Analysis"),
+        numericInput("maxAssign", "Maximum number of assignment in joint analysis",
+                     value = settings$maxAssign, width = "auto"),
       ),
       easyClose = TRUE,
       footer = modalButton("Save and close"),
@@ -1073,6 +1084,7 @@ server = function(input, output, session) {
 
   observeEvent(input$hideUnimportantLabs, {settings$hideUnimportantLabs = input$hideUnimportantLabs})
   observeEvent(input$useAliases, {settings$useAliases = input$useAliases})
+  observeEvent(input$maxAssign, {settings$maxAssign = input$maxAssign})
   observeEvent(input$standardmodel, {settings$standardmodel = input$standardmodel})
 
   # Reset -------------------------------------------------------------------
@@ -1101,6 +1113,7 @@ server = function(input, output, session) {
     settings$hideUnimportantLabs = TRUE
     settings$useAliases = TRUE
     settings$standardmodel = "equal"
+    settings$maxAssign = 1e5
   })
 
   observeEvent(resetAnalysis(), { .debug("reset results")

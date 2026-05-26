@@ -26,7 +26,8 @@ TT = list(
   mutApplyAll = "Apply to all markers",
   mutradio_none = "Disable all mutation models",
   mutradio_standard = "Apply a common model to all markers (see Settings)",
-  mutradio_original = "Use mutation models from the original input (if available)"
+  mutradio_original = "Use mutation models from the original input (if available)",
+  pairLRmin = "Minimum pairing LR to consider in analysis"
 )
 
 wrap_tooltip = function(tag, id, placement = "top"){
