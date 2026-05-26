@@ -859,12 +859,12 @@ server = function(input, output, session) {
   # Tab: Triangles ----------------------------------------------------------
 
   kappa = reactiveValues(am = NULL, pm = NULL, ampm = NULL)
-  observeEvent(settings$acrossComps, {kappa$am = NULL}, ignoreInit = TRUE)
+  observeEvent(input$acrossComps, {kappa$am = NULL}, ignoreInit = TRUE)
 
   # Number of typed in each fam (NULL -> integer0)
   nRefs = reactive(lengths(lapply(mainAM(), pedtools::typedMembers)))
 
-  output$amMsg   = renderUI(cpMessage(kappa$am, "am", nref = nRefs(), across = settings$acrossComps))
+  output$amMsg   = renderUI(cpMessage(kappa$am, "am", nref = nRefs(), across = input$acrossComps))
   output$pmMsg   = renderUI(cpMessage(kappa$pm, "pm", nvic = length(mainPM())))
   output$ampmMsg = renderUI(cpMessage(kappa$ampm, "ampm", nref = nRefs(), nvic = length(mainPM())))
 
@@ -879,7 +879,7 @@ server = function(input, output, session) {
     server = FALSE)
 
   observeEvent(input$amKappaCalc, { .debug("AM kappa calculate")
-    kappa$am = CPnoplot(req(mainAM()), acrossComps = settings$acrossComps) })
+    kappa$am = CPnoplot(req(mainAM()), acrossComps = input$acrossComps) })
 
   observeEvent(input$pmKappaCalc, { .debug("PM kappa calculate")
     kappa$pm = CPnoplot(req(mainPM())) })
@@ -1045,7 +1045,6 @@ server = function(input, output, session) {
 
   settings = reactiveValues(hideUnimportantLabs = TRUE,
                             useAliases = TRUE,
-                            acrossComps = FALSE,
                             standardmodel = "equal")
 
   observeEvent(input$settings, {
@@ -1066,10 +1065,6 @@ server = function(input, output, session) {
         awesomeRadio("standardmodel", "Model family for `Standard` models",
                      choices = c("Equal" = "equal", "Proportional" = "proportional", "Stepwise" = "stepwise"),
                      selected = settings$standardmodel, inline = TRUE, width = "auto"),
-        #br(),
-        #h4("Relatedness analysis"),
-        #awesomeCheckbox("acrossComps", "Include AM-AM comparisons across families",
-        #                value = settings$acrossComps, width = "auto"),
       ),
       easyClose = TRUE,
       footer = modalButton("Save and close"),
@@ -1078,7 +1073,6 @@ server = function(input, output, session) {
 
   observeEvent(input$hideUnimportantLabs, {settings$hideUnimportantLabs = input$hideUnimportantLabs})
   observeEvent(input$useAliases, {settings$useAliases = input$useAliases})
-  observeEvent(input$acrossComps, {settings$acrossComps = input$acrossComps})
   observeEvent(input$standardmodel, {settings$standardmodel = input$standardmodel})
 
   # Reset -------------------------------------------------------------------
@@ -1101,12 +1095,12 @@ server = function(input, output, session) {
     updateNumericInput(session, "LRthresh", value = 10000)
     updateNumericInput(session, "maxIncomp", value = 2)
     updateCheckboxInput(session, "ignoresex", value = FALSE)
-    # Settings
+    updateCheckboxInput(session, "acrossComps", value = FALSE)
+    resetAnalysis(resetAnalysis() + 1)
+    # Settings dialog
     settings$hideUnimportantLabs = TRUE
     settings$useAliases = TRUE
-    settings$acrossComps = FALSE
     settings$standardmodel = "equal"
-    resetAnalysis(resetAnalysis() + 1)
   })
 
   observeEvent(resetAnalysis(), { .debug("reset results")
