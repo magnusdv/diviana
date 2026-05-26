@@ -118,8 +118,8 @@ ui = bs4Dash::bs4DashPage(
           bs4InfoBoxOutput("dvisummary", width = 12)
         ),
       ),
-      p(sprintf("This is DIVIANA version %s.", VERSION),
-        #"(", mylink("changelog", "https://github.com/magnusdv/diviana/blob/master/NEWS.md"), ").",
+      p(sprintf("This is DIVIANA version %s", VERSION),
+        "(", mylink("changelog", "https://github.com/magnusdv/diviana/blob/master/NEWS.md"), ").",
         "Bug reports and issues are welcome ",
         mylink("here", "https://github.com/magnusdv/diviana/issues"), ".")
    ),
