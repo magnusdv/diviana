@@ -1007,6 +1007,7 @@ server = function(input, output, session) {
       local({
         ii = i
         gttab = formatJointTab(JT[[ii]], vics = names(dvi$pm), miss = dvi$missing,
+                               title = sprintf("Joint likelihood of %d assignments", nrow(JT[[ii]])),
                                usealias = settings$useAliases, aliasPM = aliasPM())
         output[[id]] = gt::render_gt(gttab)
       })

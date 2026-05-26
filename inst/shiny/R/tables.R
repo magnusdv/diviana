@@ -336,7 +336,7 @@ formatLRmatrix = function(m, title = NULL, LRthresh = 1e4, usealias = FALSE,
   tbl
 }
 
-formatJointTab = function(x, vics, miss, usealias = FALSE, aliasPM = NULL) {
+formatJointTab = function(x, vics, miss, title = NULL, usealias = FALSE, aliasPM = NULL) {
   clnms = colnames(x)
   vcol = clnms %in% vics
   mcol = clnms %in% miss
@@ -348,6 +348,7 @@ formatJointTab = function(x, vics, miss, usealias = FALSE, aliasPM = NULL) {
   wraptxt = if(any(colnames(x) > 7)) NULL else "nowrap"
 
   gt(x) |>
+    .addTitle(title) |>
     opt_row_striping() |>
     tab_options(
       table.align = "left",
