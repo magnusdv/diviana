@@ -35,3 +35,12 @@ $(document).on('expanded.lte.cardwidget', '#data-accordion .card', function() {
     });
   }
 });
+
+
+
+Shiny.addCustomMessageHandler('clearOutputs', function(ids) {
+  ids.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
+});

@@ -1094,6 +1094,10 @@ server = function(input, output, session) {
   resetAnalysis = reactiveVal(0)
 
   observeEvent(input$resetall, { .debug("reset all")
+    session$sendCustomMessage("clearOutputs", c(
+      "amcentric", "pmcentric", "lrmatrix", "exmatrix", "jointtabs", "solvelog",
+      "solutionplot", "pedplot", "dvisummary", "AM-mainTableUI", "PM-mainTableUI"
+    ))
     externalAM("reset")
     externalPM("reset")
     externalLoci$db = externalLoci$mut = NULL
