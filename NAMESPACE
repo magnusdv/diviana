@@ -2,3 +2,4 @@
 
 export(launchApp)
 import(bs4Dash)
+importFrom(dvir,dviSolve)

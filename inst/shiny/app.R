@@ -5,6 +5,7 @@ suppressMessages(suppressPackageStartupMessages({
   library(shinyjs)
   library(DT)
   library(gt)
+  library(norSTR)
   library(pedtools)
   library(pedmut)
   library(forrel)

@@ -13,12 +13,13 @@ Depends:
     R (>= 4.2)
 Imports:
     bs4Dash,
+    dvir (>= 3.4.1.9000),
     shiny
 Suggests:
     DT,
-    dvir (>= 3.4.1),
     forrel,
     gt,
+    norSTR,
     openxlsx,
     pedFamilias,
     pedmut (>= 0.9.1),
@@ -28,6 +29,9 @@ Suggests:
     shinyWidgets,
     shinyjs,
     verbalisr
+Remotes:
+    magnusdv/dvir,
+    magnusdv/pedtools
 Config/roxygen2/version: 8.0.0
 Encoding: UTF-8
 Language: en-GB
