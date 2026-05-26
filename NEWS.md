@@ -1,3 +1,16 @@
+# dev version
+
+## Analysis
+
+* Expose `dviSolve()` argument `limit` as parameter labelled "Pairwise LR min".
+* Expose `dviSolve()` argument `maxAssign` in Settings dialog window.
+* Add titles to Joint tables.
+
+## Other
+
+* Move **dvir** from *Suggests* to *Imports*.
+
+
 # diviana 0.4.2
 
 This is the first version with a NEWS file.
@@ -19,7 +32,7 @@ This is the first version with a NEWS file.
 * Add informative message when no data is displayed
 * Add "Across families" checkbox
 
-## Results
+## Analysis
 
 * Add joint table to output
 * Shorten result tab headings and add informative titles
