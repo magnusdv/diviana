@@ -85,7 +85,7 @@ formatCP = function(tab, usealias = FALSE, alias1 = NULL, alias2 = alias1, sortb
   }
 
   skipcols = c("N", "kappa0", "kappa1", "kappa2", "relgroup", "err")
-  tab = tab[!names(tab) %in% skipcols]
+  tab = tab[names(tab) %notin% skipcols]
 
   if("pedrel" %in% names(tab)) {
     names(tab)[names(tab) == "pedrel"] = "Ped"

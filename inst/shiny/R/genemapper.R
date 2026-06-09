@@ -1,7 +1,7 @@
 readGenemapper = function(file, format = NULL) {
   line1 = readLines(file, n = 1) |> strsplit("\t")
   line1 = line1[[1]]
-  if(!"Marker" %in% line1)
+  if("Marker" %notin% line1)
     stop2("Unsupported file format. Expected the first line to contain 'Marker'\n:", line1)
   if(sum(line1 == "Marker") > 1)
     stop2("Unsupported file format (multiple markers per line)")

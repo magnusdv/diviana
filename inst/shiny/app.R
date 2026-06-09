@@ -582,7 +582,7 @@ server = function(input, output, session) {
     if(is.null(am) && is.null(pm))
       return(NULL)
 
-    if(length(missing) && !all(missing %in% labels(am)))
+    if(length(missing) && anyNA(match(missing, labels(am))))
       message("Something wrong: missing person not in AM!", toString(missing))
 
     tryCatch(dviData(am = am, pm = pm, missing = missing),

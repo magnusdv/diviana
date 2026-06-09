@@ -27,6 +27,9 @@ stop2 = function (...) {
 .myintersect = function(x, y)
   y[match(x, y, 0L)]
 
+.mysetequal = function(x, y)
+  !anyNA(match(x, y)) && !anyNA(match(y, x))
+
 bigHeading = function(x)
   h4(strong(x), .noWS = "before")
 
@@ -232,7 +235,7 @@ changeSex = function(ped, ids, sex, refuse = NULL) {
   }
 
   if(sex == 0) {
-    if(!all(ids %in% leaves(ped)))
+    if(anyNA(match(ids, leaves(ped))))
       stop2("Only individuals without children can have unknown sex")
     newped = setSex(ped, ids, sex = 0)
     return(newped)

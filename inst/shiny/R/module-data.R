@@ -465,7 +465,7 @@ previewGenoDT = function(dat) {
   DT::datatable(
     dat,
     class = "stripe hover nowrap compact",
-    rownames = !"Sample" %in% colnames(dat),
+    rownames = "Sample" %notin% colnames(dat),
     escape = TRUE,
     plugins = "natural",
     selection = "multiple",
@@ -572,7 +572,7 @@ standardiseGenoData = function(df, flavour, selectRows = NULL, excludeCols = NUL
     df = df[sort(selectRows), , drop = FALSE]
 
   if(length(excludeCols))
-    df = df[, !names(df) %in% excludeCols, drop = FALSE]
+    df = df[, names(df) %notin% excludeCols, drop = FALSE]
 
   nms = names(df)
   rownms = rownames(df)
@@ -581,14 +581,14 @@ standardiseGenoData = function(df, flavour, selectRows = NULL, excludeCols = NUL
   #if(flavour == "AM" && !"Fam" %in% nms)
   #  df$Fam = ""
 
-  if(!"Sample" %in% nms && !is.null(rownms))
+  if("Sample" %notin% nms && !is.null(rownms))
     df$Sample = rownms
 
   if(!identical(rownms, df$Sample)) {
     rownames(df) = rownms = df$Sample
   }
 
-  if(!"Alias" %in% nms) {
+  if("Alias" %notin% nms) {
     al = switch(flavour, PM = "V", AM = "R") |> paste0(seq_len(nrow(df)))
     df$Alias = if(!any(al %in% rownms)) al else rownms
   }
@@ -632,7 +632,7 @@ checkSex = function(x) {
   x[x %in% c("", NA, 0)] = "?"
   x[x == 1] = "M"
   x[x == 2] = "F"
-  bad = !x %in% c("F", "M", "?")
+  bad = x %notin% c("F", "M", "?")
   if(any(bad)) {
     warning("Illegal values in the Sex column:", toString(unique(sx[bad])))
     x[bad] = "?"
