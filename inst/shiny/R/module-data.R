@@ -593,11 +593,14 @@ standardiseGenoData = function(df, flavour, selectRows = NULL, excludeCols = NUL
     df$Alias = if(!any(al %in% rownms)) al else rownms
   }
 
+  # AMEL: First column starting with amel (case insensitive). NA if empty
+  amel = grep("^amel", nms, ignore.case = TRUE, value = TRUE)[1]
+
   if("Sex" %in% nms)
     df$Sex = checkSex(df$Sex)
-  else if("AMEL" %in% nms) {
-    df$Sex = c("?", "M", "F")[amel2sex(df$AMEL) + 1]
-    df$AMEL = NULL
+  else if(!is.na(amel)) {
+    df$Sex = c("?", "M", "F")[amel2sex(df[[amel]]) + 1]
+    df[[amel]] = NULL
   }
   else
     df$Sex = "?"
