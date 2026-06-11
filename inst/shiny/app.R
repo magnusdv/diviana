@@ -1022,14 +1022,21 @@ server = function(input, output, session) {
     logMessage()[-1] |> paste0(collapse = "\n")
   })
 
-  curSols = cardCounter("solutioncard", reactive(ceiling(nPed()/6)))
+  # Number of pedigrees per page in solution plot
+  pageSize = 6
+  curSols = cardCounter("solutioncard", reactive(ceiling(nPed()/pageSize)))
 
   output$solutionplot = renderPlot({ .debug("plot solution")
     dvi = currentDviData()
     req(length(dvi$am) > 0, length(dvi$pm) > 0, length(dvi$missing) > 0)
-    pednr = seq(curSols() * 6 - 5, min(nPed(), curSols() * 6))
+
+    first = (curSols() - 1) * pageSize + 1
+    last = min(nPed(), curSols() * pageSize)
+    pednrs = first:last
+
     labfun = getLabfun(dvi, settings$hideUnimportantLabs, settings$useAliases, aliasAM())
-    plotSolutionDIVIANA(dvi, solutionTable$AM, pednr = pednr, labs = labfun)
+    plotSolutionDIVIANA(dvi, solutionTable$AM, pednrs = pednrs,
+                        pageSize = pageSize, labs = labfun)
   }, res = 96, width = "auto", height = 600, execOnResize = TRUE)
 
   # Download solution tables ------------------------------------------------
