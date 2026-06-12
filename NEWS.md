@@ -1,6 +1,8 @@
 # dev version
 
 ## Imports
+
+* Avoid crash when clicking "Save" too early
 * Accept various spellings of AMEL column
 * Recognise "ID" as sample name column
 

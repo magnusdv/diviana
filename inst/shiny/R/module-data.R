@@ -206,7 +206,11 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
 
     output$previewTable = DT::renderDT(previewGenoDT(dfFiltered()))
 
-    observeEvent(input$importSave, { .debug2("import save", input$importWhat)
+    observeEvent(input$importSave, {
+      req(input$importWhat, input$action)
+
+      .debug2("import save", input$importWhat)
+
       if(!is.null(completeDvi$raw) && input$importWhat == "everything") {
         completeDvi$import = completeDvi$raw
         sources$all = sources$current
