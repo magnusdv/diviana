@@ -30,6 +30,9 @@ stop2 = function (...) {
 .mysetequal = function(x, y)
   !anyNA(match(x, y)) && !anyNA(match(y, x))
 
+`%notin%` = function(x, table)
+  match(x, table, nomatch = 0L) == 0L
+
 bigHeading = function(x)
   h4(strong(x), .noWS = "before")
 
