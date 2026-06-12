@@ -1,14 +1,20 @@
 # dev version
 
+## Imports
+* Accept various spellings of AMEL column
+* Recognise "ID" as sample name column
+
 ## Analysis
 
 * Expose `dviSolve()` argument `limit` as parameter labelled "Pairwise LR min".
 * Expose `dviSolve()` argument `maxAssign` in Settings dialog window.
 * Add titles to Joint tables.
+* More robust layout of solution plots
 
 ## Other
 
 * Move **dvir** from *Suggests* to *Imports*.
+* Fix sheet names and colWidths in excel download
 
 
 # diviana 0.4.2
