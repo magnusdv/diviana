@@ -15,7 +15,7 @@ dataUI = function(id, title = paste(id, "data")) {
 dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = reactiveVal(),
                       missingIDs = reactiveVal(), .debug = NULL) {
 
-  .debug2 = if(!is.null(.debug)) function(...) .debug(sprintf("-%s data:", id), ...)
+  .debug2 = if(is.null(.debug)) function(...) NULL else function(...) .debug(sprintf("-%s data:", id), ...)
 
   moduleServer(id, function(input, output, session) { .debug2("server")
     ns = session$ns
@@ -122,7 +122,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     output$tableContent = renderUI({ .debug2("update raw table")
       req(mainTable$raw)
       tagList(
-        em("If you only want to import some of the samples, select them before clicking Save.",
+        em("Note: If you only want to import certain samples, select them before clicking Save.",
            style = "color: tomato;"),
         DT::DTOutput(ns("previewTable")),
         if(input$filetype == "gm") {
@@ -164,7 +164,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       rawdvi = rawtable = NULL
       tryCatch(switch(input$filetype,
         fam   = { rawdvi = dvir::familias2dvir(path, missingFormat = "M[FAM]-[IDX]", verbose = FALSE)},
-        rdata = { rawdvi = readRdvi(path)},
+        rdata = { rawdvi = readRdvi(path, name = input$file$name)},
         gm    = { rawtable = readGenemapper(path)},
         txt   = { rawtable = readGenoFromTxt(path)},
       ),
@@ -502,8 +502,11 @@ formatGenoView = function(dat, mode, flavour = NULL, fam = NULL) {
 
   if(mode == "edit" && "Sex" %in% names(dat)) {
     dat$Sex = sprintf(
-      "<select class='sex-edit' data-key='%s'><option value='F'%s>Female</option><option value='M'%s>Male</option></select>",
+      #"<select class='sex-edit' data-key='%s'><option value='F'%s>Female</option><option value='M'%s>Male</option></select>",
+      #"<select class='sex-edit' data-key='%s'><option value='?'%s>?</option><option value='F'%s>Female</option><option value='M'%s>Male</option></select>",
+      "<select class='sex-edit' data-key='%s'><option value='?'%s disabled>?</option><option value='F'%s>Female</option><option value='M'%s>Male</option></select>",
       dat$.rowid,
+      ifelse(!dat$Sex %in% c("F", "M"), " selected", ""),
       ifelse(dat$Sex == "F", " selected", ""),
       ifelse(dat$Sex == "M", " selected", "")
     )
@@ -641,14 +644,15 @@ checkSex = function(x) {
   x[x == 2] = "F"
   bad = x %notin% c("F", "M", "?")
   if(any(bad)) {
-    warning("Illegal values in the Sex column:", toString(unique(sx[bad])))
+    warning("Illegal values in the Sex column:", toString(unique(x[bad])))
     x[bad] = "?"
   }
   x
 }
 
-readRdvi = function(fil) {
-  switch(tolower(tools::file_ext(fil)),
+readRdvi = function(fil, name = basename(fil)) {
+  ext = tolower(tools::file_ext(name)) # use 'name' here (temporary path has unstable extension)
+  switch(ext,
     rds = {
       content = readRDS(fil)
       if(!inherits(content, "dviData"))
@@ -673,7 +677,7 @@ readRdvi = function(fil) {
 banner = function(session) {
   if(!is.null(session)) {
     isShinyAppsIO = grepl("shinyapps.io", session$clientData$url_hostname)
-    if(!sShinyAppsIO) return()
+    if(!isShinyAppsIO) return()
   }
   div(class = "aligned-row",
     style = "background-color: #fff3cd; border-radius: 10px; text-align: center; line-height: 90%; font-size:60%",

@@ -318,7 +318,7 @@ splitCols = function(x, sep = NULL) { #print(x)
   if(all(nas))
     return(res)
 
-  sep = sep %||% getAlleleSep(x[,1])
+  sep = sep %||% getAlleleSep(x[!nas])
 
   nonNA = x[!nas][1]
   if(!grepl(sep, nonNA))
@@ -338,6 +338,10 @@ splitCols = function(x, sep = NULL) { #print(x)
 }
 
 getAlleleSep = function(v) {
+  # Avoid checking very long vectors
+  if(length(v) > 100)
+    length(v) = 100
+
   for(s in c("/", ",", "-", ";", " "))
     if(any(grepl(s, v, fixed = TRUE))) return(s)
   stop2("No separator found: ", v)

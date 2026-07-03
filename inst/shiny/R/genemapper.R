@@ -75,9 +75,9 @@ readGenoFromTxt = function(file) {
     col1 = splitcols[odd]
     col2 = splitcols[!odd]
     nms0 = substr(names(x)[splitcols], 1, nchar(names(x)[splitcols]) - 2)
-    if(!all.equal(nms0[col1], nms0[col2])) {
+    if(!identical(nms0[odd], nms0[!odd]))
       stop2("Genotypes seems to be split in the wrong order")
-    }
+
     nms = nms0[odd]
 
     # Merge

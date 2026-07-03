@@ -143,7 +143,7 @@ formatDatabaseTable = function(df) {
       dom = "t",
       paging = FALSE,
       ordering = FALSE,
-      autoWidth = TRUE,
+      autoWidth = FALSE,
       scrollY = "500px",
       scrollCollapse = TRUE,
       columnDefs = list(list(targets = "keep", visible = FALSE),
@@ -189,11 +189,12 @@ formatFreqTable = function(freqs) {
         class = "stripe compact nowrap",
         rownames = FALSE,
         selection = "none",
-        width = "100%",
+        #width = "100%",
         options = list(
           dom = "t",
           paging = FALSE,
           ordering = FALSE,
+          autoWidth = FALSE,
           scrollX = FALSE,
           scrollY = "310px", #if(nrow(df) > 15) "310px" else NULL,
           scrollCollapse = TRUE,
@@ -225,18 +226,15 @@ formatMatrix = function(m) {
                    cell_borders(sides = "all", style = "hidden")),
       locations = cells_stubhead()
     ) |>
-    tab_style(
-      style = cell_text(align = "center"),
-      locations = list(cells_body(), cells_column_labels(), cells_stub())
-    ) |>
+    cols_align("center") |>
     tab_options(
       table.align = "left",
       table_body.hlines.style = "solid",
       table_body.vlines.style = "solid",
       column_labels.vlines.style = "solid",
-      data_row.padding = if(nr > 10) px(2) else if(nr > 20) px(0),
-      column_labels.padding.horizontal = if(nc > 10) px(2) else if(nc > 20) px(0),
-      table.font.size = if(nr > 20 || nc > 20) "75%" else if(nr > 10 || nc > 10) "90%"
+      data_row.padding = if(nr > 20) px(1) else if(nr > 10) px(3),
+      column_labels.padding.horizontal = if(nc > 20) px(2) else if(nc > 10) px(4),
+      table.font.size = if(nr > 25 || nc > 20) "75%" else if(nr > 15 || nc > 10) "90%"
     )
 }
 
@@ -336,7 +334,7 @@ formatLRmatrix = function(m, title = NULL, LRthresh = 1e4, usealias = FALSE,
   tbl
 }
 
-formatJointTab = function(x, vics, miss, title = NULL, usealias = FALSE, aliasPM = NULL) {
+formatJointTab = function(x, vics, miss, title = NULL, usealias = FALSE, aliasPM = NULL, maxrows = 100) {
   clnms = colnames(x)
   vcol = clnms %in% vics
   mcol = clnms %in% miss
@@ -345,7 +343,11 @@ formatJointTab = function(x, vics, miss, title = NULL, usealias = FALSE, aliasPM
 
   nr = nrow(x)
   nc = ncol(x)
-  wraptxt = if(any(colnames(x) > 7)) NULL else "nowrap"
+  if(nr > maxrows) {
+    x = x[1:maxrows, , drop = FALSE]
+    nr = maxrows
+  }
+  wraptxt = if(any(nchar(colnames(x)) > 7)) NULL else "nowrap"
 
   gt(x) |>
     .addTitle(title) |>
@@ -373,10 +375,7 @@ formatJointTab = function(x, vics, miss, title = NULL, usealias = FALSE, aliasPM
       style = cell_fill(color = "#FFE5B4"),
       locations = cells_column_labels(which(vcol))
     ) |>
-    tab_style(
-      style = cell_text(align = "center"),
-      locations = list(cells_body(), cells_column_labels())
-    )
+    cols_align(align = "center")
 }
 
 # Used in the main app: Insert missing row/columns

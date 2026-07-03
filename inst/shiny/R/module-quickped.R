@@ -277,7 +277,8 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       orig = orig[!ron[orig] %in% oldped$ID]
       newids[orig] = ron[orig]
       empt = newids == ""
-      newids[empt] = .generateLabs(oldped, n = length(empt), avoid = avoid)
+      newids[empt] = .generateLabs(oldped, n = sum(empt), avoid = c(avoid, newids[!empt]))
+      #newids[empt] = .generateLabs(oldped, n = length(empt), avoid = avoid)
 
       newped = relabel(oldped, new = newids)
       newrefs = .mysetdiff(refs, ids)
@@ -317,10 +318,17 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       }
 
       ref = remainingRefs()[input$refTable_rows_selected]
+      refsx = refsex[ref] %||% 0L
+      refsx[is.na(refsx)] = 0L
+
+      if(refsx == 0L) {
+        showErr(sprintf("Reference '%s' has unknown sex. Edit the AM data before assigning it to a pedigree", ref))
+        return()
+      }
 
       sex = getSex(currData$ped, id)
-      if(sex != refsex[ref]) {
-        showErr(sprintf("Sex mismatch! Reference '%s' is %s", ref, c("male", "female")[refsex[ref]]))
+      if(sex != refsx) {
+        showErr(sprintf("Sex mismatch! Reference '%s' is %s", ref, c("male", "female")[refsx]))
         return()
       }
 

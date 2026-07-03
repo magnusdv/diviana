@@ -37,6 +37,10 @@ addResourcePath("icons", "www/static_icons")
 # TRIANGLES
 # * Triangle plots: Latex labels
 # * Triangle AM: Select family
+# * Warning in asNum(als) : NAs introduced by coercion
+#
+# ANALYSIS
+# Use extendedtask/mirai to make async solve() with progress bar
 #
 #---------------------------------------------
 
@@ -242,8 +246,15 @@ server = function(input, output, session) {
     cat("\n")
   }
 
-  # Close app when browser closes
-  observeEvent(input$browserClosed, stopApp())
+  isLocalHost = function() {
+    host = session$clientData$url_hostname %||% ""
+    host %in% c("localhost", "127.0.0.1", "::1")
+  }
+
+  # Close local app when browser closes
+  observeEvent(input$browserClosed, {
+    if(isLocalHost()) stopApp()
+  }, ignoreInit = TRUE)
 
   # Main reactive variables -------------------------------------------------
 
@@ -386,8 +397,10 @@ server = function(input, output, session) {
 
   customDB = reactive({ .debug("customDB")
     path = req(input$customDB$datapath)
+    ext = tools::file_ext(input$customDB$name)
+
     tryCatch({
-      if(identical(tools::file_ext(path), "fam")) {
+      if(ext == "fam") {
         y = pedFamilias::readFam(path, verbose = FALSE)
         if(length(y) && is.ped(y[[1]]))
           getFreqDatabase(y[[1]])
@@ -420,6 +433,13 @@ server = function(input, output, session) {
       original = appData()$db, # NULL ok
       NULL
     )
+  })
+
+  output$database_famname = renderText({
+    req(appData()$db)
+    src = unique.default(c(dataServerAM$sources(), dataServerPM$sources()))
+    src = src[nzchar(src)]
+    if(length(src)) basename(src[1]) else "(unknown filename)"
   })
 
   mutParams = reactive({ .debug("mutParams")
@@ -607,8 +627,6 @@ server = function(input, output, session) {
       isolate(updateSelectInput(session, "example", selected = ""))
   })
 
-  observe(shinyjs::toggleState("mutApplyAll", condition = input$muttype == "standard"))
-
   observe({
     dat = appData()
     toggleState(
@@ -641,7 +659,7 @@ server = function(input, output, session) {
       size = "l",
       easyClose = TRUE,
       tags$div(
-        style = "display:flex;align-items:flex-start;gap:15px;",
+        style = "display:flex;align-items:flex-start;gap:15px;margin-right:20px",
         tags$div(style = "flex:0 0 75%;", plotOutput("freqPlot", height = 350)),
         tags$div(style = "flex:0 0 25%;", DT::DTOutput("freqTable"))
       )
@@ -1044,7 +1062,7 @@ server = function(input, output, session) {
   output$downloadTables = downloadHandler(
     filename = function() sprintf("diviana-%s.xlsx", Sys.Date()),
     content = function(file) { .debug("download")
-      req(solutionTable$AM)
+      req(solutionTable$AM, solutionTable$LR, solutionTable$EX)
       dvi = req(currentDviData())
       tables = reactiveValuesToList(solutionTable)
       tables$LR = tables$LR |> completeMatrix(names(dvi$pm), dvi$missing)

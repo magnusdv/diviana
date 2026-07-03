@@ -113,7 +113,11 @@ freqRadios = function(id) {
       fileInput("customDB", "Custom"),
 
       tags$input(type = "radio", name = id, value = "original"),
-      tags$div(tags$label("Original"), textOutput("database_famname"))
+      tags$div(
+        tags$label("Original", style = "margin-right: 0.5em;"),
+        textOutput("database_famname", inline = TRUE),
+        style = "white-space: nowrap;"
+      )
     )
   )
 }
@@ -153,9 +157,9 @@ mutRadios = function(id) {
             class = "standard-rate",
             tags$div("Male", class = "tinylabel"),
             numericInput("mutrateM", NULL, width = "100%", min = 0, max = 1, value = 0.002)
-          ),
-          actionBttn("mutApplyAll", label = tagList(myIcon("play", align = "-0.1em")), style = "jelly", size = "s") |>
-          wrap_tooltip("mutApplyAll")
+          )
+          #actionBttn("mutApplyAll", label = tagList(myIcon("play", align = "-0.1em")), style = "jelly", size = "s") |>
+          #wrap_tooltip("mutApplyAll")
         )
       ),
       tags$input(type = "radio", name = id, value = "original"),
