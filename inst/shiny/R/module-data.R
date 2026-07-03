@@ -207,11 +207,12 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     output$previewTable = DT::renderDT(previewGenoDT(dfFiltered()))
 
     observeEvent(input$importSave, {
-      req(input$importWhat, input$action)
+      req(input$action)
+      importWhat = input$importWhat %||% "samples"
 
-      .debug2("import save", input$importWhat)
+      .debug2("import save", importWhat)
 
-      if(!is.null(completeDvi$raw) && input$importWhat == "everything") {
+      if(!is.null(completeDvi$raw) && importWhat == "everything") {
         completeDvi$import = completeDvi$raw
         sources$all = sources$current
         removeModal()
