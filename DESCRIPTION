@@ -12,12 +12,11 @@ BugReports: https://github.com/magnusdv/diviana/issues
 Depends: 
     R (>= 4.2)
 Imports:
-    bs4Dash,
-    dvir (>= 3.4.1.9001),
-    shiny
-Suggests:
     DT,
+    bs4Dash,
+    dvir (>= 3.4.2),
     forrel,
+    ggplot2,
     gt,
     norSTR,
     openxlsx,
@@ -26,6 +25,7 @@ Suggests:
     pedprobr,
     pedtools,
     plotly,
+    shiny,
     shinyWidgets,
     shinyjs,
     verbalisr
