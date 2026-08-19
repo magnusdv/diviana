@@ -1,10 +1,13 @@
-# dev version
+# diviana 0.4.4
 
 ## Imports
 
 * Avoid crash when clicking "Save" too early
-* Accept various spellings of AMEL column
+* Fix bug failing to recognise "-/-" as missing data
 * Recognise "ID" as sample name column
+* Accept various spellings of AMEL column
+* Harmonise marker names when adding more samples 
+* Various fixes of the "Sources" fields
 
 ## Analysis
 
@@ -17,6 +20,8 @@
 
 * Move **dvir** from *Suggests* to *Imports*.
 * Fix sheet names and colWidths in excel download
+* Disable triangle calculations with more than 5000 pairs
+* Move Reset button to top-right corner
 
 
 # diviana 0.4.2
