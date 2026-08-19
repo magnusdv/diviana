@@ -73,7 +73,7 @@ formatResultTable = function(x, title = NULL, usealias = FALSE, aliasPM = NULL, 
     fmt_scientific(c("LR", "GLR"), decimals = 2, exp_style = "e", force_sign_n = TRUE) |>
     fmt_number("LR",  decimals = 2, rows = LR >= 0.1 & LR < 1000) |>
     fmt_number("GLR", decimals = 2, rows = GLR >= 0.1 & GLR < 1000) |>
-    cols_add(colour = COLS_BG[Conclusion]) |>
+    cols_add(colour = unname(COLS_BG[as.character(Conclusion)])) |>
     cols_hide("colour") |>
     tab_style(
       style = cell_fill(color = from_column(column = "colour")),
