@@ -227,8 +227,11 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         sources$all = sources$current
       }
       else {
+        # Generate aliases for added samples (V1, V2, ... or R1, R2, ...)
+        df$Alias = paste0(switch(id, PM = "V", AM = "R"),
+                          NROW(mainTable$main) + seq_len(nrow(df)))
         mainTable$main = rbindSafe(mainTable$main, df)
-        sources$all = c(sources$all, sources$current)
+        sources$all = unique.default(c(sources$all, sources$current))
       }
       removeModal()
     })
@@ -458,7 +461,8 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     list(main = reactive(mainTable$main),
          completeDvi = reactive(completeDvi$import),
          idEdits = reactive(idEdits()),
-         sources = reactive(sources$all))
+         sources = reactive(sources$all),
+         sourceValues = sources)
   })
 
 }
