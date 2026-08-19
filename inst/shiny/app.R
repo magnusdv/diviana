@@ -76,9 +76,9 @@ ui = bs4Dash::bs4DashPage(
           wrap_tooltip("settings", "bottom"),
         downloadBttn("downloaddata", NULL, style = "jelly", color = "warning", size = "m")|>
           wrap_tooltip("downloaddata", "bottom"),
+        selectInput("example", NULL, choices = c("Load example" = "", DATASETS), width = "200px"),
         actionBttn("resetall", icon("redo"), style = "jelly", color = "danger", size = "m") |>
           wrap_tooltip("resetall", "bottom"),
-        selectInput("example", NULL, choices = c("Load example" = "", DATASETS), width = "200px"),
       )
     ))
   ),
