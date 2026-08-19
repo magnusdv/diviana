@@ -467,17 +467,20 @@ server = function(input, output, session) {
     amatAM = alleleMatAM()
     amatPM = alleleMatPM()
 
+    # Missing alleles
+    miss = c("", ".", "-", "0", NA)
+
     am = pm = NULL
 
     if(!is.null(amatAM)) {
       am = lapply(seq_len(ncol(amatAM)/2), function(k)
-        unique.default(as.character(amatAM[, (2*k-1):(2*k)]) |> .mysetdiff(0)))
+        unique.default(as.character(amatAM[, (2*k-1):(2*k)]) |> .mysetdiff(miss)))
       names(am) = markersAM()
     }
 
     if(!is.null(amatPM)) {
       pm = lapply(seq_len(ncol(amatPM)/2), function(k)
-        unique.default(as.character(amatPM[, (2*k-1):(2*k)]) |> .mysetdiff(0)))
+        unique.default(as.character(amatPM[, (2*k-1):(2*k)]) |> .mysetdiff(miss)))
       names(pm) = markersPM()
     }
 
