@@ -614,10 +614,12 @@ server = function(input, output, session) {
   })
 
   observeEvent(dataServerAM$completeDvi(), { .debug("AM complete dvi")
+    dataServerPM$sourceValues$all = dataServerAM$sources()
     setCompleteDVI(dataServerAM$completeDvi())
   }, ignoreNULL = TRUE)
 
   observeEvent(dataServerPM$completeDvi(), { .debug("PM complete dvi:")
+    dataServerAM$sourceValues$all = dataServerPM$sources()
     setCompleteDVI(dataServerPM$completeDvi())
   }, ignoreNULL = TRUE)
 
@@ -1077,7 +1079,7 @@ server = function(input, output, session) {
 
   settings = reactiveValues(hideUnimportantLabs = TRUE,
                             useAliases = TRUE,
-                            maxAssign = 1e5,
+                            maxAssign = 1e4,
                             standardmodel = "equal")
 
   observeEvent(input$settings, {
@@ -1121,8 +1123,9 @@ server = function(input, output, session) {
   observeEvent(input$resetall, { .debug("reset all")
     session$sendCustomMessage("clearOutputs", c(
       "amcentric", "pmcentric", "lrmatrix", "exmatrix", "jointtabs", "solvelog",
-      "solutionplot", "pedplot", "dvisummary", "AM-mainTableUI", "PM-mainTableUI"
-    ))
+      "solutionplot", "pedplot", "dvisummary", "AM-mainTableUI", "PM-mainTableUI",
+      "AM-sourcefield", "PM-sourcefield")
+    )
     externalAM("reset")
     externalPM("reset")
     externalLoci$db = externalLoci$mut = NULL
@@ -1144,7 +1147,7 @@ server = function(input, output, session) {
     settings$hideUnimportantLabs = TRUE
     settings$useAliases = TRUE
     settings$standardmodel = "equal"
-    settings$maxAssign = 1e5
+    settings$maxAssign = 1e4
   })
 
   observeEvent(resetAnalysis(), { .debug("reset results")
