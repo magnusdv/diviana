@@ -179,6 +179,11 @@ useAlias = function(labs, alias) {
 rbindSafe = function(df1, df2) {
   if(is.null(df1))
     return(df2)
+
+  # Match column names ignoring case and whitespace
+  idx = match(normaliseName(names(df2)), normaliseName(names(df1)), nomatch = 0L)
+  names(df2)[idx > 0] = names(df1)[idx[idx > 0]]
+
   cols = union(names(df1), names(df2))
   df1[.mysetdiff(cols, names(df1))] = NA
   df2[.mysetdiff(cols, names(df2))] = NA
