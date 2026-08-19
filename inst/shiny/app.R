@@ -909,12 +909,17 @@ server = function(input, output, session) {
     kappa$am = CPnoplot(req(mainAM()), acrossComps = input$acrossComps) })
 
   observeEvent(input$pmKappaCalc, { .debug("PM kappa calculate")
-    kappa$pm = CPnoplot(req(mainPM())) })
+    pm = req(mainPM())
+    req(choose(length(pm), 2) <= 5000)
+    kappa$pm = CPnoplot(pm)
+  })
 
   observeEvent(input$ampmKappaCalc, { .debug("AM-PM kappa calculate")
     am = req(mainAM())
     pm = req(mainPM())
     idMatr = pedtools:::fast.grid(list(typedMembers(am), names(pm))) |> req()
+    req(nrow(idMatr) <= 5000)
+
     commonMarkers = .myintersect(name(am), name(pm)) |> req()
     allcmps = c(selectMarkers(am, commonMarkers), selectMarkers(pm, commonMarkers))
     k = forrel::ibdEstimate(allcmps, ids = idMatr, verbose = FALSE)

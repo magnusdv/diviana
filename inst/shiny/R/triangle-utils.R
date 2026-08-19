@@ -46,20 +46,26 @@ cpMessage = function(tab, type, nref = NULL, nvic = NULL, across = FALSE) {
       }
     },
     ampm = {
+      npairs = nrefTot * nvic
       if(nvic == 0)
         "Nothing to compute: no PM samples loaded."
       else if(nrefTot == 0)
         "Nothing to compute: no AM samples in families."
+      else if(npairs > 5000)
+        sprintf("Cannot calculate: Too many pairs (%d).", npairs)
       else
         sprintf("Click Calculate to compute: %d AM-PM pairs.", nrefTot * nvic)
     },
     pm = {
+      npairs = choose(nvic, 2)
       if(nvic == 0)
         "Nothing to compute: no PM samples loaded."
       else if(nvic < 2)
         "Nothing to compute: fewer than 2 PM samples."
+      else if(npairs > 5000)
+        sprintf("Cannot calculate: Too many pairs (%d).", npairs)
       else
-        sprintf("Click Calculate to compute: %d PM pairs.", choose(nvic, 2))
+        sprintf("Click Calculate to compute: %d PM pairs.", npairs)
     })
 
   shiny::div(class = "text-muted", style = "font-style:italic;", msg)
