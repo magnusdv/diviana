@@ -157,8 +157,9 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         mainTable$raw = NULL
     })
 
-    observeEvent(input$file, { .debug2("import file", input$file$name);
+    observeEvent(list(input$file, input$filetype), {
       req(input$file)
+      .debug2("import file", input$file$name)
       path = input$file$datapath
       fileError(NULL)
       rawdvi = rawtable = NULL
