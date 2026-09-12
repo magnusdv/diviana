@@ -169,7 +169,10 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         txt   = { rawtable = readGenoFromTxt(path)},
       ),
       warning = function(e) print(conditionMessage(e)), #showErr, TODO!
-      error = function(e) fileError(conditionMessage(e)))
+      error = function(e) {
+        msg = gsub(path, input$file$name, conditionMessage(e), fixed = TRUE)
+        fileError(msg)
+      })
 
       if(!is.null(rawtable))
         mainTable$raw = rawtable |> moveColsFirst("AMEL")
