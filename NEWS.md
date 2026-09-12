@@ -1,3 +1,20 @@
+
+# diviana 0.4.5
+
+## Imports
+
+* Reprocess file when changing file type.
+* Fix odd-looking error messages when wrong file type.
+
+## Pedigrees
+
+* Fix broken plots of pedigrees with more than 4 generations. 
+
+## Analysis
+
+* Add option `Compact` to result tables, making them more focused on positive findings. The current behaviour is to hide samples with conclusion "No match" or "Excluded".
+
+
 # diviana 0.4.4
 
 ## Imports
