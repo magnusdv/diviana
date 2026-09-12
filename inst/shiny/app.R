@@ -792,10 +792,10 @@ server = function(input, output, session) {
       labs = useAlias(labs, aliasAM())
 
     ngen = generations(ped)
-    topmar = switch(ngen, 5,5,3,2)
-    botmar = topmar - 1
-    sidemar = switch(ngen, 6,6,4,2)
-    margins = c(botmar, sidemar, topmar, sidemar)
+    i = min(ngen, 4)
+    topmar = c(5, 5, 3, 2)[i]
+    sidemar = c(6, 6, 4, 2)[i]
+    margins = c(topmar - 1, sidemar, topmar, sidemar)
 
     plot(ped, title = title, hatched = refs, cex = 1.2, cex.main = 1.5,
          margins = margins, labs = labs, foldLabs = 8,
