@@ -34,7 +34,8 @@ COLS_BG = c(
 redText = c("Nonidentifiable", "No match", "Inconclusive")
 
 
-formatResultTable = function(x, title = NULL, usealias = FALSE, aliasPM = NULL, style = 6) {
+formatResultTable = function(x, title = NULL, usealias = FALSE, aliasPM = NULL,
+                             style = 6, compact = FALSE) {
 
   if(is.character(x)) {
     emptyGT = gt(data.frame(Message = x)) |>
@@ -51,6 +52,9 @@ formatResultTable = function(x, title = NULL, usealias = FALSE, aliasPM = NULL, 
     x$Sample[len1] = aliasPM[x$Sample[len1]] # this handles NAs!
     x$Sample[!len1] = vapply(spl[!len1], \(s) paste(aliasPM[s], collapse = "/"), character(1))
   }
+
+  if(isTRUE(compact))
+    x = x[.compactRows(x), , drop = FALSE]
 
   tab = gt(x) |>
     .addTitle(title) |>
@@ -88,6 +92,10 @@ formatResultTable = function(x, title = NULL, usealias = FALSE, aliasPM = NULL, 
       locations = cells_body(columns = c("LR", "GLR", "Conclusion", "Comment")))
 
   tab
+}
+
+.compactRows = function(x) {
+  x$Conclusion %notin% c("No match", "Excluded")
 }
 
 .addTitle = function(tab, title = NULL) {

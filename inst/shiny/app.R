@@ -202,6 +202,8 @@ ui = bs4Dash::bs4DashPage(
       # Report table: AM and PM tabs --------------------------------------------
       column(5, class = "col-xl-6",
          bs4TabCard(title = div("Identifications", style = "padding-right:10px;"),
+                    label = div(style = "margin-top: 5px",
+                                checkboxInput("compactTabs", "Compact", FALSE, width = "auto")),
                     width = NULL, type = "tabs", side = "right",
                     collapsible = FALSE,
                     tabPanel(title = "AM", gt::gt_output("amcentric")),
@@ -997,17 +999,23 @@ server = function(input, output, session) {
 
   output$amcentric = gt::render_gt({  .debug("render result AM")
     formatResultTable(req(solutionTable$AM), title = "AM-centered result table",
-                      settings$useAliases, aliasPM = aliasPM())
+                      settings$useAliases, aliasPM = aliasPM(),
+                      compact = input$compactTabs)
   }, height = 600)
 
   output$pmcentric = gt::render_gt({  .debug("render result PM")
     formatResultTable(req(solutionTable$PM), title = "PM-centered result table",
-                      settings$useAliases, aliasPM = aliasPM())
+                     settings$useAliases, aliasPM = aliasPM(),
+                     compact = input$compactTabs)
   }, height = 600)
 
   output$lrmatrix = gt::render_gt({ .debug("render LR matrix")
     dvi = currentDviData()
     m = req(solutionTable$LR) |> completeMatrix(names(dvi$pm), dvi$missing)
+    if(isTRUE(input$compactTabs))
+      m = m[.compactRows(solutionTable$PM),
+            .compactRows(solutionTable$AM), drop = FALSE]
+
     formatLRmatrix(m, title = "Pairwise LR matrix",
                    input$LRthresh, settings$useAliases, aliasPM = aliasPM())
   }, height = 600)
