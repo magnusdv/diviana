@@ -961,6 +961,7 @@ server = function(input, output, session) {
                           maxIncomp = input$maxIncomp,
                           limit = input$pairLRmin,
                           maxAssign = settings$maxAssign,
+                          computeLR0 = settings$computeLR0,
                           ignoreSex = input$ignoresex, verbose = TRUE,
                           debug = DEVMODE, detailedOutput = TRUE)
       },
@@ -1096,6 +1097,7 @@ server = function(input, output, session) {
 
   settings = reactiveValues(hideUnimportantLabs = TRUE,
                             useAliases = TRUE,
+                            computeLR0 = FALSE,
                             maxAssign = 1e4,
                             standardmodel = "equal")
 
@@ -1120,6 +1122,9 @@ server = function(input, output, session) {
                      selected = settings$standardmodel, inline = TRUE, width = "auto"),
         br(),
         h4("Analysis"),
+        awesomeCheckbox("computeLR0", "Compute reference-free LRs (LR0) for complex families",
+                        value = settings$computeLR0, width = "auto"),
+        br(),
         numericInput("maxAssign", "Maximum number of assignment in joint analysis",
                      value = settings$maxAssign, width = "auto"),
       ),
@@ -1130,6 +1135,7 @@ server = function(input, output, session) {
 
   observeEvent(input$hideUnimportantLabs, {settings$hideUnimportantLabs = input$hideUnimportantLabs})
   observeEvent(input$useAliases, {settings$useAliases = input$useAliases})
+  observeEvent(input$computeLR0, {settings$computeLR0 = input$computeLR0})
   observeEvent(input$maxAssign, {settings$maxAssign = input$maxAssign})
   observeEvent(input$standardmodel, {settings$standardmodel = input$standardmodel})
 
@@ -1163,6 +1169,7 @@ server = function(input, output, session) {
     # Settings dialog
     settings$hideUnimportantLabs = TRUE
     settings$useAliases = TRUE
+    settings$computeLR0 = FALSE
     settings$standardmodel = "equal"
     settings$maxAssign = 1e4
   })

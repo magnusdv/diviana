@@ -12,6 +12,8 @@
 
 ## Analysis
 
+* New option "Compute reference-free LRs (LR0)" in Settings dialog window. This is a useful diagnostic in cases with closely related (e.g. parent-child) victims.
+
 * Add option `Compact` to result tables, making them more focused on positive findings. The current behaviour is to hide samples with conclusion "No match" or "Excluded".
 
 

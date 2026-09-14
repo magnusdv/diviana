@@ -373,8 +373,8 @@ formatJointTab = function(x, vics, miss, title = NULL, usealias = FALSE, aliasPM
       style = cell_text(weight = "bold", whitespace = wraptxt),
       locations = list(cells_column_labels())
     ) |>
-    fmt_number("loglik", decimals = 2) |>
-    fmt_scientific("LR", decimals = 2, exp_style = "e") |>
+    fmt_number(columns = starts_with("loglik"), decimals = 2) |>
+    fmt_scientific(columns = starts_with("LR"), decimals = 2, exp_style = "e") |>
     tab_style(
       style = cell_fill(color = "#E6E6FA"),
       locations = cells_column_labels(which(mcol))
@@ -383,7 +383,15 @@ formatJointTab = function(x, vics, miss, title = NULL, usealias = FALSE, aliasPM
       style = cell_fill(color = "#FFE5B4"),
       locations = cells_column_labels(which(vcol))
     ) |>
-    cols_align(align = "center")
+    cols_align(align = "center") |>
+    tooltipHeader(list(
+      loglik = "Log-likelihood of the assignment using all data reaching this stage",
+      loglik0 = "Log-likelihood with the assigned victims disconnected from the reference family",
+      LR = "LR comparing the assignment with the unrelated hypothesis",
+      `LR[1:k]` = "LR comparing the best assignment (row 1) with row k",
+      LR0 = "Reference-free LR; evidence for the victim relationships the assignment",
+      LRref = "Additional LR contribution from the reference data (LR/LR0)"
+    ))
 }
 
 # Used in the main app: Insert missing row/columns
@@ -402,4 +410,15 @@ completeMatrix = function(m, rownames, colnames) {
 # Utility: Check if all elements exceed a certain value (and not all NA)
 allAbove = function(x, val) {
   !all(is.na(x)) && all(x > val, na.rm = TRUE)
+}
+
+# Utility: Add tooltips to column headers in gt table
+tooltipHeader = function(tab, tips) {
+  cols = intersect(names(tips), names(gt::extract_body(tab, build_stage = "init", incl_hidden_cols = TRUE)))
+  labs = lapply(cols, \(x)
+    gt::html(sprintf('<span title="%s">%s</span>',
+      htmltools::htmlEscape(tips[[x]], attribute = TRUE), x)))
+  names(labs) = cols
+
+  do.call(gt::cols_label, c(list(tab), labs))
 }
