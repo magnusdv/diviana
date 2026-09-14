@@ -203,7 +203,8 @@ ui = bs4Dash::bs4DashPage(
       column(5, class = "col-xl-6",
          bs4TabCard(title = div("Identifications", style = "padding-right:10px;"),
                     label = div(style = "margin-top: 5px",
-                                checkboxInput("compactTabs", "Compact", FALSE, width = "auto")),
+                                checkboxInput("compactTabs", "Compact", FALSE, width = "auto") |>
+                                  wrap_tooltip("compactTabs")),
                     width = NULL, type = "tabs", side = "right",
                     collapsible = FALSE,
                     tabPanel(title = "AM", gt::gt_output("amcentric")),
