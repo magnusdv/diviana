@@ -172,6 +172,8 @@ amel2sex = function(amel) {
 }
 
 useAlias = function(labs, alias) {
+  if(!length(labs))
+    return(labs)
   names(labs) = ifelse(labs %in% names(alias), alias[labs], "")
   labs
 }
