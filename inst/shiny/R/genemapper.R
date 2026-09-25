@@ -45,7 +45,7 @@ readGenemapper = function(file, format = NULL) {
 
 readGenoFromTxt = function(file) {
   x = read.table(file, header = TRUE, sep = "\t", colClasses = "character",
-                 check.names = FALSE, row.names = NULL)
+                 check.names = FALSE, row.names = NULL, strip.white = TRUE)
 
   # Convert sample ID columns to row names
   trycols = list()

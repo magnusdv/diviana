@@ -321,20 +321,27 @@ splitCols = function(x, sep = NULL) { #print(x)
   nr = nrow(x)
   res = matrix(0, ncol = 2 * nc, nrow = nr, dimnames = list(rownames(x), NULL))
 
-  nas = is.na(x) | x == 0
-  if(all(nas))
-    return(res)
+  x = trimws(x)
+  nas = is.na(x) | x == "" | x == 0
 
   sep = sep %||% getAlleleSep(x[!nas])
 
-  nonNA = x[!nas][1]
-  if(!grepl(sep, nonNA))
-    stop2("Allele separator not found in first non-NA entry of allele matrix: ", nonNA)
-
-  # Replace NA's and missing by 0/0
+  # Convert completely missing genotypes to 0/0
   x[nas] = sprintf("0%s0", sep)
 
-  splitvec = unlist(strsplit(x, sep, fixed = TRUE))
+  # Convert empty individual alleles to 0
+  i = startsWith(x, sep)
+  x[i] = paste0("0", x[i])
+  i = endsWith(x, sep)
+  x[i] = paste0(x[i], "0")
+
+  # Split alleles and require exactly two per genotype
+  spl = strsplit(x, sep, fixed = TRUE)
+  ll = lengths(spl)
+  if(any(ll != 2))
+    stop2("Malformed genotype found: ", x[which(ll != 2)[1]])
+
+  splitvec = trimws(unlist(spl))
 
   # Odd columns get first allele, even columns get second allele
   evencols = 2 * seq_len(nc)
