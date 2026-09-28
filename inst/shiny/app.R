@@ -47,7 +47,7 @@ addResourcePath("icons", "www/static_icons")
 
 DEVMODE = F
 
-DATASETS = c("example1", "example2", "exclusionExample", "fire", "grave", "icmp", "planecrash")
+DATASETS = c("example1", "example2", "exclusionExample", "fire", "grave", "heli", "icmp", "planecrash")
 
 # UI ----------------------------------------------------------------------
 
