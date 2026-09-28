@@ -1,3 +1,17 @@
+# diviana 0.5.0
+
+## Imports
+
+* Familias files with disconnected reference families are now supported. Such families are internally 'repaired' (artificially connected) and should be manually inspected after loading.
+
+## PM data
+
+* A new module "Merge PM" is added, activated by a button in the PM data window.
+
+## Other
+
+* Added new dataset `heli`, exemplifying PM merging.
+
 
 # diviana 0.4.5
 
