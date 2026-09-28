@@ -619,6 +619,13 @@ server = function(input, output, session) {
     resetAnalysis(resetAnalysis() + 1)
   })
 
+  mergedPm = mergePmServer("mergePM", trigger = dataServerPM$merge, dvi = currentDviData)
+
+  observeEvent(mergedPm(), {
+    pm = genosWithAttrs(req(mergedPm())$pm, addCols = c("Sample", "Sex"))
+    externalPM(pm)
+  })
+
   observeEvent(dataServerAM$completeDvi(), { .debug("AM complete dvi")
     dataServerPM$sourceValues$all = dataServerAM$sources()
     setCompleteDVI(dataServerAM$completeDvi())

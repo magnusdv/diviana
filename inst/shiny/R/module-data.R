@@ -7,7 +7,9 @@ dataUI = function(id, title = paste(id, "data")) {
     footer = div(class = "btn-group",
       actionButton(ns("importButton"), label = tagList(myIcon("file-arrow-up", align = "-0.1em"), "Import")),
       actionButton(ns("editButton"), label = tagList(myIcon("edit", align = "-0.1em"), "Edit")),
-      actionButton(ns("aliasButton"), label = tagList(icon("user-pen", align = "-0.1em"), "Aliases"))
+      actionButton(ns("aliasButton"), label = tagList(icon("user-pen", align = "-0.1em"), "Aliases")),
+      if(id == "PM")
+        actionButton(ns("mergeButton"), label = tagList(icon("object-group"), "Merge PM"))
     )
   )
 }
@@ -473,6 +475,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     list(main = reactive(mainTable$main),
          completeDvi = reactive(completeDvi$import),
          idEdits = reactive(idEdits()),
+         merge = reactive(input$mergeButton),
          sources = reactive(sources$all),
          sourceValues = sources)
   })
