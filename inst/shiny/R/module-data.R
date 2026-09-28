@@ -143,9 +143,17 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       info[1] = "<b>Contents of DVI dataset</b>"
       s = paste(info, collapse = "\n")
       s = HTML(gsub("\n ", "\n &bull; ", s))
-      div(s, style = paste(
-        "white-space: pre-wrap; color: RoyalBlue; line-height: 1.2em; padding: 5px;",
-        "margin: 5px 0; background-color: #f9f9f9; border: 1px solid #ccc;"))
+      check = attr(raw, "reconnectedAM")
+
+      tagList(
+        div(s, style = paste(
+          "white-space: pre-wrap; color: RoyalBlue; line-height: 1.2em; padding: 5px;",
+          "margin: 5px 0; background-color: #f9f9f9; border: 1px solid #ccc;")),
+        if(length(check))
+          div(class = "alert alert-warning py-2 mt-2 mb-0",
+              strong("Families repaired - manual inspection recommended: "),
+              toString(check))
+      )
     })
 
     observeEvent(input$importWhat, { .debug2("importWhat =", input$importWhat)
