@@ -17,7 +17,8 @@ dataUI = function(id, title = paste(id, "data")) {
 dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = reactiveVal(),
                       missingIDs = reactiveVal(), .debug = NULL) {
 
-  .debug2 = if(is.null(.debug)) function(...) NULL else function(...) .debug(sprintf("-%s data:", id), ...)
+  .debug2 = if(is.null(.debug)) function(...) NULL else function(...)
+    .debug(sprintf("-%s data:", id), ...)
 
   moduleServer(id, function(input, output, session) { .debug2("server")
     ns = session$ns
@@ -26,6 +27,13 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     mainTable = reactiveValues(raw = NULL, main = NULL)
     completeDvi = reactiveValues(raw = NULL, import = NULL)
     sources = reactiveValues(current = NULL, all = NULL)
+
+    # AM table: Clicking first column opens pedigree
+    famClick = reactive({
+      z = input$mainTable_cell_clicked
+      req(id == "AM", z$col == 0)
+      z$value
+    })
 
     observeEvent(externalData(), { .debug2("set external", externalData())
       ext = externalData()
@@ -153,8 +161,8 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
           "margin: 5px 0; background-color: #f9f9f9; border: 1px solid #ccc;")),
         if(length(check))
           div(class = "alert alert-warning py-2 mt-2 mb-0",
-              strong("Families repaired - manual inspection recommended: "),
-              toString(check))
+            strong("Disconnected families repaired"), br(),
+            "Please review manually: ", toString(check))
       )
     })
 
@@ -477,7 +485,8 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
          idEdits = reactive(idEdits()),
          merge = reactive(input$mergeButton),
          sources = reactive(sources$all),
-         sourceValues = sources)
+         sourceValues = sources,
+         famClick = famClick)
   })
 
 }
@@ -580,7 +589,8 @@ genoDT = function(dat, mode = c("main", "edit"), flavour = NULL, assigned = NULL
   ) |>
     DT::formatStyle(names(dat), target = "row", lineHeight = "75%") |>
     DT::formatStyle(.cols("Sex"), borderRight = "1px solid #ccc") |>
-    DT::formatStyle(.cols("Fam"), fontWeight = "bold", color = "darkblue")
+    DT::formatStyle(.cols("Fam"), fontWeight = "bold", color = "darkblue",
+                cursor = "pointer")
 
   if(mode == "main")
     dt = dt |> DT::formatStyle(.cols("Sex"), color = DT::styleEqual(c("F", "M"),

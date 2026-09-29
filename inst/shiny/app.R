@@ -709,6 +709,13 @@ server = function(input, output, session) {
   nPed = reactive(length(pedigrees()))
   curPed = cardCounter("pedcard", nPed)
 
+  # Clicking a family name in AM table opens its plot
+  observeEvent(dataServerAM$famClick(), {
+    i = match(dataServerAM$famClick(), names(pedigrees()))
+    if(!is.na(i))
+      curPed(i)
+  })
+
   observeEvent(input$newped, { .debug("new pedigree")
     isNewPed(TRUE)
     uniqueID = uniquify("quickpedModule")

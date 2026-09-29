@@ -4,6 +4,10 @@
 
 * Familias files with disconnected reference families are now supported. Such families are internally 'repaired' (artificially connected) and should be manually inspected after loading.
 
+## AM data
+
+* Clicking a family name opens the pedigree in the pedigree plot window.
+
 ## PM data
 
 * A new module "Merge PM" is added, activated by a button in the PM data window.
