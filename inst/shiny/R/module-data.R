@@ -162,7 +162,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         if(length(check))
           div(class = "alert alert-warning py-2 mt-2 mb-0",
             strong("Disconnected families repaired"), br(),
-            "Please review manually: ", toString(check))
+            "Manual review recommended: ", toString(check))
       )
     })
 
