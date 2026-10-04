@@ -19,7 +19,8 @@
 #      })
 
 mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropout = 0,
-                          defaultMethod = "combine", defaultNames = "combine") {
+                         defaultDropin = 0, defaultTypingError = 0,
+                         defaultMethod = "combine", defaultNames = "combine") {
   moduleServer(id, function(input, output, session) {
     ns = session$ns
 
@@ -37,13 +38,15 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
     namesDefault = reactiveVal(defaultNames)
 
     currentSettings = function() {
-      list(threshold = input$threshold, dropout = input$dropout)
+      list(threshold = input$threshold, dropout = input$dropout,
+           dropin = input$dropin, typingError = input$typingError)
     }
 
     showMain = function() {
       s = analysedSettings()
       if(is.null(s))
-        s = list(threshold = defaultThreshold, dropout = defaultDropout)
+        s = list(threshold = defaultThreshold, dropout = defaultDropout,
+                 dropin = defaultDropin, typingError = defaultTypingError)
 
       showModal(modalDialog(
         title = "Merge PM",
@@ -60,14 +63,12 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
                          min = 0, max = 0.99, step = 0.01)
           ),
           column(3,
-            tags$fieldset(disabled = "disabled",
-              textInput(ns("dropin"), "Dropin", placeholder = "Not implemented")
-            )
+            numericInput(ns("dropin"), "Dropin", value = s$dropin,
+                         min = 0, max = 0.99, step = 0.01)
           ),
           column(3,
-            tags$fieldset(disabled = "disabled",
-              textInput(ns("typingError"), "Typing error", placeholder = "Not implemented")
-            )
+            numericInput(ns("typingError"), "Typing error", value = s$typingError,
+                         min = 0, max = 0.99, step = 0.01)
           )
         ),
         br(),
@@ -129,7 +130,9 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       namesDefault(input$defaultNames %||% namesDefault())
       res = tryCatch(
         dvir::mergePM(d$pm, threshold = s$threshold, method = "combine",
-                      names = "combine", dropout = s$dropout, verbose = FALSE),
+                      names = "combine", dropout = s$dropout,
+                      dropin = s$dropin, typingError = s$typingError,
+                      verbose = FALSE),
         error = function(e) {
           showNotification(conditionMessage(e), type = "error")
           NULL
@@ -258,8 +261,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       showModal(modalDialog(
         title = div(class = "aligned-row-wide",
           span(sprintf("Inspect cluster: %s", paste(g, collapse = ", "))),
-          tags$small(sprintf("Dropout: %g (%s)", dropout,
-                             if(dropout > 0) "modelled" else "not modelled"),
+          tags$small(sprintf("Dropout modelled: %s", if(dropout > 0) "yes" else "no"),
                      class = "text-muted")
         ),
         size = "l",
@@ -515,7 +517,7 @@ mergePmTestApp = function(dvi0 = dvir::heli) {
       dvi = reactiveVal(dvi0)
 
       merged = mergePmServer("mergePM", trigger = reactive(input$mergePm),
-                             dvi = dvi, defaultDropout = 0.1)
+                             dvi = dvi, defaultDropout = 0)
       observeEvent(merged(), dvi(req(merged())))
 
       output$summary = renderPrint(print(dvi(), printMax = 20))
