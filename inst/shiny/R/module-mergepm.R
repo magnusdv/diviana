@@ -25,7 +25,9 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
     ns = session$ns
 
     analysis = reactiveVal(NULL)
-    analysedSettings = reactiveVal(NULL)
+    settings = reactiveVal(list(threshold = defaultThreshold, dropout = defaultDropout,
+                                dropin = defaultDropin, typingError = defaultTypingError,
+                                defaultMethod = defaultMethod, defaultNames = defaultNames))
     approved = reactiveVal(character())
     mergedNames = reactiveVal(character())
     mergeMethods = reactiveVal(character())
@@ -34,19 +36,26 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
     lrClicks = reactiveVal(integer())
     pending = reactiveVal(NULL)
     saved = reactiveVal(NULL)
-    methodDefault = reactiveVal(defaultMethod)
-    namesDefault = reactiveVal(defaultNames)
 
     currentSettings = function() {
       list(threshold = input$threshold, dropout = input$dropout,
-           dropin = input$dropin, typingError = input$typingError)
+           dropin = input$dropin, typingError = input$typingError,
+           defaultMethod = input$defaultMethod, defaultNames = input$defaultNames)
     }
 
+    # Remember settings and require fresh analysis after any change
+    observe({
+      req(input$threshold, input$dropout, input$dropin, input$typingError,
+          input$defaultMethod, input$defaultNames)
+      s = currentSettings()
+      if(!identical(s, settings())) {
+        settings(s)
+        analysis(NULL)
+      }
+    }, priority = 100)
+
     showMain = function() {
-      s = analysedSettings()
-      if(is.null(s))
-        s = list(threshold = defaultThreshold, dropout = defaultDropout,
-                 dropin = defaultDropin, typingError = defaultTypingError)
+      s = settings()
 
       showModal(modalDialog(
         title = "Merge PM",
@@ -74,14 +83,14 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
         br(),
         fluidRow(
           column(5,
-            radioButtons(ns("defaultMethod"), "Merge method", inline = TRUE,
+            radioButtons(ns("defaultMethod"), "Default merge method", inline = TRUE,
                          choices = c("Combine" = "combine", "Most complete" = "mostcomplete"),
-                         selected = methodDefault())
+                         selected = s$defaultMethod)
           ),
           column(5,
-            radioButtons(ns("defaultNames"), "Names", inline = TRUE,
+            radioButtons(ns("defaultNames"), "Default names", inline = TRUE,
                          choices = c("Combine" = "combine", "Most complete" = "mostcomplete"),
-                         selected = namesDefault())
+                         selected = s$defaultNames)
           ),
           column(2,
             div(style = "padding-top:25px; text-align:right;",
@@ -99,7 +108,6 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
 
     observeEvent(trigger(), {
       analysis(NULL)
-      analysedSettings(NULL)
       approved(character())
       mergedNames(character())
       mergeMethods(character())
@@ -108,14 +116,9 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       lrClicks(integer())
       pending(NULL)
       saved(NULL)
-      methodDefault(defaultMethod)
-      namesDefault(defaultNames)
       showMain()
     })
 
-
-    observeEvent(input$defaultMethod, methodDefault(input$defaultMethod), ignoreInit = TRUE)
-    observeEvent(input$defaultNames, namesDefault(input$defaultNames), ignoreInit = TRUE)
 
     # Identify groups once, always computing the combined profile
     observeEvent(input$analyse, {
@@ -126,8 +129,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       }
 
       s = currentSettings()
-      methodDefault(input$defaultMethod %||% methodDefault())
-      namesDefault(input$defaultNames %||% namesDefault())
+      settings(s)
       res = tryCatch(
         dvir::mergePM(d$pm, threshold = s$threshold, method = "combine",
                       names = "combine", dropout = s$dropout,
@@ -143,12 +145,11 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
 
       groups = res$groups[lengths(res$groups) > 1L]
       analysis(res)
-      analysedSettings(s)
       approved(character())
-      nms = if(namesDefault() == "combine") names(groups) else
+      nms = if(s$defaultNames == "combine") names(groups) else
         vapply(groups, function(g) g[which.max(res$nonmissing[g])], character(1))
       mergedNames(setNames(unname(nms), names(groups)))
-      mergeMethods(setNames(rep.int(methodDefault(), length(groups)), names(groups)))
+      mergeMethods(setNames(rep.int(s$defaultMethod, length(groups)), names(groups)))
       clicks(vapply(seq_along(groups), function(i) input[[paste0("inspect", i)]] %||% 0,
                     numeric(1)))
       lrClicks(vapply(seq_along(groups), function(i) input[[paste0("lr", i)]] %||% 0,
@@ -183,7 +184,8 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
 
         status = if(ok) {
           method = if(methods[gn] == "combine") "Combine" else "Most complete"
-          span(paste("Approved:", method), class = "text-success", style = "font-weight:bold;")
+          span(icon("check"), " ", method, class = "text-success", title = "Approved",
+               style = "font-weight:bold; white-space:nowrap;")
         }
         else
           span("Pending", class = "text-muted")
@@ -201,10 +203,9 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       })
 
       tagList(
-        div(class = "d-flex justify-content-between align-items-center mb-2",
-            span(sprintf("%d merge group%s identified.", length(groups),
-                         if(length(groups) == 1L) "" else "s")),
-            actionButton(ns("approveAll"), "Approve all", class = "btn-sm")),
+        div(class = "mb-2",
+            sprintf("%d merge group%s identified.", length(groups),
+                    if(length(groups) == 1L) "" else "s")),
         tags$table(
           class = "table table-sm table-bordered",
           style = "margin-bottom:10px; width:100%;",
@@ -216,8 +217,9 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
             tags$th("Status"),
             tags$th("Review")
           )),
-          tags$tbody(rows)
-        )
+          tags$tbody(style = "font-size:95%;", rows)
+        ),
+        div(style = "text-align:right;", actionLink(ns("approveAll"), "Approve all"))
       )
     })
 
@@ -246,23 +248,21 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       if(!length(hit))
         return()
 
-      if(!identical(currentSettings(), analysedSettings())) {
-        showNotification("Settings have changed. Click Analyse again first.", type = "warning")
-        return()
-      }
-
       i = hit[1]
       gn = names(groups)[i]
       g = groups[[i]]
       selected(gn)
-      dropout = analysedSettings()$dropout
+      s = settings()
       best = g[which.max(res$nonmissing[g])]
 
       showModal(modalDialog(
-        title = div(class = "aligned-row-wide",
-          span(sprintf("Inspect cluster: %s", paste(g, collapse = ", "))),
-          tags$small(sprintf("Dropout modelled: %s", if(dropout > 0) "yes" else "no"),
-                     class = "text-muted")
+        title = tagList(
+          sprintf("Inspect cluster: %s", paste(g, collapse = ", ")),
+          div(class = "text-muted",
+              style = "position:absolute; top:10px; right:10px; font-size:60%; line-height:1.2;
+                       font-family:monospace; white-space:pre; text-align:left;",
+              sprintf("%8s %g\n%8s %g\n%8s %g",
+                      "Dropout:", s$dropout, "Dropin:", s$dropin, "Error:", s$typingError))
         ),
         size = "l",
         fluidRow(
@@ -278,7 +278,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
         ),
         DT::DTOutput(ns("inspectTable")),
         footer = tagList(
-          actionButton(ns("reject"), "Cancel"),
+          actionButton(ns("reject"), "Don't merge"),
           actionButton(ns("approve"), "Approve merge", status = "success")
         )
       ))
@@ -303,11 +303,6 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       if(!length(hit))
         return()
 
-      if(!identical(currentSettings(), analysedSettings())) {
-        showNotification("Settings have changed. Click Analyse again first.", type = "warning")
-        return()
-      }
-
       g = groups[[hit[1]]]
       m = res$LRmat[g, g, drop = FALSE]
       fm = matrix(formatC(m, format = "g", digits = 4), nrow = length(g),
@@ -316,10 +311,9 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
 
       showModal(modalDialog(
         title = "Pairwise LR matrix",
-        p(class = "text-muted", paste(g, collapse = ", ")),
         tags$table(
           class = "table table-sm table-bordered w-auto mx-auto mb-0",
-          tags$thead(tags$tr(tags$th(""), lapply(g, tags$th))),
+          tags$thead(tags$tr(tags$th(""), lapply(g, function(x) tags$th(x, class = "text-center")))),
           tags$tbody(lapply(seq_along(g), function(r)
             tags$tr(tags$th(g[r]),
                     lapply(seq_along(g), function(cc) tags$td(fm[r, cc])))))
@@ -334,7 +328,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       res = req(analysis())
       gn = req(selected())
       d = req(dvi())
-      g = res$groups[[gn]]
+      g = names(d$pm)[names(d$pm) %in% res$groups[[gn]]]
 
       orig = getGenotypes(d$pm[g])
       method = input$mergeMethod %||% mergeMethods()[gn]
@@ -348,7 +342,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
 
       probs = res$problems[[gn]]
       problems = colnames(orig) %in% probs
-      dropout = analysedSettings()$dropout
+      dropout = settings()$dropout
 
       # Describe differences among the original profiles
       diffs = vapply(seq_len(ncol(orig)), function(j) {
@@ -357,7 +351,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
           return("Inconsistent")
         if(length(unique.default(z)) == 1L)
           return("")
-        if(any(grepl("-", z, fixed = TRUE)))
+        if(any(z == "-/-") && length(unique.default(z[z != "-/-"])) == 1L)
           return("Missing")
         if(dropout > 0)
           return("Dropout")
@@ -365,7 +359,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       }, character(1))
 
       tab = data.frame(Marker = colnames(orig), t.default(orig), Result = unname(result),
-                       Diffs = diffs, check.names = FALSE, row.names = NULL)
+                       Difference = diffs, check.names = FALSE, row.names = NULL)
       diffsCol = ncol(tab) - 1L
 
       DT::datatable(tab,
@@ -384,7 +378,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       ) |>
         DT::formatStyle(names(tab), target = "row", lineHeight = "80%") |>
         DT::formatStyle("Result", borderLeft = "2px solid #adb5bd") |>
-        DT::formatStyle(names(tab), valueColumns = "Diffs", target = "row",
+        DT::formatStyle(names(tab), valueColumns = "Difference", target = "row",
           backgroundColor = DT::styleEqual(
             c("Missing", "Dropout", "Inconsistent"),
             c("#fff3cd", "#fff3cd", "#f8d7da")
@@ -464,10 +458,6 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
 
     observeEvent(input$save, {
       req(analysis())
-      if(!identical(currentSettings(), analysedSettings())) {
-        showNotification("Settings have changed. Click Analyse again first.", type = "warning")
-        return()
-      }
       if(!length(approved())) {
         showNotification("No merge groups have been approved", type = "warning")
         return()
