@@ -48,9 +48,9 @@ cpMessage = function(tab, type, nref = NULL, nvic = NULL, across = FALSE) {
     ampm = {
       npairs = nrefTot * nvic
       if(nvic == 0)
-        "Nothing to compute: no PM samples loaded."
+        "Nothing to compute: no typed PM samples."
       else if(nrefTot == 0)
-        "Nothing to compute: no AM samples in families."
+        "Nothing to compute: no AM samples assigned to families."
       else if(npairs > 5000)
         sprintf("Cannot calculate: Too many pairs (%d).", npairs)
       else

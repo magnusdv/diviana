@@ -84,15 +84,14 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
                          selected = s$defaultNames)
           ),
           column(2,
-            div(style = "padding-top:25px; text-align:right;",
+            div(style = "padding-top:15px; text-align:right;",
                 actionButton(ns("analyse"), "Analyse", status = "primary"))
           )
         ),
-        br(),
         uiOutput(ns("results")),
         footer = tagList(
           modalButton("Cancel"),
-          actionButton(ns("save"), "Save and replace", status = "success")
+          actionButton(ns("save"), "Apply merges", status = "success")
         )
       ))
     }
@@ -194,11 +193,12 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       })
 
       tagList(
-        div(class = "mb-2",
+        div(class = "mt-3 mb-2",
             sprintf("%d merge group%s identified.", length(groups),
                     if(length(groups) == 1L) "" else "s")),
+        tags$style(".merge-pm-results td {vertical-align:middle;}"),
         tags$table(
-          class = "table table-sm table-bordered",
+          class = "table table-sm table-bordered merge-pm-results",
           style = "margin-bottom:10px; width:100%;",
           tags$thead(tags$tr(
             tags$th("Samples"),
@@ -210,7 +210,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
           )),
           tags$tbody(style = "font-size:95%;", rows)
         ),
-        div(style = "text-align:right;", actionLink(ns("approveAll"), "Approve all"))
+        div(style = "text-align:right; padding-right:5px", actionLink(ns("approveAll"), "Approve all"))
       )
     })
 
@@ -250,7 +250,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
         title = tagList(
           sprintf("Inspect cluster: %s", paste(g, collapse = ", ")),
           div(class = "text-muted",
-              style = "position:absolute; top:10px; right:10px; font-size:60%; line-height:1.2;
+              style = "position:absolute; top:10px; right:15px; font-size:60%; line-height:1.1;
                        font-family:monospace; white-space:pre; text-align:left;",
               sprintf("%8s %g\n%8s %g\n%8s %g",
                       "Dropout:", s$dropout, "Dropin:", s$dropin, "Error:", s$typingError))
@@ -303,11 +303,10 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       showModal(modalDialog(
         title = "Pairwise LR matrix",
         tags$table(
-          class = "table table-sm table-bordered w-auto mx-auto mb-0",
-          tags$thead(tags$tr(tags$th(""), lapply(g, function(x) tags$th(x, class = "text-center")))),
-          tags$tbody(lapply(seq_along(g), function(r)
-            tags$tr(tags$th(g[r]),
-                    lapply(seq_along(g), function(cc) tags$td(fm[r, cc])))))
+          class = "table table-sm table-bordered w-auto mx-auto mb-0 text-center",
+          tags$thead(tags$tr(tags$th(""), lapply(g, tags$th))),
+          tags$tbody(lapply(seq_along(g), \(r)
+            tags$tr(tags$th(g[r]), lapply(fm[r, ], tags$td))))
         ),
         footer = actionButton(ns("lrBack"), "Back")
       ))
@@ -465,13 +464,18 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
         return()
       pending(x)
 
-      showModal(modalDialog(
-        "Are you sure you want to replace the current PM data with the merged data?",
-        footer = tagList(
-          actionButton(ns("confirmBack"), "Cancel"),
-          actionButton(ns("confirmSave"), "Save and replace", status = "danger")
-        )
-      ))
+      confirm = modalDialog(
+        "Replace the current PM data with the approved merges?",
+        footer = div(style = "display:flex; justify-content:center; gap:8px; width:100%;",
+          actionButton(ns("confirmBack"), "No, go back"),
+          actionButton(ns("confirmSave"), "Yes, replace", status = "danger"))
+      )
+      # Center the confirmation dialog
+      confirm$children[[1]]$attribs$class = paste(
+        confirm$children[[1]]$attribs$class, "modal-dialog-centered")
+      confirm$children[[1]]$attribs$style = "max-width:420px; top:-15vh;"
+
+      showModal(confirm)
     })
 
     observeEvent(input$confirmBack, showMain())

@@ -25,6 +25,7 @@ Imports:
     pedprobr (>= 1.1.1),
     pedtools (>= 2.11.0),
     plotly,
+    ribd,
     shiny,
     shinyWidgets,
     shinyjs,

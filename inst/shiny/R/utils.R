@@ -206,7 +206,7 @@ genosWithAttrs = function(x, addCols = c("Sample", "Sex"), addAttrs = "Fam") {
     x = list(a = x)
 
   glist = lapply(x, function(cmp) {
-    typed = typedMembers(cmp)
+    typed = if(is.singleton(cmp)) cmp$ID else typedMembers(cmp)  # allow untyped PM
     g = getGenotypes(cmp, typed)
     attr(g, "sex") = getSex(cmp, typed)
     g

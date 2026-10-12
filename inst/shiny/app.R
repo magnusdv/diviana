@@ -76,7 +76,7 @@ ui = bs4Dash::bs4DashPage(
           wrap_tooltip("settings", "bottom"),
         downloadBttn("downloaddata", NULL, style = "jelly", color = "warning", size = "m")|>
           wrap_tooltip("downloaddata", "bottom"),
-        selectInput("example", NULL, choices = c("Load example" = "", DATASETS), width = "200px"),
+        selectInput("example", NULL, choices = c("Load example" = "", DATASETS), width = "200px", selectize = FALSE),
         actionBttn("resetall", icon("redo"), style = "jelly", color = "danger", size = "m") |>
           wrap_tooltip("resetall", "bottom"),
       )
@@ -934,7 +934,7 @@ server = function(input, output, session) {
   observeEvent(input$ampmKappaCalc, { .debug("AM-PM kappa calculate")
     am = req(mainAM())
     pm = req(mainPM())
-    idMatr = pedtools:::fast.grid(list(typedMembers(am), names(pm))) |> req()
+    idMatr = pedtools:::fast.grid(list(typedMembers(am), typedMembers(pm))) |> req()
     req(nrow(idMatr) <= 5000)
 
     commonMarkers = .myintersect(name(am), name(pm)) |> req()
@@ -958,7 +958,7 @@ server = function(input, output, session) {
   output$ampmTriangle = renderPlotly({ .debug("ampm-triangle");
     input$ampmTable_search # trigger on search/filter
     df = kappa$ampm[isolate(input$ampmTable_rows_all), , drop = FALSE]
-    forrel::showInTriangle(df, plotType = "plotly", xlab = "", ylab = "", pch = 16, col = "pink", cex = 1.2)
+    ribd::showInTriangle(df, plotType = "plotly", xlab = "", ylab = "", pch = 16, col = "pink", cex = 1.2)
   })
 
   # Tab: Analysis ---------------------------------------------------------------
