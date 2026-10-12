@@ -1,25 +1,7 @@
 # Merge PM module ----------------------------------------------------------
-#
-# Diviana integration:
-#
-# 1) Add to the PM card footer in dataUI():
-#      if(id == "PM")
-#        actionButton(ns("mergeButton"), label = tagList(icon("object-group"), "Merge PM"))
-#
-# 2) Add to the list returned by dataServer():
-#      merge = reactive(input$mergeButton)
-#
-# 3) After currentDviData() is defined in app.R:
-#      mergedPm = mergePmServer("mergePM", trigger = dataServerPM$merge,
-#                               dvi = currentDviData)
-#
-#      observeEvent(mergedPm(), {
-#        pm = genosWithAttrs(req(mergedPm())$pm, addCols = c("Sample", "Sex"))
-#        externalPM(pm)
-#      })
 
 mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropout = 0,
-                         defaultDropin = 0, defaultTypingError = 0,
+                         defaultDropin = 0, defaultTypingError = 0, defaultIgnoreSex = FALSE,
                          defaultMethod = "combine", defaultNames = "combine") {
   moduleServer(id, function(input, output, session) {
     ns = session$ns
@@ -27,7 +9,8 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
     analysis = reactiveVal(NULL)
     settings = reactiveVal(list(threshold = defaultThreshold, dropout = defaultDropout,
                                 dropin = defaultDropin, typingError = defaultTypingError,
-                                defaultMethod = defaultMethod, defaultNames = defaultNames))
+                                ignoreSex = defaultIgnoreSex, defaultMethod = defaultMethod,
+                                defaultNames = defaultNames))
     approved = reactiveVal(character())
     mergedNames = reactiveVal(character())
     mergeMethods = reactiveVal(character())
@@ -40,13 +23,14 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
     currentSettings = function() {
       list(threshold = input$threshold, dropout = input$dropout,
            dropin = input$dropin, typingError = input$typingError,
+           ignoreSex = input$ignoreSex,
            defaultMethod = input$defaultMethod, defaultNames = input$defaultNames)
     }
 
     # Remember settings and require fresh analysis after any change
     observe({
       req(input$threshold, input$dropout, input$dropin, input$typingError,
-          input$defaultMethod, input$defaultNames)
+          !is.null(input$ignoreSex), input$defaultMethod, input$defaultNames)
       s = currentSettings()
       if(!identical(s, settings())) {
         settings(s)
@@ -75,9 +59,16 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
             numericInput(ns("dropin"), "Dropin", value = s$dropin,
                          min = 0, max = 0.99, step = 0.01)
           ),
-          column(3,
+          column(3, style = "position:relative;",
             numericInput(ns("typingError"), "Typing error", value = s$typingError,
-                         min = 0, max = 0.99, step = 0.01)
+                         min = 0, max = 0.99, step = 0.01),
+            div(style = "position:absolute; right:10px;",
+                tags$label(
+                  style = "display:flex; align-items:center; gap:8px; font-weight:normal;",
+                  "Ignore sex",
+                  tags$input(id = ns("ignoreSex"), type = "checkbox",
+                             class = "shiny-input-checkbox",
+                             checked = if(s$ignoreSex) "checked")))
           )
         ),
         br(),
@@ -134,7 +125,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
         dvir::mergePM(d$pm, threshold = s$threshold, method = "combine",
                       names = "combine", dropout = s$dropout,
                       dropin = s$dropin, typingError = s$typingError,
-                      verbose = FALSE),
+                      ignoreSex = s$ignoreSex, verbose = FALSE),
         error = function(e) {
           showNotification(conditionMessage(e), type = "error")
           NULL
@@ -450,6 +441,9 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
           best = g[which.max(res$nonmissing[g])]
           d$pm[[best]]
         }
+        if(settings()$ignoreSex)
+          prof$SEX = res$pmReduced[[gn]]$SEX
+
         relabel(prof, new = unname(nms[gn]))
       })
 
@@ -491,33 +485,3 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
   })
 }
 
-
-# Standalone test app ------------------------------------------------------
-
-mergePmTestApp = function(dvi0 = dvir::heli) {
-  shinyApp(
-    ui = fluidPage(
-      titlePanel("Merge PM module test"),
-      actionButton("mergePm", "Merge PM"),
-      hr(),
-      DT::DTOutput("pm"),
-      verbatimTextOutput("summary")
-    ),
-    server = function(input, output, session) {
-      dvi = reactiveVal(dvi0)
-
-      merged = mergePmServer("mergePM", trigger = reactive(input$mergePm),
-                             dvi = dvi, defaultDropout = 0)
-      observeEvent(merged(), dvi(req(merged())))
-
-      output$summary = renderPrint(print(dvi(), printMax = 20))
-      output$pm = DT::renderDT({
-        g = getGenotypes(dvi()$pm)
-        tab = data.frame(Sample = rownames(g), g, check.names = FALSE, row.names = NULL)
-        DT::datatable(tab, rownames = FALSE, selection = "none",
-          class = "stripe hover compact nowrap",
-          options = list(dom = "t", paging = FALSE, scrollX = TRUE))
-      }, server = FALSE)
-    }
-  )
-}
