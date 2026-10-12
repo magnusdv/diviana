@@ -89,9 +89,11 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
           )
         ),
         uiOutput(ns("results")),
-        footer = tagList(
-          modalButton("Cancel"),
-          actionButton(ns("save"), "Apply merges", status = "success")
+        footer = div(style = "display:flex; justify-content:space-between; width:100%;",
+          uiOutput(ns("downloadControl")),
+          div(style = "display:flex; gap:8px;",
+              modalButton("Cancel"),
+              actionButton(ns("save"), "Apply merges", status = "success"))
         )
       ))
     }
@@ -124,7 +126,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
         dvir::mergePM(d$pm, threshold = s$threshold, method = "combine",
                       names = "combine", dropout = s$dropout,
                       dropin = s$dropin, typingError = s$typingError,
-                      ignoreSex = s$ignoreSex, verbose = FALSE),
+                      ignoreSex = s$ignoreSex, markerwise = TRUE, verbose = FALSE),
         error = function(e) {
           showNotification(conditionMessage(e), type = "error")
           NULL
@@ -146,6 +148,11 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
                       numeric(1)))
     })
 
+    output$downloadControl = renderUI({
+      if(!is.null(analysis()))
+        downloadButton(ns("downloadExcel"), "Download Excel")
+    })
+
     output$results = renderUI({
       res = analysis()
       if(is.null(res))
@@ -153,7 +160,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
 
       groups = res$groups[lengths(res$groups) > 1L]
       if(!length(groups))
-        return(div(class = "text-muted", "No merge groups identified."))
+        return(div(class = "mt-3 mb-2 text-muted", "No merge groups identified."))
 
       appr = approved()
       nms = mergedNames()
@@ -220,6 +227,43 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       approved(names(groups))
     })
 
+    # Show Inspect with optional unsaved values when returning from an LR matrix
+    showInspect = function(nm = NULL, method = NULL) {
+      res = req(analysis())
+      gn = req(selected())
+      g = res$groups[[gn]]
+      s = settings()
+      best = g[which.max(res$nonmissing[g])]
+
+      showModal(modalDialog(
+        title = tagList(
+          sprintf("Inspect cluster: %s", paste(g, collapse = ", ")),
+          div(class = "text-muted",
+              style = "position:absolute; top:10px; right:15px; font-size:60%; line-height:1.1;
+                       font-family:monospace; white-space:pre; text-align:left;",
+              sprintf("%8s %g\n%8s %g\n%8s %g",
+                      "Dropout:", s$dropout, "Dropin:", s$dropin, "Error:", s$typingError))
+        ),
+        size = "l",
+        fluidRow(
+          column(6,
+            textInput(ns("mergedName"), "Merged sample name", value = nm %||% mergedNames()[gn])
+          ),
+          column(6,
+            radioButtons(ns("mergeMethod"), "Merge method", inline = TRUE,
+              choices = setNames(c("combine", "mostcomplete"),
+                                 c("Combine profiles", sprintf("Most complete (%s)", best))),
+              selected = method %||% mergeMethods()[gn])
+          )
+        ),
+        DT::DTOutput(ns("inspectTable")),
+        footer = tagList(
+          actionButton(ns("reject"), "Don't merge"),
+          actionButton(ns("approve"), "Approve merge", status = "success")
+        )
+      ))
+    }
+
     # Detect which dynamically generated Inspect button was clicked
     observe({
       res = analysis()
@@ -239,41 +283,30 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       if(!length(hit))
         return()
 
-      i = hit[1]
-      gn = names(groups)[i]
-      g = groups[[i]]
-      selected(gn)
-      s = settings()
-      best = g[which.max(res$nonmissing[g])]
+      selected(names(groups)[hit[1]])
+      showInspect()
+    })
+
+    # Display overall or marker-wise LR matrix
+    showLRmatrix = function(m, title, back) {
+      g = rownames(m)
+      fm = matrix(formatC(m, format = "g", digits = 4), nrow = length(g),
+                  dimnames = dimnames(m))
+      diag(fm) = "–"
 
       showModal(modalDialog(
-        title = tagList(
-          sprintf("Inspect cluster: %s", paste(g, collapse = ", ")),
-          div(class = "text-muted",
-              style = "position:absolute; top:10px; right:15px; font-size:60%; line-height:1.1;
-                       font-family:monospace; white-space:pre; text-align:left;",
-              sprintf("%8s %g\n%8s %g\n%8s %g",
-                      "Dropout:", s$dropout, "Dropin:", s$dropin, "Error:", s$typingError))
+        title = title,
+        tags$table(
+          class = "table table-sm table-bordered w-auto mx-auto mb-0 text-center",
+          tags$thead(tags$tr(tags$th(""), lapply(g, tags$th))),
+          tags$tbody(lapply(seq_along(g), \(r)
+            tags$tr(tags$th(g[r]), lapply(fm[r, ], tags$td))))
         ),
-        size = "l",
-        fluidRow(
-          column(6,
-            textInput(ns("mergedName"), "Merged sample name", value = mergedNames()[gn])
-          ),
-          column(6,
-            radioButtons(ns("mergeMethod"), "Merge method", inline = TRUE,
-              choices = setNames(c("combine", "mostcomplete"),
-                                 c("Combine profiles", sprintf("Most complete (%s)", best))),
-              selected = mergeMethods()[gn])
-          )
-        ),
-        DT::DTOutput(ns("inspectTable")),
-        footer = tagList(
-          actionButton(ns("reject"), "Don't merge"),
-          actionButton(ns("approve"), "Approve merge", status = "success")
-        )
+        footer = actionButton(ns(back), "Back")
       ))
-    })
+    }
+
+    markerState = reactiveVal(NULL)
 
     # Show pairwise LRs for groups with more than two samples
     observe({
@@ -295,24 +328,30 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
         return()
 
       g = groups[[hit[1]]]
-      m = res$LRmat[g, g, drop = FALSE]
-      fm = matrix(formatC(m, format = "g", digits = 4), nrow = length(g),
-                  dimnames = dimnames(m))
-      diag(fm) = "–"
-
-      showModal(modalDialog(
-        title = "Pairwise LR matrix",
-        tags$table(
-          class = "table table-sm table-bordered w-auto mx-auto mb-0 text-center",
-          tags$thead(tags$tr(tags$th(""), lapply(g, tags$th))),
-          tags$tbody(lapply(seq_along(g), \(r)
-            tags$tr(tags$th(g[r]), lapply(fm[r, ], tags$td))))
-        ),
-        footer = actionButton(ns("lrBack"), "Back")
-      ))
+      showLRmatrix(res$LRmat[g, g, drop = FALSE], "Pairwise LR matrix", "lrBack")
     })
 
     observeEvent(input$lrBack, showMain())
+
+    # Click the LR column in Inspect to view one marker's pairwise LRs
+    observeEvent(input$inspectTable_cell_clicked, {
+      z = input$inspectTable_cell_clicked
+      res = req(analysis())
+      gn = req(selected())
+      g = res$groups[[gn]]
+      req(isTRUE(z$col == length(g) + 3L), identical(z$value, "Matrix"),
+          !is.null(z$row))
+      marker = dimnames(res$LRmarker)[[3]][z$row]
+      req(!is.na(marker))
+
+      markerState(list(name = input$mergedName, method = input$mergeMethod))
+      showLRmatrix(res$LRmarker[g, g, marker], paste("LR matrix:", marker), "markerBack")
+    })
+
+    observeEvent(input$markerBack, {
+      st = req(markerState())
+      showInspect(st$name, st$method)
+    })
 
     output$inspectTable = DT::renderDT({
       res = req(analysis())
@@ -348,12 +387,28 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
         "Inconsistent"
       }, character(1))
 
+      # Display the common LR for typed pairs, otherwise offer the full matrix
+      lr = vapply(seq_len(ncol(orig)), function(j) {
+        typed = g[orig[, j] != "-/-"]
+        if(length(typed) < 2L)
+          return("–")
+        m = res$LRmarker[typed, typed, colnames(orig)[j]]
+        v = m[lower.tri(m)]
+        if(length(unique.default(signif(v, 8))) == 1L)
+          formatC(v[1], format = "g", digits = 4)
+        else
+          "Matrix"
+      }, character(1))
       tab = data.frame(Marker = colnames(orig), t.default(orig), Result = unname(result),
-                       Difference = diffs, check.names = FALSE, row.names = NULL)
-      diffsCol = ncol(tab) - 1L
+                       Difference = diffs, LR = lr, check.names = FALSE, row.names = NULL)
+      diffsCol = ncol(tab) - 2L
 
-      DT::datatable(tab,
+      dt = DT::datatable(tab,
         rownames = FALSE,
+        container = tags$table(tags$thead(tags$tr(
+          lapply(names(tab)[-ncol(tab)], tags$th),
+          wrap_tooltip(tags$th("LR"), "mergePmLR")
+        ))),
         selection = "none",
         class = "stripe hover compact nowrap",
         options = list(
@@ -362,7 +417,8 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
           scrollCollapse = TRUE, order = list(),
           columnDefs = list(
             list(orderable = FALSE, targets = 0:(diffsCol - 1L)),
-            list(orderable = TRUE, targets = diffsCol)
+            list(orderable = TRUE, targets = diffsCol),
+            list(orderable = FALSE, targets = diffsCol + 1L)
           )
         )
       ) |>
@@ -373,6 +429,9 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
             c("Missing", "Dropout", "Inconsistent"),
             c("#fff3cd", "#fff3cd", "#f8d7da")
           ))
+      DT::formatStyle(dt, "LR", color = DT::styleEqual("Matrix", "steelblue"),
+                      cursor = DT::styleEqual("Matrix", "pointer"),
+                      textDecoration = DT::styleEqual("Matrix", "underline"))
     }, server = FALSE)
 
     # Store the cluster decision without changing PM data
@@ -409,6 +468,57 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       approved(setdiff(approved(), gn))
       showMain()
     })
+
+    # Download groups and pairwise LRs, including marker-wise contributions
+    output$downloadExcel = downloadHandler(
+      filename = function() sprintf("mergePM-%s.xlsx", Sys.Date()),
+      content = function(file) {
+        res = req(analysis())
+        s = settings()
+        groups = res$groups[lengths(res$groups) > 1L]
+        gn = names(groups)
+        ids = names(req(dvi())$pm)
+
+        # First sheet: parameters
+        params = data.frame(
+          Parameter = c("LR threshold", "Dropout", "Dropin", "Typing error", "Ignore sex"),
+          Value = vapply(s[c("threshold", "dropout", "dropin", "typingError", "ignoreSex")],
+                         as.character, character(1), USE.NAMES = FALSE))
+
+        # One row for each unordered pair within a merge group
+        pairs = if(length(groups)) do.call(rbind, lapply(gn, function(x) {
+          g = ids[ids %in% groups[[x]]]
+          p = t.default(combn(g, 2L))
+          data.frame(Group = x, `Sample 1` = p[, 1], `Sample 2` = p[, 2],
+                     check.names = FALSE)
+        })) else data.frame(Group = character(), `Sample 1` = character(),
+                           `Sample 2` = character(), check.names = FALSE)
+        pairTab = pairs
+        pairTab$LR = res$LRmat[as.matrix(pairs[, 2:3])]
+        pairTab$Group = unname(mergedNames()[pairTab$Group])
+
+        # Expand each pair over all markers, keeping LRs numeric in Excel
+        markers = dimnames(res$LRmarker)[[3]]
+        markerTab = pairs[rep(seq_len(nrow(pairs)), each = length(markers)), , drop = FALSE]
+        markerTab$Marker = rep(markers, nrow(pairs))
+        geno = getGenotypes(req(dvi())$pm)
+        markerTab$Geno1 = geno[cbind(markerTab[[2]], markerTab$Marker)]
+        markerTab$Geno2 = geno[cbind(markerTab[[3]], markerTab$Marker)]
+        markerTab$LR = res$LRmarker[cbind(markerTab[[2]], markerTab[[3]], markerTab$Marker)]
+        names(markerTab)[2:3] = c("Sample1", "Sample2")
+
+        # One sheet per group
+        tabs = split(markerTab[-1], markerTab$Group)
+        sheetNames = make.unique(substr(chartr("\\/:*?[]", "_______", unname(mergedNames()[gn])), 1, 28))
+
+        sheets = c(list(Parameters = params, `LR totals` = pairTab),
+                   setNames(tabs[gn], sheetNames))
+
+        openxlsx::write.xlsx(sheets, file, colNames = TRUE, colWidths = "auto",
+                             headerStyle = openxlsx::createStyle(textDecoration = "bold"))
+      },
+      contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
     # Replace only approved groups, preserving all other singleton objects
     buildReplacement = function() {
