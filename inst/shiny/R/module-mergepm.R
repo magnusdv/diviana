@@ -49,7 +49,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
         fluidRow(
           column(3,
             numericInput(ns("threshold"), "LR threshold", value = s$threshold,
-                         min = 1, step = 1000)
+                         min = 0, step = 1000)
           ),
           column(3,
             numericInput(ns("dropout"), "Dropout", value = s$dropout,
@@ -224,6 +224,10 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
     observeEvent(input$approveAll, {
       res = req(analysis())
       groups = res$groups[lengths(res$groups) > 1L]
+      if(anyDuplicated(unname(mergedNames()))) {
+        showNotification("Duplicate merged sample names", type = "error")
+        return()
+      }
       approved(names(groups))
     })
 
@@ -529,6 +533,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       groups = res$groups
       methods = mergeMethods()
       nms = mergedNames()
+      ignsex = settings()$ignoreSex
 
       grp = rep(names(groups), lengths(groups))
       names(grp) = unlist(groups, use.names = FALSE)
@@ -543,15 +548,16 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
         if(id != first)
           return(NULL)
 
-        prof = if(methods[gn] == "combine") {
-          res$pmReduced[[gn]]
-        }
+        # Merge method
+        meth = methods[gn]
+        if(meth == "combine")
+          prof = res$pmReduced[[gn]]
         else {
           best = g[which.max(res$nonmissing[g])]
-          d$pm[[best]]
+          prof = d$pm[[best]]
+          if(ignsex)
+            prof = setSex(prof, prof$ID, sex = res$pmReduced[[gn]]$SEX)
         }
-        if(settings()$ignoreSex)
-          prof$SEX = res$pmReduced[[gn]]$SEX
 
         relabel(prof, new = unname(nms[gn]))
       })
