@@ -1,3 +1,13 @@
+# diviana 0.5.1
+
+## Imports
+
+* Improved handling of disconnected reference pedigrees in Familias `.fam` files. The import window also shows more informative warnings for families requiring manual inspection.
+
+## PM data
+
+* Completed the "Merge PM" module, with support for dropout, drop-in and typing errors, an option to ignore sex, and Excel export.
+
 # diviana 0.5.0
 
 ## Imports
