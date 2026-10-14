@@ -168,11 +168,11 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
                              length(unique.default(unlist(check, use.names = FALSE))))),
               if(nSexChanged)
                 tags$details(
-                  tags$summary(sprintf("Missing person sex changed (%d)", nSexChanged)),
+                  tags$summary(sprintf("Changed sex of missing person (%d)", nSexChanged)),
                   div(class = "small ms-3", toString(check$mpSexChanged))),
               if(nRepair)
                 tags$details(
-                  tags$summary(sprintf("Child or fallback repair (%d)", nRepair)),
+                  tags$summary(sprintf("Repaired disconnected family (%d)", nRepair)),
                   div(class = "small ms-3", toString(check$nonSpouseRepair)))
               )
         )
