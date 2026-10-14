@@ -153,17 +153,29 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       info[1] = "<b>Contents of DVI dataset</b>"
       s = paste(info, collapse = "\n")
       s = HTML(gsub("\n ", "\n &bull; ", s))
-      check = attr(raw, "reconnectedAM")
+      check = attr(raw, "inspectAM")
+
+      nSexChanged = length(check$mpSexChanged)
+      nRepair = length(check$nonSpouseRepair)
 
       tagList(
         div(s, style = paste(
           "white-space: pre-wrap; color: RoyalBlue; line-height: 1.2em; padding: 5px;",
           "margin: 5px 0; background-color: #f9f9f9; border: 1px solid #ccc;")),
-        if(length(check))
+        if(any(lengths(check)))
           div(class = "alert alert-warning py-2 mt-2 mb-0",
-            strong("Disconnected families repaired"), br(),
-            "Manual review recommended: ", toString(check))
-      )
+              strong(sprintf("%d families require inspection",
+                             length(unique.default(unlist(check, use.names = FALSE))))),
+              if(nSexChanged)
+                tags$details(
+                  tags$summary(sprintf("Missing person sex changed (%d)", nSexChanged)),
+                  div(class = "small ms-3", toString(check$mpSexChanged))),
+              if(nRepair)
+                tags$details(
+                  tags$summary(sprintf("Child or fallback repair (%d)", nRepair)),
+                  div(class = "small ms-3", toString(check$nonSpouseRepair)))
+              )
+        )
     })
 
     observeEvent(input$importWhat, { .debug2("importWhat =", input$importWhat)
@@ -176,10 +188,11 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     })
 
     observeEvent(list(input$file, input$filetype), {
+      mainTable$raw = completeDvi$raw = completeDvi$import = NULL
+      fileError(NULL)
       req(input$file)
       .debug2("import file", input$file$name)
       path = input$file$datapath
-      fileError(NULL)
       rawdvi = rawtable = NULL
       tryCatch(switch(input$filetype,
         fam   = { rawdvi = dvir::familias2dvir(path, missingFormat = "M[FAM]-[IDX]", verbose = FALSE)},
@@ -187,7 +200,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         gm    = { rawtable = readGenemapper(path)},
         txt   = { rawtable = readGenoFromTxt(path)},
       ),
-      warning = function(e) print(conditionMessage(e)), #showErr, TODO!
+      #warning = function(e) OK without?
       error = function(e) {
         msg = gsub(path, input$file$name, conditionMessage(e), fixed = TRUE)
         fileError(msg)
