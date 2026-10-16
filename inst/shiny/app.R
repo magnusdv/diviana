@@ -289,8 +289,8 @@ server = function(input, output, session) {
   aliasAM = reactive({g = dataServerAM$main(); .setnames(g$Alias, rownames(g))})
   aliasPM = reactive({g = dataServerPM$main(); .setnames(g$Alias, rownames(g))})
 
-  alleleMatAM = reactive(splitCols(genoAM()))
-  alleleMatPM = reactive(splitCols(genoPM()))
+  alleleMatAM = reactive(splitGenotypes(genoAM()))
+  alleleMatPM = reactive(splitGenotypes(genoPM()))
 
   # React to ID edits ---------------------------------------------------------------------------
 
