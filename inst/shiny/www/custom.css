@@ -41,6 +41,31 @@
   padding:0px 5px; font-size:95%
 }
 
+
+/* Pedigree inspection controls */
+.ped-review { gap: 6px; align-items: center; margin: -5px 0; }
+.ped-review .btn, .ped-review select {
+  height: 30px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  box-sizing: border-box;
+}
+.ped-review .btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  gap: 4px;
+}
+.ped-review select {
+  width: 120px;
+  padding: 4px 24px 4px 8px;
+  background-color: #ffbf47;
+  border-color: #d99800;
+  color: #523400;
+}
+.ped-review option { background-color: #fff3cd; color: #523400; }
+
 #markersummary table.dataTable th,
 #markersummary table.dataTable td {padding-bottom: 2px; padding-top: 2px}
 

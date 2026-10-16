@@ -107,7 +107,7 @@ ui = bs4Dash::bs4DashPage(
         column(
           width = 5, id = "pedcol",
           bs4Card(width = NULL, collapsible = FALSE,
-            title = cardNavigation("pedcard", "Pedigrees"),
+            title = cardNavigation("pedcard", "Pedigrees", uiOutput("reviewControl")),
             plotOutput("pedplot", width = "auto", height = "auto"),
             footer = div(class = "aligned-row-wide",
               div(class = "btn-group",
@@ -262,6 +262,7 @@ server = function(input, output, session) {
   # Main reactive variables -------------------------------------------------
 
   pedigrees = reactiveVal(NULL)
+  pedIssues = reactiveVal(character())
   DB = reactiveVal(NULL) # list of freq vectors
   mainMissing = reactiveVal(NULL)
 
@@ -272,7 +273,8 @@ server = function(input, output, session) {
   assignedRefs = reactiveVal(NULL)
   externalLoci = reactiveValues(db = NULL, mut = NULL, hasMut = FALSE) # `mut` becomes named list
 
-  dataServerAM = dataServer("AM", externalAM, assignedRefs, missingIDs = mainMissing, .debug = .debug)
+  dataServerAM = dataServer("AM", externalAM, assignedRefs, missingIDs = mainMissing,
+                            existingFams = reactive(names(pedigrees())), .debug = .debug)
   dataServerPM = dataServer("PM", externalPM, missingIDs = mainMissing, .debug = .debug)
 
   genoAM = reactive({ .debug("genoAM", dataServerAM$main())
@@ -372,6 +374,7 @@ server = function(input, output, session) {
   loadDvi = function(dvi) { .debug("loadDvi")
     dat = normalizeLoadedDvi(dvi)
     loading(TRUE)
+    pedIssues(pedIssueReasons(attr(dvi, "inspectAM")))
 
     appData(dat)
     pedigrees(dat$peds)
@@ -704,10 +707,69 @@ server = function(input, output, session) {
 
   # Pedigrees -----------------------------------------------------------
 
+  observeEvent(dataServerAM$constructedAM(), {
+    z = req(dataServerAM$constructedAM())
+    b = z$result
+    peds = lapply(seq_along(b$am), function(i) {
+      p = b$am[[i]]
+      if(!is.ped(p))
+        p = p[[which(vapply(p, \(q) b$missing[i] %in% q$ID, logical(1)))[1]]]
+      list(ped = p, famid = names(b$am)[i], miss = b$missing[i],
+           refs = intersect(p$ID, rownames(b$geno)), refOrigName = character())
+    })
+    names(peds) = names(b$am)
+    pedigrees(if(z$action == "add") c(pedigrees(), peds) else peds)
+    issues = pedIssueReasons(b$issues)
+    pedIssues(if(z$action == "add") c(pedIssues(), issues) else issues)
+  })
+
   pedFromModule = reactiveVal()
   isNewPed = reactiveVal(FALSE)
   nPed = reactive(length(pedigrees()))
   curPed = cardCounter("pedcard", nPed)
+
+  # Flagged pedigrees can be opened and approved from the card header
+    output$reviewControl = renderUI({
+    issues = pedIssues()
+    issues = issues[intersect(names(pedigrees()), names(issues))]
+    if(!length(issues)) return(NULL)
+
+    current = if(curPed() > 0) names(pedigrees())[curPed()] else ""
+    choices = setNames(names(issues), sprintf("%s (%s)", names(issues), issues))
+
+    div(class = "aligned-row ped-review",
+        actionButton("approveAll", " OK all", icon = icon("check-double"),
+                     class = "btn-sm", title = "Approve all flagged pedigrees"),
+        tags$select(id = "issueFamily", class = "custom-select",
+                    tags$option(sprintf("Inspect (%d)", length(issues)), value = "",
+                                selected = "selected", disabled = "disabled", hidden = "hidden"),
+                    lapply(seq_along(choices), \(i)
+                      tags$option(names(choices)[i], value = unname(choices[i])))),
+        actionButton("approveOne", " OK", icon = icon("check"), class = "btn-sm",
+                     title = "Approve current pedigree",
+                     disabled = if(current %in% names(issues)) NULL else "disabled"))
+  })
+
+  observeEvent(input$issueFamily, {
+    i = match(req(input$issueFamily), names(pedigrees()))
+    if(!is.na(i)) curPed(i)
+    updateSelectInput(session, "issueFamily", selected = "")
+  })
+
+  observeEvent(input$approveOne, {
+    pednms = names(pedigrees())
+    pedIss = pedIssues()
+    flagged = intersect(pednms, names(pedIss))
+    i = match(pednms[curPed()], flagged)
+    req(!is.na(i))
+
+    # Approve current family and open the next flagged family
+    pedIssues(pedIss[names(pedIss) != flagged[i]])
+    if(length(flagged) > 1L)
+      curPed(match(flagged[i %% length(flagged) + 1L], pednms))
+  })
+
+  observeEvent(input$approveAll, pedIssues(character()))
 
   # Clicking a family name in AM table opens its plot
   observeEvent(dataServerAM$famClick(), {
@@ -772,6 +834,7 @@ server = function(input, output, session) {
     }
 
     peds = pedigrees()
+    pedIssues(pedIssues()[names(pedIssues()) != names(peds)[curped]])
     peds[[curped]] = NULL
     pedigrees(peds)
   })
@@ -785,6 +848,11 @@ server = function(input, output, session) {
     }
     else {
       idx = curPed()
+      if(names(peds)[idx] != newdat$famid && names(peds)[idx] %in% names(pedIssues())) {
+        issues = pedIssues()
+        names(issues)[names(issues) == names(peds)[idx]] = newdat$famid
+        pedIssues(issues)
+      }
       peds[[idx]] = newdat
       names(peds)[idx] = newdat$famid
     }
@@ -1161,13 +1229,14 @@ server = function(input, output, session) {
     session$sendCustomMessage("clearOutputs", c(
       "amcentric", "pmcentric", "lrmatrix", "exmatrix", "jointtabs", "solvelog",
       "solutionplot", "pedplot", "dvisummary", "AM-mainTableUI", "PM-mainTableUI",
-      "AM-sourcefield", "PM-sourcefield")
+      "AM-sourcefield", "PM-sourcefield", "reviewControl")
     )
     externalAM("reset")
     externalPM("reset")
     externalLoci$db = externalLoci$mut = NULL
     externalLoci$hasMut = FALSE
     pedigrees(NULL)
+    pedIssues(character())
     mainMissing(NULL)
     DB(NULL)
     isolate(updateSelectInput(session, "example", selected = ""))

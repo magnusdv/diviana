@@ -1,3 +1,21 @@
+# Convert import issues to reasons indexed by family
+pedIssueReasons = function(x) {
+  if(!length(x)) return(character())
+  cause = names(x)
+  cause[cause == "mpSexChanged"] = "check sexes"
+  cause[cause == "nonSpouseRepair"] = "repaired disconnected family"
+  y = split(rep(tolower(cause), lengths(x)), unlist(x, use.names = FALSE))
+  vapply(y, function(z) paste(unique.default(z), collapse = "; "), "")
+}
+
+pedIssueSummary = function(x) {
+  n = length(pedIssueReasons(x))
+  if(!n) return(NULL)
+  div(class = "alert alert-warning py-2 mt-2 mb-0",
+      style = "background:#fff3cd;border-color:#ffe69c;color:#664d03",
+      sprintf("%d %s manual inspection after saving", n,
+              if(n == 1L) "pedigree needs" else "pedigrees need"))
+}
 
 dataUI = function(id, title = paste(id, "data")) {
   ns = NS(id)
@@ -15,7 +33,7 @@ dataUI = function(id, title = paste(id, "data")) {
 }
 
 dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = reactiveVal(),
-                      missingIDs = reactiveVal(), .debug = NULL) {
+                      missingIDs = reactiveVal(), existingFams = reactive(character()), .debug = NULL) {
 
   .debug2 = if(is.null(.debug)) function(...) NULL else function(...)
     .debug(sprintf("-%s data:", id), ...)
@@ -27,6 +45,8 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     mainTable = reactiveValues(raw = NULL, main = NULL)
     completeDvi = reactiveValues(raw = NULL, import = NULL)
     sources = reactiveValues(current = NULL, all = NULL)
+    builtAM = reactiveVal(NULL)
+    importedAM = reactiveVal(NULL)
 
     # AM table: Clicking first column opens pedigree
     famClick = reactive({
@@ -41,6 +61,8 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       if(identical(ext, "reset")) {
         mainTable$main = mainTable$raw = completeDvi$raw = completeDvi$import = NULL
         sources$all = sources$current = NULL
+        builtAM(NULL)
+        importedAM(NULL)
         isolate(externalData(NULL)) # TODO
         return()
       }
@@ -57,6 +79,8 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     observeEvent(input$importButton, { .debug2("open import UI")
       # Reset each time (but not main table)
       mainTable$raw = completeDvi$raw = completeDvi$import = NULL
+      builtAM(NULL)
+      importedAM(NULL)
       fileError(NULL)
 
       showModal(modalDialog(
@@ -97,6 +121,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
 
     observeEvent(input$filetype, { .debug2("filetype =", input$filetype)
       mainTable$raw = completeDvi$raw = NULL
+      builtAM(NULL)
       fileError(NULL)
       filetypeSaved(input$filetype)
 
@@ -132,19 +157,28 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     output$tableContent = renderUI({ .debug2("update raw table")
       req(mainTable$raw)
       tagList(
-        em("Note: If you only want to import certain samples, select them before clicking Save.",
-           style = "color: tomato;"),
         DT::DTOutput(ns("previewTable")),
-        if(input$filetype == "gm") {
+        em("To import only certain samples, select them before clicking Save.",
+           style = "color: gray;"),
+        if(identical(input$filetype, "gm"))
           div(style = "margin:5px 0;",
               checkboxInput(ns("includeHidden"), width = "100%",
-                            "Include blanks, controls and ladder samples"))
-        },
+                            "Include blanks, controls and ladder samples")),
         div(class = "aligned-row-wide", style = "margin-top: 5px",
             p("Exclude columns:",
               style = "white-space: nowrap; font-weight: bolder; margin:0; padding-right:10px"),
             selectizeInput(ns("excludeCols"), NULL, width = "100%",
-                           choices = character(), multiple = TRUE)))
+                           choices = character(), multiple = TRUE)),
+        if(id == "AM" && !is.null(builtAM()))
+          div(style = "margin-top:12px",
+              checkboxInput(ns("createAM"), strong("Create pedigrees automatically"), TRUE)),
+        if(id == "AM") uiOutput(ns("buildIssues"))
+      )
+    })
+
+    output$buildIssues = renderUI({
+      req(isTRUE(input$createAM))
+      pedIssueSummary(selectedAM()$issues)
     })
 
     output$dviInfo = renderUI({ .debug2("render dvi info")
@@ -153,29 +187,12 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       info[1] = "<b>Contents of DVI dataset</b>"
       s = paste(info, collapse = "\n")
       s = HTML(gsub("\n ", "\n &bull; ", s))
-      check = attr(raw, "inspectAM")
-
-      nSexChanged = length(check$mpSexChanged)
-      nRepair = length(check$nonSpouseRepair)
-
       tagList(
         div(s, style = paste(
           "white-space: pre-wrap; color: RoyalBlue; line-height: 1.2em; padding: 5px;",
           "margin: 5px 0; background-color: #f9f9f9; border: 1px solid #ccc;")),
-        if(any(lengths(check)))
-          div(class = "alert alert-warning py-2 mt-2 mb-0",
-              strong(sprintf("%d families require inspection",
-                             length(unique.default(unlist(check, use.names = FALSE))))),
-              if(nSexChanged)
-                tags$details(
-                  tags$summary(sprintf("Changed sex of missing person (%d)", nSexChanged)),
-                  div(class = "small ms-3", toString(check$mpSexChanged))),
-              if(nRepair)
-                tags$details(
-                  tags$summary(sprintf("Repaired disconnected family (%d)", nRepair)),
-                  div(class = "small ms-3", toString(check$nonSpouseRepair)))
-              )
-        )
+        if(input$importWhat == "everything")
+          pedIssueSummary(attr(raw, "inspectAM")))
     })
 
     observeEvent(input$importWhat, { .debug2("importWhat =", input$importWhat)
@@ -187,8 +204,9 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         mainTable$raw = NULL
     })
 
-    observeEvent(list(input$file, input$filetype), {
+    observeEvent(input$file, {
       mainTable$raw = completeDvi$raw = completeDvi$import = NULL
+      builtAM(NULL)
       fileError(NULL)
       req(input$file)
       .debug2("import file", input$file$name)
@@ -198,9 +216,18 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         fam   = { rawdvi = dvir::familias2dvir(path, missingFormat = "M[FAM]-[IDX]", verbose = FALSE)},
         rdata = { rawdvi = readRdvi(path, name = input$file$name)},
         gm    = { rawtable = readGenemapper(path)},
-        txt   = { rawtable = readGenoFromTxt(path)},
+        txt = {
+          hdr = names(read.delim(path, nrows = 0, check.names = FALSE))
+          if(id == "AM" && length(hdr) >= 3L &&
+             startsWith(tolower(hdr[1]), "family") &&
+             tolower(hdr[2]) %in% c("relationship", "kinship")) {
+            x = read.delim(path, check.names = FALSE, colClasses = "character")
+            b = dvir::buildAM(x, mpFormat = "family")
+            builtAM(list(source = x, result = b))
+            rawtable = b$geno
+          } else rawtable = readGenoFromTxt(path)
+        }
       ),
-      #warning = function(e) OK without?
       error = function(e) {
         msg = gsub(path, input$file$name, conditionMessage(e), fixed = TRUE)
         fileError(msg)
@@ -230,13 +257,21 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     # Genemapper: Remove blanks, controls and ladder samples
     dfFiltered = reactive({ .debug2("import filter genemapper/text blanks")
       df = req(mainTable$raw)
-      if(input$filetype == "gm" && !input$includeHidden) {
+      if(identical(input$filetype, "gm") && !isTRUE(input$includeHidden)) {
         blanks = rowSums(df != "/", na.rm = TRUE) == 0
         controls = grepl("C[+-]", rownames(df))
         ladder = grepl("Ladder", rownames(df))
         df = df[!(blanks | controls | ladder), , drop = FALSE]
       }
       df
+    })
+
+    # Build pedigrees from selected rows only
+    selectedAM = reactive({
+      b = req(builtAM())
+      sel = input$previewTable_rows_selected
+      if(length(sel)) dvir::buildAM(b$source[sort(sel), , drop = FALSE], mpFormat = "family")
+      else b$result
     })
 
     output$previewTable = DT::renderDT(previewGenoDT(dfFiltered()))
@@ -253,10 +288,24 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         removeModal()
         return()
       }
+      req(mainTable$raw)
       # If not complete DVI
+      create = id == "AM" && !is.null(builtAM()) && isTRUE(input$createAM)
       df = standardiseGenoData(dfFiltered(), flavour = id,
                                selectRows = input$previewTable_rows_selected,
                                excludeCols = input$excludeCols)
+      if(create) {
+        b = selectedAM()
+        if(input$action == "add") {
+          dup = c(intersect(names(b$am), existingFams()),
+                  intersect(rownames(b$geno), rownames(mainTable$main)),
+                  intersect(b$missing, missingIDs()))
+          if(length(dup)) {
+            fileError(paste("Existing family or individual IDs:", toString(unique(dup))))
+            return()
+          }
+        }
+      }
       if(input$action == "replace") {
         mainTable$main = df
         sources$all = sources$current
@@ -268,6 +317,8 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         mainTable$main = rbindSafe(mainTable$main, df)
         sources$all = unique.default(c(sources$all, sources$current))
       }
+      if(create)
+        importedAM(list(result = b, action = input$action))
       removeModal()
     })
 
@@ -499,7 +550,8 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
          merge = reactive(input$mergeButton),
          sources = reactive(sources$all),
          sourceValues = sources,
-         famClick = famClick)
+         famClick = famClick,
+         constructedAM = reactive(importedAM()))
   })
 
 }
