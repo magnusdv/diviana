@@ -47,6 +47,9 @@ readGenoFromTxt = function(file) {
   x = read.table(file, header = TRUE, sep = "\t", colClasses = "character",
                  check.names = FALSE, row.names = NULL, strip.white = TRUE)
 
+  # Remove columns with no name (typically at the end)
+  x = x[, names(x) != ""]
+
   # Convert sample ID columns to row names
   trycols = list()
   for(a in c("Family", "Sample|^ID", "Relationship", "Kinship")) {
