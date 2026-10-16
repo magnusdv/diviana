@@ -4,6 +4,8 @@
 
 * Improved handling of disconnected reference pedigrees in Familias `.fam` files. The import window also shows more informative warnings for families requiring manual inspection.
 
+* Added support for automatic pedigree creation based on 'Relationship' tags in AM text input files.
+
 ## PM data
 
 * Completed the "Merge PM" module, with support for dropout, drop-in and typing errors, an option to ignore sex, and Excel export.
