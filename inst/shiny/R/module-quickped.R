@@ -86,6 +86,81 @@ pedigreeUI = function(id, famid = "F1") {
   )
 }
 
+# Dialog for renaming families and missing persons
+relabelPedigreesDialog = function(opt) {
+  modalDialog(
+    title = "Relabel pedigrees",
+    fluidRow(
+      column(6,
+        radioButtons("relabelFamilies", "Family names",
+                     choices = c("Keep existing" = "keep", "Name after missing person" = "mp",
+                                 "Sequential (1, 2, ...) with prefix" = "prefix"),
+                     selected = opt$families),
+        conditionalPanel("input.relabelFamilies == 'prefix'",
+                         textInput("relabelPrefix", NULL, opt$prefix, width = "120px"))),
+      column(6,
+        radioButtons("relabelMissing", "Missing persons",
+                     choiceNames = list("Keep existing", "M1, M2, ...",
+                                        "M1-1, M1-2, M2-1, ...",
+                                        tagList("Custom format ",
+                                          conditionalPanel("input.relabelMissing == 'custom'",
+                                            tags$details(style = "display:inline-block;position:relative",
+                                              tags$summary(style = "cursor:pointer;list-style:none",
+                                                           icon("question-circle")),
+                                              div(class = "bg-white border rounded shadow-sm p-2",
+                                                  style = "position:absolute;left:0;z-index:1050;white-space:nowrap",
+                                                  tags$div("[FIDX]: Family index"),
+                                                  tags$div("[FNAME]: Family name"),
+                                                  tags$div("[MIDX]: Global missing index"),
+                                                  tags$div("[MIDX_FAM]: Within-family index"))),
+                                            style = "display:inline-block"))),
+                     choiceValues = c("keep", "M[MIDX]", "M[FIDX]-[MIDX_FAM]", "custom"),
+                     selected = opt$missing),
+        conditionalPanel("input.relabelMissing == 'custom'",
+                         textInput("relabelFormat", NULL, opt$format)))
+    ),
+    br(),
+    uiOutput("relabelPreview"),
+    footer = div(class = "aligned-row", style = "justify-content:flex-end;gap:12px;width:100%",
+                 modalButton("Cancel"), actionButton("applyRelabel", "Apply")),
+    easyClose = TRUE, size = "m"
+  )
+}
+
+# Show at most ten labels from the first three families
+relabelPreviewTable = function(old, new) {
+  rows = lapply(seq_len(min(3L, length(old$am))), function(i) {
+    a = intersect(old$missing, old$am[[i]]$ID)
+    b = intersect(new$missing, new$am[[i]]$ID)
+    if(!length(a)) a = b = ""
+    lapply(seq_along(a), function(j)
+      tags$tr(tags$td(if(j == 1L) names(old$am)[i]), tags$td(a[j]),
+              tags$td(if(j == 1L) names(new$am)[i]), tags$td(b[j])))
+  })
+  div(class = "table-responsive",
+    tags$table(class = "table table-sm table-striped mb-0",
+      tags$thead(
+        tags$tr(tags$th(tags$em("Old"), colspan = 2, class = "text-center border-0"),
+                tags$th(tags$em("New"), colspan = 2, class = "text-center border-0")),
+        tags$tr(lapply(rep(c("Family", "Missing"), 2), tags$th))),
+      tags$tbody(head(do.call(c, rows), 10L)))
+  )
+}
+
+# Confirm changes before relabelling
+relabelConfirmDialog = function() {
+  confirm = modalDialog(
+    "Apply the new family and missing-person labels?",
+    footer = div(class = "aligned-row", style = "justify-content:center;gap:10px;width:100%",
+                 actionButton("relabelBack", "No, go back"),
+                 actionButton("confirmRelabel", "Yes, apply", status = "primary"))
+  )
+  confirm$children[[1]]$attribs$class = paste(
+    confirm$children[[1]]$attribs$class, "modal-dialog-centered")
+  confirm$children[[1]]$attribs$style = "max-width:420px; top:-15vh;"
+  confirm
+}
+
 pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
                           allrefs = NULL, refsex = NULL, avoidLabs = NULL, currentModal = NULL,
                           .debug = NULL) {

@@ -115,6 +115,7 @@ ui = bs4Dash::bs4DashPage(
                 actionButton("editped", label = tagList(icon("edit"), "Edit")) |> wrap_tooltip("editped"),
                 actionButton("delped", label = tagList(icon("trash-can"), "Delete") ) |> wrap_tooltip("delped")
               ),
+              actionButton("relabelPeds", tagList(icon("tags"), "Relabel")),
               actionBttn("plotdviButton", "Overview", style = "jelly", size = "s", color = "success") |>
                 wrap_tooltip("dviplot")
             )
@@ -735,6 +736,8 @@ server = function(input, output, session) {
   isNewPed = reactiveVal(FALSE)
   nPed = reactive(length(pedigrees()))
   curPed = cardCounter("pedcard", nPed)
+  relabelOptions = reactiveVal(list(families = "keep", prefix = "F", missing = "keep",
+                                    format = "[FNAME]_M[MIDX_FAM]"))
 
   # Flagged pedigrees can be opened and approved from the card header
     output$reviewControl = renderUI({
@@ -867,6 +870,67 @@ server = function(input, output, session) {
     pedigrees(peds)
     curPed(idx)
     isolate(updateSelectInput(session, "example", selected = ""))
+  })
+
+  # Relabel family names and missing persons without changing other data
+  observeEvent(input$relabelPeds, {
+    req(nPed() > 0)
+    showModal(relabelPedigreesDialog(relabelOptions()))
+  })
+
+  relabeled = reactive({
+    req(input$relabelFamilies, input$relabelMissing)
+    fmt = input$relabelMissing
+    if(fmt == "keep") fmt = NULL
+    else if(fmt == "custom") fmt = input$relabelFormat
+    families = if(input$relabelFamilies == "mp")
+      vapply(pedigrees(), function(p) if(length(p$miss)) p$miss[1] else p$famid, "")
+    dvir::relabelDVI(req(currentDviData()), families = families,
+                     familyPrefix = if(input$relabelFamilies == "prefix") input$relabelPrefix,
+                     missingFormat = fmt)
+  })
+
+  output$relabelPreview = renderUI({
+    tryCatch(relabelPreviewTable(req(currentDviData()), relabeled()),
+             error = function(e) span(class = "text-danger", conditionMessage(e)))
+  })
+
+  pendingRelabel = reactiveVal()
+  observeEvent(input$applyRelabel, {
+    tryCatch({
+      pendingRelabel(list(dvi = relabeled(),
+                          opt = list(families = input$relabelFamilies, prefix = input$relabelPrefix,
+                                     missing = input$relabelMissing, format = input$relabelFormat)))
+      showModal(relabelConfirmDialog())
+    }, error = showErr)
+  })
+
+  observeEvent(input$relabelBack,
+               showModal(relabelPedigreesDialog(req(pendingRelabel())$opt)))
+
+  observeEvent(input$confirmRelabel, {
+    tryCatch({
+      z = req(pendingRelabel())
+      dvi = z$dvi
+      old = names(pedigrees())
+      peds = Map(function(dat, ped, fam) {
+        dat$ped = ped
+        dat$famid = fam
+        dat$miss = intersect(dvi$missing, ped$ID)
+        dat
+      }, pedigrees(), dvi$am, names(dvi$am))
+      names(peds) = names(dvi$am)
+
+      issues = pedIssues()
+      names(issues) = names(peds)[match(names(issues), old)]
+      pedIssues(issues)
+      mainMissing(dvi$missing)
+      pedigrees(peds)
+      relabelOptions(z$opt)
+      pendingRelabel(NULL)
+      removeModal()
+      isolate(updateSelectInput(session, "example", selected = ""))
+    }, error = showErr)
   })
 
   output$pedplot = renderPlot({ .debug("plot current pedigree:", curPed());
