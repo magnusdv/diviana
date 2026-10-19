@@ -560,7 +560,15 @@ server = function(input, output, session) {
     peddata = pedigrees()
     loci = locusAttrs()
 
-    if(is.null(a) || !length(peddata) || !length(loci))
+    if(!length(peddata))
+      return(NULL)
+
+    # Retain untyped pedigrees when all AM samples are deleted
+    if(is.null(a))
+      return(tryCatch(setMarkers(lapply(peddata, `[[`, "ped"),
+                                 locusAttributes = loci), error = showErr))
+
+    if(!length(loci))
       return(NULL)
 
     idx = match(normaliseName(markersAM()), normaliseName(names(loci)), nomatch = 0L)
@@ -937,7 +945,7 @@ server = function(input, output, session) {
   })
 
   plotdims = reactive({ .debug("plot dims")
-    dvi = currentDviData()
+    dvi = req(currentDviData())
     k = sum(pedsize(dvi$am))
     dims = dvir:::findPlotDims(dvi$am, npm = length(dvi$pm))
     amdims = dims$amSize

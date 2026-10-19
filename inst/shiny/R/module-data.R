@@ -311,9 +311,10 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         sources$all = sources$current
       }
       else {
-        # Generate aliases for added samples (V1, V2, ... or R1, R2, ...)
-        df$Alias = paste0(switch(id, PM = "V", AM = "R"),
-                          NROW(mainTable$main) + seq_len(nrow(df)))
+        # Generate unused aliases for added samples
+        prefix = switch(id, PM = "V", AM = "R")
+        candidates = paste0(prefix, seq_len(NROW(mainTable$main) + nrow(df)))
+        df$Alias = head(setdiff(candidates, mainTable$main$Alias), nrow(df))
         mainTable$main = rbindSafe(mainTable$main, df)
         sources$all = unique.default(c(sources$all, sources$current))
       }
@@ -346,19 +347,64 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     editdata = reactiveVal(NULL)
     idEdits = reactiveVal(NULL)
 
+    showEdit = function() showModal(modalDialog(
+      title = "Edit mode", size = "l",
+      p("Double-click cells to edit, or select rows to delete samples. Press 'Save' to confirm changes."),
+      DT::DTOutput(ns("editTable"), height = "320px"),
+      footer = div(class = "aligned-row-wide",
+                   actionLink(ns("editDelete"), NULL, icon = icon("trash-can", class = "fa-lg"),
+                              title = "Delete selected samples", style = "color:inherit"),
+                   div(modalButton("Cancel"),
+                       actionButton(ns("editSave"), "Save", status = "success")))
+    ))
+
     observeEvent(input$editButton, { .debug2("open edit UI")
       editdata(req(mainTable$main))
-      showModal(modalDialog(
-        title = "Edit mode", size = "l",
-        p("Edit the table by double clicking on the cells. Press 'Save' to confirm changes."),
-        DT::DTOutput(ns("editTable"), height = "320px"),
-        footer = tagList(modalButton("Cancel"),
-                         actionButton(ns("editSave"), "Save", status = "success"))
-      ))
+      showEdit()
     })
 
     output$editTable = DT::renderDT({ .debug2("render edit table")
       genoDT(editdata(), mode = "edit", flavour = id, scrollY = "300px")
+    })
+
+    deleteRows = reactiveVal(integer())
+    observeEvent(input$editDelete, {
+      rows = input$editTable_rows_selected
+      req(length(rows))
+      dat = editdata()
+
+      # Keep references that belong to an AM pedigree
+      if(id == "AM") {
+        old = mainTable$main
+        refs = old$Sample[match(dat$.rowid[rows], old$.rowid)]
+        assigned = intersect(refs, names(assignedRefs()))
+        if(length(assigned)) {
+          showErr("Cannot delete references assigned to pedigrees: ", toString(assigned))
+          return()
+        }
+      }
+      deleteRows(dat$.rowid[rows])
+      confirm = modalDialog(
+        sprintf("Delete %d selected %s?", length(rows),
+                if(length(rows) == 1L) "sample" else "samples"),
+        tags$ul(style = "margin:0;padding-left:20px;max-height:250px;overflow-y:auto",
+                lapply(dat$Sample[rows], tags$li)),
+        footer = div(style = "display:flex; justify-content:center; gap:8px; width:100%;",
+                     actionButton(ns("editDeleteBack"), "No, go back"),
+                     actionButton(ns("editDeleteConfirm"), "Yes, delete", status = "danger"))
+      )
+      confirm$children[[1]]$attribs$class = paste(
+        confirm$children[[1]]$attribs$class, "modal-dialog-centered")
+      confirm$children[[1]]$attribs$style = "max-width:420px; top:-15vh;"
+      showModal(confirm)
+    })
+
+    observeEvent(input$editDeleteBack, showEdit())
+    observeEvent(input$editDeleteConfirm, {
+      dat = editdata()
+      editdata(dat[!dat$.rowid %in% deleteRows(), , drop = FALSE])
+      deleteRows(integer())
+      saveEdit()
     })
 
     # Preserve manually entered aliases
@@ -401,16 +447,13 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       editdata(dat)
     })
 
-    observeEvent(input$editSave, {  .debug2("edit save")
-      old = mainTable$main
+    saveEdit = function() { .debug2("edit save")
       new = editdata()
-
-      old = old[order(old$.rowid), , drop = FALSE]
-      new = new[order(new$.rowid), , drop = FALSE]
+      old = mainTable$main
+      old = old[match(new$.rowid, old$.rowid), , drop = FALSE]
 
       idch = old$Sample != new$Sample
       sexch = old$Sex != new$Sex
-      rows = which(idch | sexch)
 
       sex012 = match(new$Sex, c("M", "F"), nomatch = 0L)
 
@@ -420,10 +463,11 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       changes = if(length(ids) || length(sex)) list(ids = ids, sex = sex) else NULL
 
       rownames(new) = new$Sample
-      mainTable$main = new
+      mainTable$main = if(nrow(new)) new else NULL
       idEdits(changes)
       removeModal()
-    })
+    }
+    observeEvent(input$editSave, saveEdit())
 
     # Alias -------------------------------------------------------------------
 
@@ -596,11 +640,10 @@ formatGenoView = function(dat, mode, flavour = NULL, fam = NULL) {
 
   if(mode == "edit" && "Sex" %in% names(dat)) {
     dat$Sex = sprintf(
-      #"<select class='sex-edit' data-key='%s'><option value='F'%s>Female</option><option value='M'%s>Male</option></select>",
-      #"<select class='sex-edit' data-key='%s'><option value='?'%s>?</option><option value='F'%s>Female</option><option value='M'%s>Male</option></select>",
-      "<select class='sex-edit' data-key='%s'><option value='?'%s disabled>?</option><option value='F'%s>Female</option><option value='M'%s>Male</option></select>",
+      "<select class='sex-edit' data-key='%s'><option value='?'%s%s>?</option><option value='F'%s>Female</option><option value='M'%s>Male</option></select>",
       dat$.rowid,
       ifelse(!dat$Sex %in% c("F", "M"), " selected", ""),
+      if(identical(flavour, "PM")) "" else " disabled",
       ifelse(dat$Sex == "F", " selected", ""),
       ifelse(dat$Sex == "M", " selected", "")
     )
@@ -636,7 +679,7 @@ genoDT = function(dat, mode = c("main", "edit"), flavour = NULL, assigned = NULL
     escape = if(mode == "edit") .mysetdiff(nms, "Sex") else TRUE,
     callback = callback,
     plugins = "natural",
-    selection = "none",
+    selection = if(mode == "edit") "multiple" else "none",
     editable = editopt,
     options = list(
       dom = "t",
