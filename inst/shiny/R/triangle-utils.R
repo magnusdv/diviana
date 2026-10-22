@@ -80,6 +80,28 @@ CPnoplot = function(x, ...) {
 }
 
 
+# AM-PM comparison, allowing overlapping sample IDs
+CPampm = function(am, pm, ids) {
+  oldPM = ids[, 2]
+  pmIDs = labels(pm)
+  amIDs = labels(am)  # Include untyped; getComponent() requires unique IDs
+
+  if(any(pmIDs %in% amIDs)) {
+    newPM = tail(make.unique(c(amIDs, pmIDs), sep = ".PM"), length(pmIDs))
+    pm = relabel(pm, old = pmIDs, new = newPM)
+    ids[, 2] = newPM[match(oldPM, pmIDs)]
+  }
+
+  markers = req(.myintersect(name(am), name(pm)))
+  peds = c(selectMarkers(am, markers), selectMarkers(pm, markers))
+  k = forrel::ibdEstimate(peds, ids = ids, verbose = FALSE)
+
+  # Restore original PM labels; ibdEstimate() preserves pair order
+  k$id2 = oldPM
+  as.data.frame(k)
+}
+
+
 formatCP = function(tab, usealias = FALSE, alias1 = NULL, alias2 = alias1, sortby = NULL) {
 
   if(is.null(tab) || nrow(tab) == 0)

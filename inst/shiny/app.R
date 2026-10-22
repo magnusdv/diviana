@@ -1076,11 +1076,7 @@ server = function(input, output, session) {
     pm = req(mainPM())
     idMatr = pedtools:::fast.grid(list(typedMembers(am), typedMembers(pm))) |> req()
     req(nrow(idMatr) <= 5000)
-
-    commonMarkers = .myintersect(name(am), name(pm)) |> req()
-    allcmps = c(selectMarkers(am, commonMarkers), selectMarkers(pm, commonMarkers))
-    k = forrel::ibdEstimate(allcmps, ids = idMatr, verbose = FALSE)
-    kappa$ampm = as.data.frame(k)
+    kappa$ampm = CPampm(am, pm, idMatr)
   })
 
   output$amTriangle = renderPlotly({ .debug("am triangle")
