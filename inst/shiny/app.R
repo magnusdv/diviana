@@ -948,13 +948,17 @@ server = function(input, output, session) {
     if(settings$useAliases)
       labs = useAlias(labs, aliasAM())
 
+    N = length(ped$ID)
     ngen = generations(ped)
-    i = min(ngen, 4)
-    topmar = c(5, 5, 3, 2)[i]
-    sidemar = c(6, 6, 4, 2)[i]
-    margins = c(topmar - 1, sidemar, topmar, sidemar)
 
-    plot(ped, title = title, hatched = refs, cex = 1.2, cex.main = 1.5,
+    cex = if(N>40) 1 else if(N>30) 1.1 else 1.2
+
+    topmar = c(5, 5, 3, 2)[min(ngen, 4)]
+    botmar = c(4, 4, 2, 1, 0.5)[min(ngen, 5)]
+    sidemar = if(N>40) 0.5 else if(N>30) 1 else if(N>25) 1.5 else c(6, 6, 4, 2)[min(ngen, 4)]
+    margins = c(botmar, sidemar, topmar, sidemar)
+
+    plot(ped, title = title, hatched = refs, cex = cex, cex.main = 1.5,
          margins = margins, labs = labs, foldLabs = 8,
          carrier = miss, col = list("red" = miss), lwd = list("1.2" = miss))
     box("outer", col = 1)
