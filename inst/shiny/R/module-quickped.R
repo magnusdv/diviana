@@ -19,7 +19,7 @@ pedigreeUI = function(id, famid = "F1") {
 
   fluidRow(
     useShinyjs(),
-    column(width = 3,
+    column(width = 3, style = "flex:0 0 175px;max-width:175px",
 
        p("Family label", style = "font-weight:bold; margin-bottom: 0; margin-top:-5px"),
        textInput(ns("famid"), label = NULL, value = famid, width = "100%"),
@@ -73,7 +73,7 @@ pedigreeUI = function(id, famid = "F1") {
     ),
 
     # Pedigree plot
-    column(width = 9,
+    column(width = 9, style = "flex:1;max-width:none;min-width:0",
            plotOutput(ns("plot"), click = ns("ped_click"), dblclick = ns("ped_dblclick"),
                       width = "auto", height = "auto"),
            div(
@@ -185,24 +185,33 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
                               refs = initialDat$refs,
                               refOrigName = initialDat$refOrigName)
 
+    largeMode = reactive(isTRUE(input$builderLarge))
+
     previousStack = reactiveVal(list(initialDat))
 
     plotdat = reactiveValues(alignment = NULL, scaling = NULL, annotation = NULL)
     sel = reactiveVal(character(0))
+
+    # Modal width follows the size selector
+    output$modalWidth = renderUI({
+      tags$style(HTML(sprintf("
+        @media (min-width: 576px) {
+          .pedmodal > .modal-dialog { max-width: %dpx !important; }
+        }", if(largeMode()) 1000 else 600)))
+    })
 
     # Modal creation and invocation
     showModal({
       mod = modalDialog(
         title = div(class = "aligned-row-wide", "Pedigree builder",
                     helpBtn("help-ped") |> wrap_tooltip("pedhelp", "left")),
-        tags$head(tags$style(HTML("
-          @media (min-width: 576px) {
-            .pedmodal > .modal-dialog { max-width: 600px !important; }
-          }"))),
+        uiOutput(ns("modalWidth")),
         pedigreeUI(id, famid),
-        footer = tagList(
-          actionButton(ns("cancel"), "Cancel"),
-          actionButton(ns("save"), "Save")
+        footer = div(class = "aligned-row-wide",
+          prettySwitch(ns("builderLarge"), "Large window", slim = TRUE, status = "primary"),
+          div(class = "aligned-row", style = "gap:8px",
+              actionButton(ns("cancel"), "Cancel"),
+              actionButton(ns("save"), "Save"))
         )
       ) |>
         tagAppendAttributes(class = "pedmodal")
@@ -456,8 +465,8 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       refs = currData$refs
       labs = if(input$showall) x$ID else c(miss, refs)
       dat = tryCatch(
-        plot(x, title = famid, margins = 2, labs = labs,
-             hatched = refs, cex = 1.2, cex.main = 1.5,
+        plot(x, title = famid, margins = if(largeMode()) 1 else 2, labs = labs,
+             hatched = refs, cex = if(largeMode()) 1 else 1.2, cex.main = 1.5,
              col = list(red = miss, blue = sel()),
              lwd = list(`1.2` = miss, `2` = sel()),
              carrier = miss, foldLabs = 10),
@@ -470,7 +479,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       plotdat$scaling = dat$scaling
       plotdat$annotation = dat$annotation
     },
-    execOnResize = TRUE, res = 72, height = 420, width = 420)
+    execOnResize = TRUE, res = 72, height = 420)
 
     positionDf = reactive({
       align = req(plotdat$alignment)
