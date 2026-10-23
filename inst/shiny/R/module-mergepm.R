@@ -294,20 +294,25 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
     # Display overall or marker-wise LR matrix
     showLRmatrix = function(m, title, back) {
       g = rownames(m)
-      fm = matrix(formatC(m, format = "g", digits = 4), nrow = length(g),
-                  dimnames = dimnames(m))
+      fm = matrix(formatC(m, format = "g", digits = 4), nrow = length(g), dimnames = dimnames(m))
       diag(fm) = "–"
 
-      showModal(modalDialog(
+      dlg = modalDialog(
         title = title,
-        tags$table(
-          class = "table table-sm table-bordered w-auto mx-auto mb-0 text-center",
-          tags$thead(tags$tr(tags$th(""), lapply(g, tags$th))),
-          tags$tbody(lapply(seq_along(g), \(r)
-            tags$tr(tags$th(g[r]), lapply(fm[r, ], tags$td))))
+        div(style = "overflow-x:auto",
+          tags$table(
+            class = "table table-sm table-bordered w-auto mx-auto mb-0 text-center",
+            style = "white-space:nowrap",
+            tags$thead(tags$tr(tags$th(""), lapply(g, tags$th))),
+            tags$tbody(lapply(seq_along(g), \(r)
+              tags$tr(tags$th(g[r]), lapply(fm[r, ], tags$td))))
+          )
         ),
-        footer = actionButton(ns(back), "Back")
-      ))
+        footer = actionButton(ns(back), "Back"),
+        easyClose = TRUE
+      )
+      dlg$children[[1]]$attribs$style = "width:max-content;max-width:calc(100vw - 32px)"
+      showModal(dlg)
     }
 
     markerState = reactiveVal(NULL)
