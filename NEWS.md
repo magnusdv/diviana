@@ -10,6 +10,16 @@
 
 * Completed the "Merge PM" module, with support for dropout, drop-in and typing errors, an option to ignore sex, and Excel export.
 
+## AM data
+
+* Add "Relabel" button for systematically renaming families and missing persons.
+
+## Pedigrees
+
+* Better plots of large pedigrees
+* Added pagination for Overview plot
+
+
 # diviana 0.5.0
 
 ## Imports
