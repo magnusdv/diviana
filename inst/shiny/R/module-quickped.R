@@ -89,39 +89,50 @@ pedigreeUI = function(id, famid = "F1") {
 # Dialog for renaming families and missing persons
 relabelPedigreesDialog = function(opt) {
   modalDialog(
-    title = "Relabel pedigrees",
-    fluidRow(
-      column(6,
-        radioButtons("relabelFamilies", "Family names",
-                     choices = c("Keep existing" = "keep", "Name after missing person" = "mp",
-                                 "Sequential (1, 2, ...) with prefix" = "prefix"),
-                     selected = opt$families),
-        conditionalPanel("input.relabelFamilies == 'prefix'",
-                         textInput("relabelPrefix", NULL, opt$prefix, width = "120px"))),
-      column(6,
-        radioButtons("relabelMissing", "Missing persons",
-                     choiceNames = list("Keep existing", "M1, M2, ...",
-                                        "M1-1, M1-2, M2-1, ...",
-                                        tagList("Custom format ",
-                                          conditionalPanel("input.relabelMissing == 'custom'",
-                                            tags$details(style = "display:inline-block;position:relative",
-                                              tags$summary(style = "cursor:pointer;list-style:none",
-                                                           icon("question-circle")),
-                                              div(class = "bg-white border rounded shadow-sm p-2",
-                                                  style = "position:absolute;left:0;z-index:1050;white-space:nowrap",
-                                                  tags$div("[FIDX]: Family index"),
-                                                  tags$div("[FNAME]: Family name"),
-                                                  tags$div("[MIDX]: Global missing index"),
-                                                  tags$div("[MIDX_FAM]: Within-family index"))),
-                                            style = "display:inline-block"))),
-                     choiceValues = c("keep", "M[MIDX]", "M[FIDX]-[MIDX_FAM]", "custom"),
-                     selected = opt$missing),
-        conditionalPanel("input.relabelMissing == 'custom'",
-                         textInput("relabelFormat", NULL, opt$format)))
+    title = "Relabel families and missing persons",
+    div(class = "p-2",
+      div(class = "d-flex justify-content-between",
+        div(
+          radioButtons("relabelFamilies", "Family names",
+                       choices = c("Keep existing" = "keep",
+                                   "Name after missing person" = "mp",
+                                   "Sequential (1, 2, ...) with prefix" = "prefix"),
+                       selected = opt$families),
+          conditionalPanel("input.relabelFamilies == 'prefix'",
+                           textInput("relabelPrefix", NULL, opt$prefix, width = "120px"))
+        ),
+        div(style = "width:215px",
+          radioButtons("relabelMissing", "Missing persons",
+                       choiceNames = list(
+                         "Keep existing",
+                         "M1, M2, ...",
+                         "M1-1, M1-2, M2-1, ...",
+                         tagList("Custom format ",
+                           tags$details(
+                             style = "display:inline-block;position:relative;margin-left:2px",
+                             tags$summary(icon("question-circle"),
+                               style = "list-style:none;cursor:pointer;display:inline"),
+                             div(class = "bg-white border rounded shadow-sm p-2",
+                                 style = paste0(
+                                   "position:absolute;bottom:calc(100% + 4px);left:0;",
+                                   "width:230px;z-index:1050;line-height:1.2;white-space:nowrap"),
+                                 div("[FIDX]: Family index"),
+                                 div("[FNAME]: Family name"),
+                                 div("[MIDX]: Global missing index"),
+                                 div("[MIDX_FAM]: Within-family index"))
+                           )
+                         )
+                       ),
+                       choiceValues = c("keep", "M[MIDX]", "M[FIDX]-[MIDX_FAM]", "custom"),
+                       selected = opt$missing),
+          conditionalPanel("input.relabelMissing == 'custom'",
+                           textInput("relabelFormat", NULL, opt$format, width = "180px"))
+        )
+      ),
+      uiOutput("relabelPreview")
     ),
-    br(),
-    uiOutput("relabelPreview"),
-    footer = div(class = "aligned-row", style = "justify-content:flex-end;gap:12px;width:100%",
+    footer = div(class = "aligned-row",
+                 style = "justify-content:flex-end;gap:12px;width:100%",
                  modalButton("Cancel"), actionButton("applyRelabel", "Apply")),
     easyClose = TRUE, size = "m"
   )
