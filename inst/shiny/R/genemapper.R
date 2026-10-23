@@ -36,63 +36,50 @@ readGenemapper = function(file, format = NULL) {
   # Genotype matrix
   g = paste(x$A1, x$A2, sep = "/")
   gmat = matrix(g, nrow = length(ids), ncol = length(markers),
-             dimnames = list(ids, markers), byrow = TRUE)
+                dimnames = list(ids, markers), byrow = TRUE)
 
   # Convert to data frame (?)
   as.data.frame(gmat)
 }
 
 
+
 readGenoFromTxt = function(file) {
-  x = read.table(file, header = TRUE, sep = "\t", colClasses = "character",
-                 check.names = FALSE, row.names = NULL, strip.white = TRUE)
+  x = read.delim(file, colClasses = "character", check.names = FALSE,
+                 row.names = NULL, strip.white = TRUE, fill = TRUE)
 
-  # Remove columns with no name (typically at the end)
-  x = x[, names(x) != ""]
+  # Remove unnamed columns
+  x = x[nzchar(names(x))]
+  nm = names(x)
 
-  # Convert sample ID columns to row names
-  trycols = list()
-  for(a in c("Family", "Sample|^ID", "Relationship", "Kinship")) {
-    i = grep(a, names(x), ignore.case = TRUE)
-    trycols[[a]] = if(length(i) > 0) i else 0
-  }
-  trycols = unlist(trycols)
-  if(trycols[2] > 0) {
-    idcols = trycols[trycols > 0]
-  } else {
-    idcols = grep("sample|^id", names(x), ignore.case = TRUE)
-  }
+  # Identify sample ID columns
+  sample = grep("sample|^id", nm, ignore.case = TRUE)
+  idcols = if(length(sample))
+    c(grep("Family", nm, ignore.case = TRUE), sample[1L],
+      grep("Relationship", nm, ignore.case = TRUE),
+      grep("Kinship", nm, ignore.case = TRUE))
+  else 1L
 
-  # If no luck, use first column
-  if(length(idcols) == 0)
-    idcols = 1
+  rownames(x) = do.call(paste, c(lapply(x[idcols], trimws), list(sep = "_")))
+  x = x[-idcols]
 
-  args = lapply(idcols, function(i) trimws(x[[i]]))
-  rownames(x) = do.call(paste, c(args, list(sep = "_")))
-  x = x[, -idcols, drop = FALSE]
+  # Combine paired allele columns
+  nm = names(x)
+  cols = grep("[-_. ][12]$", nm)
+  if(length(cols) > 0L && length(cols) %% 2L == 0L) {
+    odd = seq.int(1L, length(cols), by = 2L)
+    markers = substr(nm[cols], 1L, nchar(nm[cols]) - 2L)
+    if(!identical(markers[odd], markers[odd + 1L]))
+      stop2("Genotypes seem to be split in the wrong order")
 
-  # Check if there are 2 columns per marker
-  splitcols = grep("[-_. ][12]$", names(x))
-  if(length(splitcols) > 0 && length(splitcols) %% 2 == 0) {
-    odd = seq_along(splitcols) %% 2 == 1
-    col1 = splitcols[odd]
-    col2 = splitcols[!odd]
-    nms0 = substr(names(x)[splitcols], 1, nchar(names(x)[splitcols]) - 2)
-    if(!identical(nms0[odd], nms0[!odd]))
-      stop2("Genotypes seems to be split in the wrong order")
-
-    nms = nms0[odd]
-
-    # Merge
-    for(i in seq_along(nms)) {
-      x[[nms[i]]] = paste(x[[col1[i]]], x[[col2[i]]], sep = "/")
-    }
-     # Remove split columns
-    x = x[, -splitcols, drop = FALSE]
+    x[cols] = lapply(x[cols], \(v) replace(v, is.na(v) | v == "", "0"))
+    geno = Map(\(a, b) paste(a, b, sep = "/"),
+               x[cols[odd]], x[cols[odd + 1L]])
+    names(geno) = markers[odd]
+    x[names(geno)] = geno
+    x = x[-cols]
   }
 
-  # Remove cols with all NA
-  x = x[, !apply(is.na(x) | x == "", 2, all), drop = FALSE]
-
-  x
+  # Remove completely empty columns
+  x[vapply(x, \(v) any(!is.na(v) & nzchar(v)), logical(1))]
 }
