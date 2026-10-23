@@ -220,9 +220,9 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
           hdr = names(read.delim(path, nrows = 0, check.names = FALSE))
           if(id == "AM" && length(hdr) >= 3L &&
              startsWith(tolower(hdr[1]), "family") &&
-             tolower(hdr[2]) %in% c("relationship", "kinship")) {
+             tolower(hdr[2]) %in% c("relationship", "kinship", "[relationship]", "[kinship]")) {
             x = read.delim(path, check.names = FALSE, colClasses = "character")
-            b = dvir::buildAM(x, mpFormat = "family")
+            b = dvir::buildAM(x, mpFormat = "M")
             builtAM(list(source = x, result = b))
             rawtable = b$geno
           } else rawtable = readGenoFromTxt(path)
