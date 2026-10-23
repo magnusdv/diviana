@@ -14,8 +14,8 @@ Depends:
 Imports:
     DT,
     bs4Dash,
-    dvir (>= 3.4.3),
-    forrel (>= 1.9.0),
+    dvir (>= 3.4.4),
+    forrel (>= 1.10.0),
     ggplot2,
     gt,
     norSTR,
