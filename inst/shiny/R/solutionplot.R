@@ -1,13 +1,13 @@
 
 # Temporary name waiting for better solution in dvir
 plotSolutionDIVIANA = function(dvi, summary, pednrs = NULL, labs = dvi$missing,
-                               pageSize = 6, nrowAM = NULL, ncolAM = NULL, ...) {
+                               nrowAM = NULL, ncolAM = NULL, ...) {
 
   Nped = length(dvi$am)
   if(is.null(pednrs))
     pednrs = seq_len(Nped)
 
-  pageN = min(Nped, pageSize)
+  pageN = length(pednrs)
 
   if(is.null(nrowAM) && is.null(ncolAM))
     nrowAM = if(pageN > 4) 2 else NA

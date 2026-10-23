@@ -995,40 +995,73 @@ server = function(input, output, session) {
 
   # Overview plot -----------------------------------------------------------
 
+  overviewPages = reactive({
+    if(!nPed()) return(list())
+    pedPages(lapply(pedigrees(), `[[`, "ped"),
+             pageSize = as.integer(input$overviewMax %||% 6L))
+  })
+  overviewPage = cardCounter("overviewcard", reactive(length(overviewPages())))
+  overviewLarge = reactiveVal(FALSE)
+  observeEvent(input$overviewLarge, overviewLarge(isTRUE(input$overviewLarge)))
+
+  # Resize the modal and plot together
+  output$overviewPlotUI = renderUI({
+    large = overviewLarge()
+    tagList(
+      tags$style(HTML(sprintf("#shiny-modal .modal-dialog {max-width:%dpx !important;}",
+                              if(large) 1000 else 700))),
+      plotOutput("plotdvi", height = if(large) "600px" else "450px")
+    )
+  })
+
   observeEvent(input$plotdviButton, { .debug("click Overview button")
-    if(nPed() == 0)
+    if(!nPed()) {
       showErr("No pedigrees to show")
-    req(nPed() > 0)
-    w = if(nPed() > 5) "1000px" else "800px"
+      return()
+    }
+    peds = lapply(pedigrees(), `[[`, "ped")
+    nPages = length(pedPages(peds))
+    npm = length(mainPM())
+    showPM = npm > 0L && npm <= 30L && nPages == 1L
+    overviewLarge(nPages > 1L || sum(pedsize(peds)) > 30L)
+    overviewPage(1)
+
+    pmControl = checkboxInput("overviewPM",
+      if(npm > 30L)
+        span("Show PM", tags$br(), tags$small("(too many)"), style = "line-height:1.1")
+      else "Show PM", value = showPM, width = "auto")
+    if(npm == 0L || npm > 30L)
+      pmControl = div(class = "text-muted", shinyjs::disabled(pmControl))
 
     showModal(modalDialog(
-      title = "DVI overview",
-      tags$style(HTML("
-        #shiny-modal .modal-dialog {width: fit-content; max-width: 95vw; margin: 1.75rem auto;}
-        #shiny-modal .modal-body {overflow-x: auto;}
-      ")),
-      plotOutput("plotdvi", width = plotdims()$wpx, height = plotdims()$hpx),
+      title = div(style = "font-size:1rem",
+        cardNavigation("overviewcard", span("DVI overview", style = "font-size:1.5rem"))),
+      uiOutput("overviewPlotUI"),
+      footer = div(class = "aligned-row-wide",
+        div(class = "aligned-row", style = "gap:20px",
+          prettySwitch("overviewLarge", "Large window", value = overviewLarge(),
+                       status = "primary", slim = TRUE, width = "auto"),
+          pmControl,
+          div(class = "aligned-row", style = "gap:8px;white-space:nowrap",
+            span("Max families/page"),
+            selectInput("overviewMax", NULL, choices = c(1, 2, 3, 4, 6, 8, 10),
+                        selected = 6, selectize = FALSE, width = "70px"))),
+        modalButton("Close")),
       easyClose = TRUE
     ))
   })
 
-  plotdims = reactive({ .debug("plot dims")
-    dvi = req(currentDviData())
-    k = sum(pedsize(dvi$am))
-    dims = dvir:::findPlotDims(dvi$am, npm = length(dvi$pm))
-    amdims = dims$amSize
-    w = min(1000, max(400 + 50*amdims[1], 400 + 20*k))
-    h = min(600, max(200 + 50*amdims[2], 250 + 10*k))
-    list(w = w, h = h, wpx = paste0(w, "px"), hpx = paste0(h, "px"))
-  })
-
   output$plotdvi = renderPlot({ .debug("render Overview plot")
-    dvi = currentDviData()
-    req(length(dvi$am) > 0, length(dvi$pm) > 0, length(dvi$missing) > 0)
-    labs = c(rownames(genoAM()), rownames(genoPM()), dvi$missing)
+    dvi = req(currentDviData())
+    page = overviewPage()
+    pages = overviewPages()
+    req(length(dvi$am), page > 0L, page <= length(pages))
+
     labfun = getLabfun(dvi, settings$hideUnimportantLabs, settings$useAliases,
                        c(aliasAM(), aliasPM()))
-    tryCatch(plotDVI(dvi, style = 2, labs = labfun),
+    tryCatch(plotDVI(dvi, style = 2, am = pages[[page]],
+                     pm = isTRUE(input$overviewPM) && length(dvi$pm) <= 30L,
+                     labs = labfun),
              error = function(e) {
                msg = conditionMessage(e)
                if(grepl("Cannot fit|no room", msg))
@@ -1038,10 +1071,7 @@ server = function(input, output, session) {
                plot.new()
                text(0.5, 0.5, paste(strwrap(msg, width = 60), collapse = "\n"), cex = 1.2)
              })
-  }, res = 96,
-  width = function() plotdims()$w,
-  height = function() plotdims()$h,
-  execOnResize = FALSE)
+  }, res = 96, height = function() if(overviewLarge()) 600 else 450, execOnResize = TRUE)
 
 
   # Tab: Triangles ----------------------------------------------------------
@@ -1080,6 +1110,7 @@ server = function(input, output, session) {
     pm = req(mainPM())
     idMatr = pedtools:::fast.grid(list(typedMembers(am), typedMembers(pm))) |> req()
     req(nrow(idMatr) <= 5000)
+
     kappa$ampm = CPampm(am, pm, idMatr)
   })
 
@@ -1214,21 +1245,17 @@ server = function(input, output, session) {
     logMessage()[-1] |> paste0(collapse = "\n")
   })
 
-  # Number of pedigrees per page in solution plot
-  pageSize = 6
-  curSols = cardCounter("solutioncard", reactive(ceiling(nPed()/pageSize)))
+  # Pagination in solution plot
+  pages = reactive(pedPages(lapply(pedigrees(), `[[`, "ped")))
+  curSols = cardCounter("solutioncard", reactive(length(pages())))
 
   output$solutionplot = renderPlot({ .debug("plot solution")
     dvi = currentDviData()
     req(length(dvi$am) > 0, length(dvi$pm) > 0, length(dvi$missing) > 0)
-
-    first = (curSols() - 1) * pageSize + 1
-    last = min(nPed(), curSols() * pageSize)
-    pednrs = first:last
+    pednrs = pages()[[curSols()]]
 
     labfun = getLabfun(dvi, settings$hideUnimportantLabs, settings$useAliases, aliasAM())
-    plotSolutionDIVIANA(dvi, solutionTable$AM, pednrs = pednrs,
-                        pageSize = pageSize, labs = labfun)
+    plotSolutionDIVIANA(dvi, solutionTable$AM, pednrs = pednrs, labs = labfun)
   }, res = 96, width = "auto", height = 600, execOnResize = TRUE)
 
   # Download solution tables ------------------------------------------------
