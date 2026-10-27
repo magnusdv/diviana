@@ -2,15 +2,17 @@
 
 mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropout = 0,
                          defaultDropin = 0, defaultTypingError = 0, defaultIgnoreSex = FALSE,
-                         defaultMethod = "combine", defaultNames = "combine") {
+                         defaultMethod = "combine", defaultNames = "combine",
+                         reset = reactive(NULL))  {
   moduleServer(id, function(input, output, session) {
     ns = session$ns
-
     analysis = reactiveVal(NULL)
-    settings = reactiveVal(list(threshold = defaultThreshold, dropout = defaultDropout,
-                                dropin = defaultDropin, typingError = defaultTypingError,
-                                ignoreSex = defaultIgnoreSex, defaultMethod = defaultMethod,
-                                defaultNames = defaultNames))
+
+    defaults = list(threshold = defaultThreshold, dropout = defaultDropout,
+                    dropin = defaultDropin, typingError = defaultTypingError,
+                    ignoreSex = defaultIgnoreSex, defaultMethod = defaultMethod,
+                    defaultNames = defaultNames)
+    settings = reactiveVal(defaults)
     approved = reactiveVal(character())
     mergedNames = reactiveVal(character())
     mergeMethods = reactiveVal(character())
@@ -19,6 +21,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
     lrClicks = reactiveVal(integer())
     pending = reactiveVal(NULL)
     saved = reactiveVal(NULL)
+    markerState = reactiveVal(NULL)
 
     currentSettings = function() {
       list(threshold = input$threshold, dropout = input$dropout,
@@ -32,7 +35,8 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       req(input$threshold, input$dropout, input$dropin, input$typingError,
           !is.null(input$ignoreSex), input$defaultMethod, input$defaultNames)
       s = currentSettings()
-      if(!identical(s, settings())) {
+
+      if(!identical(s, isolate(settings()))) {
         settings(s)
         analysis(NULL)
       }
@@ -98,7 +102,8 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       ))
     }
 
-    observeEvent(trigger(), {
+    # Clear previous analysis and unsaved decisions
+    clearState = function() {
       analysis(NULL)
       approved(character())
       mergedNames(character())
@@ -108,18 +113,26 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       lrClicks(integer())
       pending(NULL)
       saved(NULL)
+      markerState(NULL)
+    }
+
+    observeEvent(trigger(), {
+      if(length(dvi()$pm) < 2L) {
+        showNotification("At least two PM samples are needed", type = "warning")
+        return()
+      }
+      clearState()
       showMain()
     })
 
+    observeEvent(reset(), {
+      clearState()
+      settings(defaults)
+    }, ignoreInit = TRUE)
 
     # Identify groups once, always computing the combined profile
     observeEvent(input$analyse, {
       d = req(dvi())
-      if(length(d$pm) < 2L) {
-        showNotification("At least two PM samples are needed", type = "warning")
-        return()
-      }
-
       s = currentSettings()
       settings(s)
       res = tryCatch(
@@ -314,8 +327,6 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
       dlg$children[[1]]$attribs$style = "width:max-content;max-width:calc(100vw - 32px)"
       showModal(dlg)
     }
-
-    markerState = reactiveVal(NULL)
 
     # Show pairwise LRs for groups with more than two samples
     observe({

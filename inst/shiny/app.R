@@ -633,7 +633,8 @@ server = function(input, output, session) {
     resetAnalysis(resetAnalysis() + 1)
   })
 
-  mergedPm = mergePmServer("mergePM", trigger = dataServerPM$merge, dvi = currentDviData)
+  mergedPm = mergePmServer("mergePM", trigger = dataServerPM$merge, dvi = currentDviData,
+                           reset = reactive(input$resetall))
 
   observeEvent(mergedPm(), {
     pm = genosWithAttrs(req(mergedPm())$pm, addCols = c("Sample", "Sex"))
@@ -738,8 +739,9 @@ server = function(input, output, session) {
   isNewPed = reactiveVal(FALSE)
   nPed = reactive(length(pedigrees()))
   curPed = cardCounter("pedcard", nPed)
-  relabelOptions = reactiveVal(list(families = "keep", prefix = "F", missing = "keep",
-                                    format = "[FNAME]_M[MIDX_FAM]"))
+  defaultRelabelOptions = list(families = "keep", prefix = "F", missing = "keep",
+                             format = "[FNAME]_M[MIDX_FAM]")
+  relabelOptions = reactiveVal(defaultRelabelOptions)
 
   # Flagged pedigrees can be opened and approved from the card header
     output$reviewControl = renderUI({
@@ -1341,6 +1343,8 @@ server = function(input, output, session) {
     pedIssues(character())
     mainMissing(NULL)
     DB(NULL)
+    relabelOptions(defaultRelabelOptions)
+    pendingRelabel(NULL)
     isolate(updateSelectInput(session, "example", selected = ""))
     updateRadioButtons(session, "dbtype", selected = character(0))
     updateRadioButtons(session, "muttype", selected = character(0))
