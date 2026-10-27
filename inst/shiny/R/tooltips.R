@@ -30,6 +30,7 @@ TT = list(
   pairLRmin = "Minimum pairing LR to consider in analysis",
   compactTabs = "Hide entries with 'No match' or 'Excluded'",
   mergePmLR = "Pairwise LR between informative samples"
+  strictUndisputed = "Require all competing pairwise LRs to be at most 1"
 )
 
 wrap_tooltip = function(tag, id, placement = "top"){

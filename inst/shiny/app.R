@@ -195,6 +195,8 @@ ui = bs4Dash::bs4DashPage(
                wrap_tooltip("pairLRmin"),
              br(),
              checkboxInput("ignoresex", "Ignore Sex", value = FALSE),
+             checkboxInput("strictUndisputed", "Strict undisp.", value = FALSE) |>
+               wrap_tooltip("strictUndisputed"),
              hr(),
              downloadBttn('downloadTables', "Results", style = "material-flat", block = TRUE,
                           color = "warning") |> wrap_tooltip("downloadRes")
@@ -1144,6 +1146,7 @@ server = function(input, output, session) {
     tryCatch({
       res = captureOutput(dviSolve, dvi, threshold = input$LRthresh,
                           maxIncomp = input$maxIncomp,
+                          strict = input$strictUndisputed,
                           limit = input$pairLRmin,
                           maxAssign = settings$maxAssign,
                           computeLR0 = settings$computeLR0,
@@ -1344,6 +1347,7 @@ server = function(input, output, session) {
     updateNumericInput(session, "mutrateF", value = 0.001)
     updateNumericInput(session, "mutrateM", value = 0.002)
     updateNumericInput(session, "LRthresh", value = 10000)
+    updateCheckboxInput(session, "strictUndisputed", value = FALSE)
     updateNumericInput(session, "maxIncomp", value = 2)
     updateCheckboxInput(session, "ignoresex", value = FALSE)
     updateCheckboxInput(session, "acrossComps", value = FALSE)
