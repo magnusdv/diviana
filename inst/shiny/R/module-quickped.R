@@ -86,13 +86,14 @@ pedigreeUI = function(id, famid = "F1") {
   )
 }
 
+
 # Dialog for renaming families and missing persons
 relabelPedigreesDialog = function(opt) {
   modalDialog(
     title = "Relabel families and missing persons",
     div(class = "p-2",
-      div(class = "d-flex justify-content-between",
-        div(
+      div(class = "d-flex",
+        div(style = "flex:1;min-width:0",
           radioButtons("relabelFamilies", "Family names",
                        choices = c("Keep existing" = "keep",
                                    "Name after missing person" = "mp",
@@ -101,7 +102,7 @@ relabelPedigreesDialog = function(opt) {
           conditionalPanel("input.relabelFamilies == 'prefix'",
                            textInput("relabelPrefix", NULL, opt$prefix, width = "120px"))
         ),
-        div(style = "width:215px",
+        div(style = "flex:0 0 190px;min-width:0",
           radioButtons("relabelMissing", "Missing persons",
                        choiceNames = list(
                          "Keep existing",
@@ -126,10 +127,13 @@ relabelPedigreesDialog = function(opt) {
                        choiceValues = c("keep", "M[MIDX]", "M[FIDX]-[MIDX_FAM]", "custom"),
                        selected = opt$missing),
           conditionalPanel("input.relabelMissing == 'custom'",
-                           textInput("relabelFormat", NULL, opt$format, width = "180px"))
+                           textInput("relabelFormat", NULL, opt$format, width = "100%"))
         )
       ),
-      uiOutput("relabelPreview")
+      br(),
+      uiOutput("relabelPreview"),
+      div(class = "text-muted", style = "font-style:italic;",
+          "Note: Names of families and individuals can also be specified manually in the pedigree editor.")
     ),
     footer = div(class = "aligned-row",
                  style = "justify-content:flex-end;gap:12px;width:100%",
@@ -140,23 +144,26 @@ relabelPedigreesDialog = function(opt) {
 
 # Show at most ten labels from the first three families
 relabelPreviewTable = function(old, new) {
+  sep = "border-left:2px solid #adb5bd"
   rows = lapply(seq_len(min(3L, length(old$am))), function(i) {
     a = intersect(old$missing, old$am[[i]]$ID)
     b = intersect(new$missing, new$am[[i]]$ID)
     if(!length(a)) a = b = ""
     lapply(seq_along(a), function(j)
       tags$tr(tags$td(if(j == 1L) names(old$am)[i]), tags$td(a[j]),
-              tags$td(if(j == 1L) names(new$am)[i]), tags$td(b[j])))
+              tags$td(if(j == 1L) names(new$am)[i], style = sep), tags$td(b[j])))
   })
   div(class = "table-responsive",
     tags$table(class = "table table-sm table-striped mb-0",
       tags$thead(
         tags$tr(tags$th(tags$em("Old"), colspan = 2, class = "text-center border-0"),
-                tags$th(tags$em("New"), colspan = 2, class = "text-center border-0")),
-        tags$tr(lapply(rep(c("Family", "Missing"), 2), tags$th))),
+                tags$th(tags$em("New"), colspan = 2, class = "text-center border-0", style = sep)),
+        tags$tr(tags$th("Family"), tags$th("Missing"),
+                tags$th("Family", style = sep), tags$th("Missing"))),
       tags$tbody(head(do.call(c, rows), 10L)))
   )
 }
+
 
 # Confirm changes before relabelling
 relabelConfirmDialog = function() {
