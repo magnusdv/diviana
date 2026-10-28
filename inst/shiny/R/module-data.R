@@ -63,6 +63,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       if(identical(ext, "reset")) {
         mainTable$main = mainTable$raw = NULL
         sources$all = sources$current = NULL
+        updateRadioButtons(session, "missingFmt", selected = "M")
         builtAM(NULL)
         importedAM(NULL)
         importType(NULL)
@@ -134,7 +135,9 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
                            choices = character(), multiple = TRUE)),
         if(id == "AM" && !is.null(builtAM()))
           div(style = "margin-top:12px",
-              checkboxInput(ns("createAM"), strong("Create pedigrees automatically"), TRUE)),
+              checkboxInput(ns("createAM"), strong("Create pedigrees automatically"), TRUE),
+              conditionalPanel("input.createAM", ns = ns,
+                               missingLabelRadios(ns("missingFmt"), action = "importing"))),
         if(id == "AM") uiOutput(ns("buildIssues"))
       )
     })
@@ -198,7 +201,13 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     selectedAM = reactive({
       b = req(builtAM())
       sel = previewRows()
-      if(length(sel)) dvir::buildAM(b$source[sort(sel), , drop = FALSE], mpFormat = "family")
+      fmt = input$missingFmt %||% "M"
+      if(length(sel) || fmt != "M") {
+        source = b$source
+        if(length(sel))
+          source = source[sort(sel), , drop = FALSE]
+        dvir::buildAM(source, mpFormat = fmt)
+      }
       else b$result
     })
 
@@ -709,7 +718,7 @@ checkSex = function(x) {
 readDviFile = function(fil, name = basename(fil)) {
   ext = tolower(tools::file_ext(name))
   dvi = switch(ext,
-    fam = dvir::familias2dvir(fil, missingFormat = "M[FAM]-[IDX]", verbose = FALSE),
+    fam = dvir::familias2dvir(fil, missingFormat = "M[MIDX]", verbose = FALSE),
     rds = readRdvi(fil, name = name),
     rdata = readRdvi(fil, name = name),
     stop2("Unsupported DVI file. Use .fam, .rds or .RData")

@@ -403,8 +403,10 @@ server = function(input, output, session) {
   # Complete dataset loading stays separate from AM/PM sample import.
   pendingDvi = reactiveVal(NULL)
   loadDviError = reactiveVal(NULL)
+  loadedDvi = reactiveVal(NULL)
 
   observeEvent(input$loadDviButton, {
+    loadedDvi(NULL)
     pendingDvi(NULL)
     loadDviError(NULL)
     mod = modalDialog(
@@ -413,27 +415,59 @@ server = function(input, output, session) {
       fileInput("loadDviFile", NULL, width = "100%", accept = c(".fam", ".rds", ".RData")),
       uiOutput("loadDviError"),
       uiOutput("loadDviInfo"),
-      div(style = "margin-top:12px",
-          strong("Loading replaces all current data.")),
-      footer = tagList(modalButton("Cancel"),
-                       actionButton("loadDviSave", "Load", status = "success"))
+      uiOutput("loadDviMissingUI"),
+      footer = div(class = "d-flex justify-content-between align-items-center w-100",
+                   strong("Loading replaces all data"),
+                   div(class = "d-flex", style = "gap:8px",
+                       modalButton("Cancel"),
+                       actionButton("loadDviSave", "Load", status = "success")))
     )
     currentModal(mod)
     showModal(mod)
   })
 
+  output$loadDviMissingUI = renderUI({
+    x = req(loadedDvi())
+    if(!x$isFam) return(NULL)
+    missingLabelRadios("loadDviMissing", selected = x$defaultMissing)
+  })
+
+  # Relabel the cached file without repeating the Familias import
+  previewLoadedDvi = function(x, fmt) {
+    raw = x$raw
+    if(x$isFam && length(raw$missing)) {
+      inspect = attr(raw, "inspectAM")
+      raw = dvir::relabelDVI(raw, missingFormat = switch(fmt, M = "M[MIDX]", F = "[FNAME]_MP"))
+      attr(raw, "inspectAM") = inspect
+    }
+    list(raw = raw, dat = normalizeLoadedDvi(raw), source = x$source)
+  }
+
   observeEvent(input$loadDviFile, {
+    loadedDvi(NULL)
     pendingDvi(NULL)
     loadDviError(NULL)
-    req(input$loadDviFile)
-    f = input$loadDviFile
+    f = req(input$loadDviFile)
     tryCatch({
       raw = readDviFile(f$datapath, name = f$name)
-      dat = normalizeLoadedDvi(raw)
-      pendingDvi(list(raw = raw, dat = dat, source = f$name))
+      isFam = tolower(tools::file_ext(f$name)) == "fam"
+      fmt = "M"
+      x = list(raw = raw, source = f$name, isFam = isFam, defaultMissing = fmt)
+      pending = previewLoadedDvi(x, fmt)
+      loadedDvi(x)
+      pendingDvi(pending)
     }, error = function(e) {
       loadDviError(gsub(f$datapath, f$name, conditionMessage(e), fixed = TRUE))
     })
+  })
+
+  observeEvent(input$loadDviMissing, {
+    x = req(loadedDvi())
+    if(!x$isFam) return()
+    pendingDvi(NULL)
+    loadDviError(NULL)
+    tryCatch(pendingDvi(previewLoadedDvi(x, input$loadDviMissing)),
+             error = function(e) loadDviError(conditionMessage(e)))
   })
 
   output$loadDviError = renderUI({

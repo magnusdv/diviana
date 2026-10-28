@@ -37,6 +37,17 @@ inlineRadioButtons = function(inputId, label, ...) {
   div(class = "aligned-row", strong(label, style = "padding-right:20px"), radios)
 }
 
+# Shared missing-person labels for dataset loading and AM pedigree import
+missingLabelRadios = function(id, selected = "M", action = "loading") {
+  div(style = "margin:12px 0 8px",
+      radioButtons(id, "Naming scheme for missing persons",
+                   choices = c("M1, M2, M3, ...  (sequential)" = "M",
+                               "<Fam>-MP  (family name prefix)" = "F"),
+                   selected = selected),
+      div(class = "text-muted small",
+          sprintf("Note: Labels can also be changed after %s.", action)))
+}
+
 helpBtn = function(id) {
   actionButton(id, label = NULL, icon = icon("question-circle"),
                style = "padding: 0; margin:0; background: transparent; border: none; cursor: pointer; font-size: 20px;")

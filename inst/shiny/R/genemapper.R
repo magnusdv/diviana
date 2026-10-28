@@ -18,13 +18,17 @@ detectTextFormat = function(file) {
 
   cols = names(read.table(file, header = TRUE, sep = sep, nrows = 0,
                           check.names = FALSE, fill = TRUE, quote = "\"", comment.char = ""))
+  # Ignore unnamed trailing columns.
+  cols = cols[seq_len(max(c(0L, which(nzchar(trimws(cols))))))]
+
   if(length(cols) < 2L || any(!nzchar(trimws(cols))) || anyDuplicated(cols))
     stop2("Invalid text file header (missing or duplicate columns)")
 
   hdr = tolower(trimws(cols))
-  type = if("marker" %in% hdr && any(c("sample name", "allele 1", "allele 2") %in% hdr)) "gm" else
-    if(length(hdr) >= 3L && startsWith(hdr[1], "family") &&
-       hdr[2] %in% c("relationship", "kinship", "[relationship]", "[kinship]")) "am" else "geno"
+  isGM = "marker" %in% hdr && any(c("sample name", "allele 1", "allele 2") %in% hdr)
+  isAM = length(hdr) >= 3L && startsWith(hdr[1], "family") && grepl("^\\[?(rel|kin)", hdr[2])
+
+  type = if(isGM) "gm" else if(isAM) "am" else "geno"
 
   list(type = type, sep = sep)
 }
