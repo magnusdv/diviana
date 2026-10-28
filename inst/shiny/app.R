@@ -435,9 +435,9 @@ server = function(input, output, session) {
   # Relabel the cached file without repeating the Familias import
   previewLoadedDvi = function(x, fmt) {
     raw = x$raw
-    if(x$isFam && length(raw$missing)) {
+    if(x$isFam && fmt == "F" && length(raw$missing)) {
       inspect = attr(raw, "inspectAM")
-      raw = dvir::relabelDVI(raw, missingFormat = switch(fmt, M = "M[MIDX]", F = "[FNAME]_MP"))
+      raw = dvir::relabelDVI(raw, missingFormat = "[FNAME]-MP")
       attr(raw, "inspectAM") = inspect
     }
     list(raw = raw, dat = normalizeLoadedDvi(raw), source = x$source)
@@ -1424,6 +1424,9 @@ server = function(input, output, session) {
     )
     externalAM("reset")
     externalPM("reset")
+    appData(NULL)
+    dbChoice("builtin")
+    mutChoice("none")
     externalLoci$db = externalLoci$mut = NULL
     externalLoci$hasMut = FALSE
     pedigrees(NULL)
@@ -1433,8 +1436,8 @@ server = function(input, output, session) {
     relabelOptions(defaultRelabelOptions)
     pendingRelabel(NULL)
     isolate(updateSelectInput(session, "example", selected = ""))
-    updateRadioButtons(session, "dbtype", selected = character(0))
-    updateRadioButtons(session, "muttype", selected = character(0))
+    updateRadioButtons(session, "dbtype", selected = "builtin")
+    updateRadioButtons(session, "muttype", selected = "none")
     updateNumericInput(session, "mutrateF", value = 0.001)
     updateNumericInput(session, "mutrateM", value = 0.002)
     updateNumericInput(session, "LRthresh", value = 10000)

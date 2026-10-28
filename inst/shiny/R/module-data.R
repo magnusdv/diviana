@@ -222,6 +222,15 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       df = standardiseGenoData(dfFiltered(), flavour = id,
                                selectRows = previewRows(),
                                excludeCols = input$excludeCols)
+
+      if(input$action == "add") {
+        dup = intersect(df$Sample, mainTable$main$Sample)
+        if(length(dup)) {
+          fileError(paste("Existing sample IDs:", toString(dup)))
+          return()
+        }
+      }
+
       if(create) {
         b = selectedAM()
         if(input$action == "add") {
