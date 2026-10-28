@@ -156,7 +156,7 @@ ui = bs4Dash::bs4DashPage(
 
       column(width = 9,
         bs4Card(width = 12, collapsible = FALSE, title = "Marker summary",
-          DT::DTOutput("markersummary", width = "fit-content"),
+          DT::DTOutput("markersummary", width = "100%"),
           footer = div(class = "btn-group",
             actionButton("chartButton",
                          label = tagList(myIcon("simple-chart", align = "-0.1em"), " Frequencies")),
@@ -777,8 +777,8 @@ server = function(input, output, session) {
       easyClose = TRUE,
       tags$div(
         style = "display:flex;align-items:flex-start;gap:15px;margin-right:20px",
-        tags$div(style = "flex:0 0 75%;", plotOutput("freqPlot", height = 350)),
-        tags$div(style = "flex:0 0 25%;", DT::DTOutput("freqTable"))
+        tags$div(style = "flex:3;min-width:0", plotOutput("freqPlot", height = 350)),
+        tags$div(style = "flex:1;min-width:0", DT::DTOutput("freqTable", width = "100%"))
       )
     ))
   })

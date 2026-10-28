@@ -152,6 +152,7 @@ formatDatabaseTable = function(df) {
       paging = FALSE,
       ordering = FALSE,
       autoWidth = FALSE,
+      scrollX = TRUE,
       scrollY = "500px",
       scrollCollapse = TRUE,
       columnDefs = list(list(targets = "keep", visible = FALSE),
@@ -203,7 +204,7 @@ formatFreqTable = function(freqs) {
           paging = FALSE,
           ordering = FALSE,
           autoWidth = FALSE,
-          scrollX = FALSE,
+          scrollX = TRUE,
           scrollY = "310px", #if(nrow(df) > 15) "310px" else NULL,
           scrollCollapse = TRUE,
           columnDefs = list(list(className = 'dt-left', targets = "_all"))
