@@ -7,7 +7,7 @@ cardNavigation = function(id, title, ...) {
       ...,
       div(class = "aligned-row",
         actionBttn(ns("prev"), label = myIcon("backward-step", align = "-0.15em"), style = "jelly", size = "s"),
-        uiOutput(ns("counter")),
+        tags$b(id = ns("counter"), "0/0"),
         actionBttn(ns("nxt"), label = myIcon("forward-step", align = "-0.15em"), style = "jelly", size = "s")
       )
     )
@@ -39,8 +39,8 @@ cardCounter = function(id, mod) {
       else if(counter() > mod()) counter(mod())
     })
 
-    # Render "current/total"
-    output$counter = renderUI(HTML(sprintf("<b>%d/%d</b>", counter(), mod())))
+    # Render "current/total" NB: hack, since the counter did not reset
+    observe(shinyjs::html("counter", sprintf("%d/%d", counter(), mod())))
 
     # Return the counter for external use
     counter
