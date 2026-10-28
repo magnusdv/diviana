@@ -105,8 +105,16 @@ ui = bs4Dash::bs4DashPage(
       fluidRow(
         column(width = 7,
           div(id = "data-accordion", dataUI("AM"), dataUI("PM")),
-          actionBttn("loadDviButton", "Load DVI dataset", style = "jelly",
-                     color = "primary", size = "s")
+          div(class = "d-flex justify-content-between align-items-center",
+            style = "margin:10px 0 4px;gap:12px",
+            actionBttn("loadDviButton", "Load DVI dataset",
+                       style = "jelly", color = "primary", size = "s"),
+            div(class = "text-muted", style = "font-size:0.85rem;white-space:nowrap",
+                sprintf("DIVIANA %s · ", VERSION),
+                mylink("Changelog", "https://github.com/magnusdv/diviana/blob/master/NEWS.md"),
+                " · ",
+                mylink("Report issue", "https://github.com/magnusdv/diviana/issues"))
+          ),
         ),
         column(
           width = 5, id = "pedcol",
@@ -126,11 +134,7 @@ ui = bs4Dash::bs4DashPage(
           ),
           bs4InfoBoxOutput("dvisummary", width = 12)
         ),
-      ),
-      p(sprintf("This is DIVIANA version %s", VERSION),
-        "(", mylink("changelog", "https://github.com/magnusdv/diviana/blob/master/NEWS.md"), ").",
-        "Bug reports and issues are welcome ",
-        mylink("here", "https://github.com/magnusdv/diviana/issues"), ".")
+      )
    ),
 
    # Tab: Marker database -------------------------------------------
@@ -1369,7 +1373,7 @@ server = function(input, output, session) {
   # Settings dialog ----------------------------------------------------------
 
   settings = reactiveValues(hideUnimportantLabs = TRUE,
-                            useAliases = TRUE,
+                            useAliases = FALSE,
                             computeLR0 = FALSE,
                             maxAssign = 1e4,
                             standardmodel = "equal")
@@ -1416,7 +1420,8 @@ server = function(input, output, session) {
 
   resetAnalysis = reactiveVal(0)
 
-  observeEvent(input$resetall, { .debug("reset all")
+  observeEvent(input$resetall, {
+    .debug("reset all")
     session$sendCustomMessage("clearOutputs", c(
       "amcentric", "pmcentric", "lrmatrix", "exmatrix", "jointtabs", "solvelog",
       "solutionplot", "pedplot", "dvisummary", "AM-mainTableUI", "PM-mainTableUI",
