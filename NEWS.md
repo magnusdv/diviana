@@ -1,10 +1,15 @@
-# diviana 0.5.1
+
+# diviana 0.5.2
 
 ## Imports
 
-* Improved handling of disconnected reference pedigrees in Familias `.fam` files. The import window also shows more informative warnings for families requiring manual inspection.
+* Added a separate "Load DVI dataset" dialog for `.fam`, `.rds` and `.RData` files, with dataset preview and inspection warnings.
 
-* Added support for automatic pedigree creation based on 'Relationship' tags in AM text input files.
+* Simplified AM/PM imports, with automatic detection of text formats (genotype tables, relationship tables and GeneMapper exports).
+
+* Improved handling of disconnected reference pedigrees in Familias `.fam` files, with more informative warnings for families requiring manual inspection.
+
+* Added support for automatic pedigree construction from relationship information in AM text files.
 
 ## PM data
 
@@ -12,12 +17,14 @@
 
 ## AM data
 
-* Add "Relabel" button for systematically renaming families and missing persons.
+* Added a "Relabel" button for systematically renaming families and missing persons, with preview and confirmation.
 
 ## Pedigrees
 
-* Better plots of large pedigrees
-* Added pagination for Overview plot
+* Improved plots of large pedigrees.
+* Added pagination for the Overview plot.
+* Improved the pedigree editor and navigation between families.
+
 
 
 # diviana 0.5.0
