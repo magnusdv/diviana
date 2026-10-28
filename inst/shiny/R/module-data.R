@@ -189,7 +189,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     dfFiltered = reactive({ .debug2("import filter genemapper/text blanks")
       df = req(mainTable$raw)
       if(identical(importType(), "gm") && !isTRUE(input$includeHidden)) {
-        blanks = rowSums(df != "/", na.rm = TRUE) == 0
+        blanks = rowSums(df != "", na.rm = TRUE) == 0
         controls = grepl("C[+-]", rownames(df))
         ladder = grepl("Ladder", rownames(df))
         df = df[!(blanks | controls | ladder), , drop = FALSE]
@@ -219,6 +219,18 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       req(input$action, mainTable$raw)
 
       create = id == "AM" && !is.null(builtAM()) && isTRUE(input$createAM)
+      df = tryCatch({
+        x = standardiseGenoData(dfFiltered(), flavour = id, selectRows = previewRows(),
+                                excludeCols = input$excludeCols)
+        # Try-out to catch errors!
+        geno = x[setdiff(names(x), c(".rowid", "Fam", "Sample", "Alias", "AMEL", "Sex"))]
+        splitGenotypes(geno)
+        x
+      }, error = function(e) {
+        fileError(conditionMessage(e)); NULL}
+      )
+
+      if(is.null(df)) return()
       df = standardiseGenoData(dfFiltered(), flavour = id,
                                selectRows = previewRows(),
                                excludeCols = input$excludeCols)

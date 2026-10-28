@@ -83,8 +83,10 @@ readGenemapper = function(file, format = NULL, sep = "\t") {
   x$A1 = sub("-NB", "", x$A1, fixed = TRUE)
   x$A2 = sub("-NB", "", x$A2, fixed = TRUE)
 
-  gmat = matrix(paste(x$A1, x$A2, sep = "/"), nrow = length(ids),
-                ncol = length(markers), dimnames = list(ids, markers), byrow = TRUE)
+  geno = paste(x$A1, x$A2, sep = "/")
+  geno[x$A1 == "" & x$A2 == ""] = ""
+  gmat = matrix(geno, nrow = length(ids), ncol = length(markers),
+                dimnames = list(ids, markers), byrow = TRUE)
   as.data.frame(gmat)
 }
 
