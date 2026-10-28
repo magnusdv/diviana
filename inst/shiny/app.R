@@ -500,7 +500,8 @@ server = function(input, output, session) {
   })
 
   observeEvent(input$example, {
-    loadDvi(get(req(input$example)))
+    req(input$example)
+    loadDvi(get(input$example))
   }, ignoreInit = TRUE)
 
   # Database and mutation settings ----------------------------------------
@@ -685,7 +686,10 @@ server = function(input, output, session) {
 
     tryCatch(
       setMarkersDiviana(peds, alleleMatrix = a, loci = loci[idx]),
-      error = showErr
+      error = function(e) {
+        showErr(e)
+        NULL
+      }
     )
   })
 
@@ -1466,33 +1470,6 @@ server = function(input, output, session) {
   }, ignoreInit = TRUE)
 
 
-  # Debug -------------------------------------------------------------------
-
-  debuglog = reactiveVal("")
-  output$debugOutput = renderText(debuglog())
-
-  # Reset when debug is toggled
-  #observeEvent(input$debug, debuglog("### DEBUG LOG ###"))
-
-  #.debug = function(...) {
-  #  if(DEVMODE) print(paste(..., collapse = " "))
-    #if(isTRUE(input$debug))
-    #  isolate(debuglog(paste(debuglog(), paste(..., collapse = " "), sep = "\n")))
-  #}
-
-  output$debugElements = renderPrint({
-    req(input$debug)
-    cat("### CURRENT OBJECTS ###\n")
-    print(mainAM(), verbose = F)
-    print(mainPM(), verbose = F)
-    print(mainMissing(), verbose = F)
-    #cat("\n")
-    #print(abbrMat(genoTable$am))
-    #cat("\n")
-    #print(abbrMat(genoTable$pm))
-  })
-
-
   output$downloaddata = downloadHandler(
     filename = function() "dviData.rds",
     content = function(file) { .debug("download data")
@@ -1530,7 +1507,8 @@ server = function(input, output, session) {
         padding: 1px 4px;
         font-size: 90%;}")),
       footer = actionButton("close_instructions", "Back"),
-      easyClose = FALSE, size = "l"
+      easyClose = FALSE,
+      size = "l"
     ))
   }
 
