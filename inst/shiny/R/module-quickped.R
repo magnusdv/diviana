@@ -265,7 +265,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
                              miss = currData$miss,
                              refs = currData$refs,
                              refOrigName = currData$refOrigName,
-                             clearSel = FALSE) {
+                             clearSel = TRUE) {
 
       .debug2("update data")
       currData$ped = req(ped)
@@ -295,7 +295,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
         error = showErr)
 
       req(is.ped(newped))
-      updatePedData(ped = newped, clearSel = FALSE)
+      updatePedData(ped = newped)
     })
 
     observeEvent(input$sibleft, { .debug2("left sibling")
@@ -315,7 +315,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
     observeEvent(input$parents, { .debug2("add parents")
       id = req(sel())
       newped = tryCatch({
-        updatePedData(ped = .addParents(currData$ped, id, avoid = avoid), clearSel = TRUE)
+        updatePedData(ped = .addParents(currData$ped, id, avoid = avoid))
       }, error = showErr)
     })
 
@@ -358,7 +358,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
         showErr("Reference cannot be set as missing: ", intersect(currData$refs, ids))
         return()
       }
-      updatePedData(miss = c(currData$miss, ids), clearSel = TRUE) # dups ok here
+      updatePedData(miss = c(currData$miss, ids)) # dups ok here
     })
 
     observeEvent(input$nonmissing, { .debug2("set nonmissing")
