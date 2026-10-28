@@ -678,7 +678,7 @@ server = function(input, output, session) {
 
     idx = match(normaliseName(markersAM()), normaliseName(names(loci)), nomatch = 0L)
     if(any(idx == 0L)) {
-      showErr("Aborting - database does not contain these AM markers: ", markersAM()[idx == 0L])
+      showErr("Database does not contain these AM markers: ", markersAM()[idx == 0L])
       return(NULL)
     }
 
@@ -705,7 +705,7 @@ server = function(input, output, session) {
 
     idx = match(normaliseName(markersPM()), normaliseName(names(loci)), nomatch = 0L)
     if(any(idx == 0L)) {
-      showErr("Aborting - database does not contain these PM markers: ", markersPM()[idx == 0L])
+      showErr("Database does not contain these PM markers: ", markersPM()[idx == 0L])
       return(NULL)
     }
     s = pedtools::singletons(rownames(a), sex = sexPM()) |> .setnames(rownames(a))
