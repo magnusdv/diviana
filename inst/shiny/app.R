@@ -103,7 +103,11 @@ ui = bs4Dash::bs4DashPage(
 
    tabItem("data",
       fluidRow(
-        column(width = 7, div(id = "data-accordion", dataUI("AM"), dataUI("PM"))),
+        column(width = 7,
+          div(id = "data-accordion", dataUI("AM"), dataUI("PM")),
+          actionBttn("loadDviButton", "Load DVI dataset", style = "jelly",
+                     color = "primary", size = "s")
+        ),
         column(
           width = 5, id = "pedcol",
           bs4Card(width = NULL, collapsible = FALSE,
@@ -273,12 +277,15 @@ server = function(input, output, session) {
 
   externalAM = reactiveVal(NULL)
   externalPM = reactiveVal(NULL)
+  currentModal = reactiveVal(NULL)
   assignedRefs = reactiveVal(NULL)
   externalLoci = reactiveValues(db = NULL, mut = NULL, hasMut = FALSE) # `mut` becomes named list
 
   dataServerAM = dataServer("AM", externalAM, assignedRefs, missingIDs = mainMissing,
-                            existingFams = reactive(names(pedigrees())), .debug = .debug)
-  dataServerPM = dataServer("PM", externalPM, missingIDs = mainMissing, .debug = .debug)
+                            existingFams = reactive(names(pedigrees())),
+                            currentModal = currentModal, .debug = .debug)
+  dataServerPM = dataServer("PM", externalPM, missingIDs = mainMissing,
+                            currentModal = currentModal, .debug = .debug)
 
   genoAM = reactive({ .debug("genoAM", dataServerAM$main())
     g = dataServerAM$main(); g$.rowid = g$Fam = g$Sample = g$Alias = g$AMEL = g$Sex = NULL; g})
@@ -315,7 +322,6 @@ server = function(input, output, session) {
 
   # State for loaded/imported DVI data -------------------------------------
 
-  setCompleteDVI = reactiveVal(NULL)
   appData = reactiveVal(NULL)
   loading = reactiveVal(FALSE)
 
@@ -374,8 +380,7 @@ server = function(input, output, session) {
     mutChoice(input$muttype)
   }, ignoreInit = TRUE, priority = 100)
 
-  loadDvi = function(dvi) { .debug("loadDvi")
-    dat = normalizeLoadedDvi(dvi)
+  loadDvi = function(dvi, source = "Example", dat = normalizeLoadedDvi(dvi)) { .debug("loadDvi")
     loading(TRUE)
     pedIssues(pedIssueReasons(attr(dvi, "inspectAM")))
 
@@ -383,6 +388,8 @@ server = function(input, output, session) {
     pedigrees(dat$peds)
     externalAM(dat$am)
     externalPM(dat$pm)
+    dataServerAM$sourceValues$all = if(!is.null(dat$am)) source
+    dataServerPM$sourceValues$all = if(!is.null(dat$pm)) source
 
     dbChoice("original")
     mutChoice(if(dat$hasMut) "original" else "none")
@@ -393,10 +400,66 @@ server = function(input, output, session) {
     session$onFlushed(function() loading(FALSE), once = TRUE)
   }
 
-  observeEvent(setCompleteDVI(), {
-    loadDvi(setCompleteDVI())
-    setCompleteDVI(NULL)
-  }, ignoreNULL = TRUE)
+  # Complete dataset loading stays separate from AM/PM sample import.
+  pendingDvi = reactiveVal(NULL)
+  loadDviError = reactiveVal(NULL)
+
+  observeEvent(input$loadDviButton, {
+    pendingDvi(NULL)
+    loadDviError(NULL)
+    mod = modalDialog(
+      title = div(class = "aligned-row-wide", "Load DVI dataset", banner(session = NULL)),
+      p("Select a Familias (.fam) or dviData (.rds, .RData) file."),
+      fileInput("loadDviFile", NULL, width = "100%", accept = c(".fam", ".rds", ".RData")),
+      uiOutput("loadDviError"),
+      uiOutput("loadDviInfo"),
+      div(style = "margin-top:12px",
+          strong("Loading replaces all current data.")),
+      footer = tagList(modalButton("Cancel"),
+                       actionButton("loadDviSave", "Load", status = "success"))
+    )
+    currentModal(mod)
+    showModal(mod)
+  })
+
+  observeEvent(input$loadDviFile, {
+    pendingDvi(NULL)
+    loadDviError(NULL)
+    req(input$loadDviFile)
+    f = input$loadDviFile
+    tryCatch({
+      raw = readDviFile(f$datapath, name = f$name)
+      dat = normalizeLoadedDvi(raw)
+      pendingDvi(list(raw = raw, dat = dat, source = f$name))
+    }, error = function(e) {
+      loadDviError(gsub(f$datapath, f$name, conditionMessage(e), fixed = TRUE))
+    })
+  })
+
+  output$loadDviError = renderUI({
+    msg = req(loadDviError())
+    div(style = "color:red", strong("Error: "), msg)
+  })
+
+  output$loadDviInfo = renderUI({
+    raw = req(pendingDvi())$raw
+    info = capture.output(print(raw, printMax = 0))
+    info[1] = "<b>Contents of DVI dataset</b>"
+    s = HTML(gsub("\n ", "\n &bull; ", paste(info, collapse = "\n")))
+    tagList(
+      div(s, style = paste(
+        "white-space: pre-wrap; color: RoyalBlue; line-height: 1.2em; padding: 5px;",
+        "margin: 5px 0; background-color: #f9f9f9; border: 1px solid #ccc;")),
+      pedIssueSummary(attr(raw, "inspectAM"), when = "loading")
+    )
+  })
+
+  observeEvent(input$loadDviSave, {
+    x = req(pendingDvi())
+    loadDvi(x$raw, source = x$source, dat = x$dat)
+    pendingDvi(NULL)
+    removeModal()
+  })
 
   observeEvent(input$example, {
     loadDvi(get(req(input$example)))
@@ -640,16 +703,6 @@ server = function(input, output, session) {
     pm = genosWithAttrs(req(mergedPm())$pm, addCols = c("Sample", "Sex"))
     externalPM(pm)
   })
-
-  observeEvent(dataServerAM$completeDvi(), { .debug("AM complete dvi")
-    dataServerPM$sourceValues$all = dataServerAM$sources()
-    setCompleteDVI(dataServerAM$completeDvi())
-  }, ignoreNULL = TRUE)
-
-  observeEvent(dataServerPM$completeDvi(), { .debug("PM complete dvi:")
-    dataServerAM$sourceValues$all = dataServerPM$sources()
-    setCompleteDVI(dataServerPM$completeDvi())
-  }, ignoreNULL = TRUE)
 
   observeEvent(c(dataServerAM$sources(), dataServerPM$sources()), { .debug("source changed")
     src = c(dataServerAM$sources(), dataServerPM$sources())
@@ -1371,14 +1424,6 @@ server = function(input, output, session) {
   }, ignoreInit = TRUE)
 
 
-  observe({
-    if(DEVMODE) { .debug("devmode!")
-      updateSelectInput(session, "AM-filetype", selected = "gm")
-      #updateSelectInput(session, "example", selected = "icmp")
-      #updateNavbarTabs(session, "navmenu", selected = "analysis")
-    }
-  })
-
   # Debug -------------------------------------------------------------------
 
   debuglog = reactiveVal("")
@@ -1422,16 +1467,18 @@ server = function(input, output, session) {
   helpFiles = list.files(helpDir, pattern = "^help-.*\\.html$", full.names = FALSE)
   helpIds = sub("\\.html$", "", helpFiles)
 
-  currentModal = reactiveVal()
-
   showInstructions = function(id) { .debug("help:", id)
     helpfile = file.path(helpDir, sprintf("%s.html", id))
     req(file.exists(helpfile))
 
+    html = paste(readLines(helpfile, warn = FALSE), collapse = "\n")
+    h = regmatches(html, regexpr("<h[1-3]>[^<]+</h[1-3]>", html))
+    title = if(length(h)) gsub("</?h[1-3]>", "", h) else "Help"
+    if(length(h)) html = sub(h, "", html, fixed = TRUE)
+
     showModal(modalDialog(
-      title = NULL,
-      div(
-        includeHTML(helpfile),
+      title = strong(title),
+      div(HTML(html),
         style = "max-height:80vh; overflow-y:auto; font-size: 90%; padding: 0"),
       tags$style(HTML("code {
         background-color: #f8f8f8;
@@ -1441,7 +1488,7 @@ server = function(input, output, session) {
         padding: 1px 4px;
         font-size: 90%;}")),
       footer = actionButton("close_instructions", "Back"),
-      easyClose = FALSE
+      easyClose = FALSE, size = "l"
     ))
   }
 

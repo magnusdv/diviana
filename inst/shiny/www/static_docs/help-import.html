@@ -1,0 +1,72 @@
+
+<h3>Importing text files</h3>
+
+<div style="font-size:110%">
+<p>DIVIANA accepts <code>.txt</code>, <code>.tsv</code> and <code>.csv</code>
+files and detects column separators automatically. The following three
+formats are supported:</p>
+
+<ul>
+  <li class="mb-3">
+    <strong>Genotype table.</strong> One row per sample, with either one
+    genotype column per marker (e.g. <code>12/14</code>), or two adjacent
+    allele columns per marker.
+
+    <div class="mt-2">
+      <details class="mb-2">
+        <summary class="btn btn-sm btn-outline-secondary"
+                 style="display:inline-block;cursor:pointer">Example 1</summary>
+        <pre class="border rounded bg-light p-2 mt-2" style="tab-size:10;overflow-x:auto;font-size:0.95em;">Sample	D8S1179	TPOX
+R1	12/14	8/11
+R2	13/13	9/11</pre>
+      </details>
+
+      <details class="mb-2">
+        <summary class="btn btn-sm btn-outline-secondary"
+                 style="display:inline-block;cursor:pointer">Example 2</summary>
+        <pre class="border rounded bg-light p-2 mt-2" style="tab-size:10;overflow-x:auto;font-size:0.95em;">Sample	D8S1179.1	D8S1179.2	TPOX.1	TPOX.2
+R1	12	14	8	11
+R2	13	13	9	11</pre>
+      </details>
+    </div>
+  </li>
+
+  <li class="mb-3">
+    <strong>Genotype table with relationship information.</strong>
+    As above, but specifying each reference's relationship to the missing
+    person for automatic pedigree construction. The first three columns
+    are <code>Family</code>, <code>Relationship</code> (or
+    <code>Kinship</code>) and <code>Sample</code>, in that order;
+    minor naming variations are accepted. Relationships must be in brackets,
+    e.g. <code>[Mother]</code>.
+
+    <details class="mt-2 mb-2">
+      <summary class="btn btn-sm btn-outline-secondary"
+               style="display:inline-block;cursor:pointer">Example</summary>
+      <pre class="border rounded bg-light p-2 mt-2" style="tab-size:14;overflow-x:auto;font-size:0.95em;">Family	Relationship	Sample	D8S1179	TPOX
+F1	[Mother]	R1	12/14	8/11
+F1	[Father]	R2	13/13	9/11
+F2	[Brother]	R3	12/12	8/8</pre>
+    </details>
+  </li>
+
+  <li class="mb-3">
+    <strong>GeneMapper.</strong> DIVIANA supports some exports from GeneMapper
+    software (Thermo Fisher Scientific). In the GeneMapper export tool, choose
+    "One line per marker" and ensure the file contains columns
+    <code>Sample Name</code>, <code>Marker</code>, <code>Allele 1</code>
+    and <code>Allele 2</code>. Special samples (blanks, controls and ladders)
+    are automatically detected by DIVIANA and hidden by default.
+
+    <details class="mt-2 mb-2">
+      <summary class="btn btn-sm btn-outline-secondary"
+               style="display:inline-block;cursor:pointer">Example</summary>
+      <pre class="border rounded bg-light p-2 mt-2" style="tab-size:14;overflow-x:auto;font-size:0.95em;">Sample Name	Marker	Allele 1	Allele 2
+R1	D8S1179	12	14
+R1	TPOX	8	11
+R2	D8S1179	13	13
+R2	TPOX	9	11</pre>
+    </details>
+  </li>
+</ul>
+</div>

@@ -8,13 +8,13 @@ pedIssueReasons = function(x) {
   vapply(y, function(z) paste(unique.default(z), collapse = "; "), "")
 }
 
-pedIssueSummary = function(x) {
+pedIssueSummary = function(x, when = "saving") {
   n = length(pedIssueReasons(x))
   if(!n) return(NULL)
   div(class = "alert alert-warning py-2 mt-2 mb-0",
       style = "background:#fff3cd;border-color:#ffe69c;color:#664d03",
-      sprintf("%d %s manual inspection after saving", n,
-              if(n == 1L) "pedigree needs" else "pedigrees need"))
+      sprintf("%d %s manual inspection after %s", n,
+              if(n == 1L) "pedigree needs" else "pedigrees need", when))
 }
 
 dataUI = function(id, title = paste(id, "data")) {
@@ -33,7 +33,8 @@ dataUI = function(id, title = paste(id, "data")) {
 }
 
 dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = reactiveVal(),
-                      missingIDs = reactiveVal(), existingFams = reactive(character()), .debug = NULL) {
+                      missingIDs = reactiveVal(), existingFams = reactive(character()),
+                      currentModal = NULL, .debug = NULL) {
 
   .debug2 = if(is.null(.debug)) function(...) NULL else function(...)
     .debug(sprintf("-%s data:", id), ...)
@@ -43,10 +44,11 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
 
     # Main reactives
     mainTable = reactiveValues(raw = NULL, main = NULL)
-    completeDvi = reactiveValues(raw = NULL, import = NULL)
     sources = reactiveValues(current = NULL, all = NULL)
     builtAM = reactiveVal(NULL)
     importedAM = reactiveVal(NULL)
+    importType = reactiveVal(NULL)
+    previewRows = reactiveVal(NULL)
 
     # AM table: Clicking first column opens pedigree
     famClick = reactive({
@@ -59,98 +61,59 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       ext = externalData()
 
       if(identical(ext, "reset")) {
-        mainTable$main = mainTable$raw = completeDvi$raw = completeDvi$import = NULL
+        mainTable$main = mainTable$raw = NULL
         sources$all = sources$current = NULL
         builtAM(NULL)
         importedAM(NULL)
+        importType(NULL)
+        previewRows(NULL)
         isolate(externalData(NULL)) # TODO
         return()
       }
       else {
-        mainTable$main = externalData() |> standardiseGenoData(flavour = id)
-        completeDvi$raw = completeDvi$import = NULL
+        mainTable$main = ext |> standardiseGenoData(flavour = id)
+        mainTable$raw = NULL
+        builtAM(NULL)
+        importedAM(NULL)
+        importType(NULL)
+        previewRows(NULL)
       }
     }, ignoreInit = TRUE, ignoreNULL = FALSE)
 
 
     # Import ------------------------------------------------------------------
 
-    filetypeSaved = reactiveVal(NULL)
-    observeEvent(input$importButton, { .debug2("open import UI")
-      # Reset each time (but not main table)
-      mainTable$raw = completeDvi$raw = completeDvi$import = NULL
-      builtAM(NULL)
-      importedAM(NULL)
-      fileError(NULL)
-
-      showModal(modalDialog(
-        title = div(class = "aligned-row-wide", paste("Data import:", id), uiOutput(ns("banner"))),
-        size = "l",
-        fluidRow(
-          column(4,
-            pickerInput(ns("filetype"), label = NULL, width = "100%",
-                        choices = c(Familias = "fam",
-                                    Genemapper = "gm",
-                                    `Text file` = "txt",
-                                    `dviData (.RData/.rds)` = "rdata"),
-                        selected = filetypeSaved(),
-                        choicesOpt = list(disabled = c(FALSE, FALSE, FALSE, FALSE),
-                                          style = c("", "", "", ""), # color: gray !important;
-                                          icon = c("", "", "", "")), # "fa-ban"
-                        options = pickerOptions(style = "btn-outline-primary",
-                                                iconBase = "fas"))),
-          column(8,
-            fileInput(ns("file"), NULL, width = "100%",
-                      accept = c(".csv", ".tsv", ".txt", ".fam", ".rds", ".RData"))),
-        ),
-        textOutput(ns("instructions")),
-        uiOutput(ns("fileError")),
-
-        # Conditional panel showing complete DVI info
-        uiOutput(ns("dviContent")),
-
-        # Conditional panel showing raw sample genotypes
-        uiOutput(ns("tableContent")),
-
-        footer = tagList(div(class = "aligned-row-wide",
-          radioButtons(ns("action"), NULL, inline = TRUE,
-                       choices = c("Replace existing data" = "replace", "Add" = "add")),
-          div(modalButton("Cancel"), actionButton(ns("importSave"), "Save", status = "success"))))
-      ))
-    })
-
-    observeEvent(input$filetype, { .debug2("filetype =", input$filetype)
-      mainTable$raw = completeDvi$raw = NULL
-      builtAM(NULL)
-      fileError(NULL)
-      filetypeSaved(input$filetype)
-
-      instr = switch(input$filetype,
-        fam = "A file exported from the DVI module of Familias.",
-        gm = "A genemapper file in 'tall format', i.e., with one genotype per line.",
-        txt = "A tab-separated file with one row per individual. Alleles may be split in two columns per marker, or joined as genotypes ('a/b' or 'a,b').",
-        rdata = "A `dviData` object created in R with the dvir package, saved as either RData or rds."
-      )
-      output$instructions = renderText(paste("Expected format:", instr))
-    })
-
     fileError = reactiveVal(NULL)
 
-    output$fileError = renderUI(
-      div(style = "color: red", HTML(paste("<b>Error:</b>", req(fileError())))))
+    observeEvent(input$importButton, { .debug2("open import UI")
+      mainTable$raw = NULL
+      builtAM(NULL)
+      importedAM(NULL)
+      importType(NULL)
+      previewRows(NULL)
+      sources$current = NULL
+      fileError(NULL)
 
-    # Conditional panel with DVI info
-    output$dviContent = renderUI({
-      req(completeDvi$raw)
-      tagList(
-        fluidRow(
-          column(6, uiOutput(ns("dviInfo"))),
-          column(6, style = "padding: 20px",
-                 radioButtons(ns("importWhat"), label = "What do you want to import?",
-                              choiceValues = c("everything", "samples"),
-                              choiceNames = c("Everything", paste(id, "only"))))
-        )
+      mod = modalDialog(
+        title = div(class = "aligned-row-wide", paste("Import", id, "samples"),
+                    uiOutput(ns("banner")), helpBtn("help-import")),
+        size = "l",
+        p("Import sample data from a plain text file. See help page for supported formats."),
+        fileInput(ns("file"), NULL, width = "100%", accept = c(".txt", ".tsv", ".csv")),
+        uiOutput(ns("fileError")),
+        uiOutput(ns("tableContent")),
+        footer = tagList(div(class = "aligned-row-wide",
+          radioButtons(ns("action"), NULL, inline = TRUE, selected = "replace",
+                       choices = c("Replace existing data" = "replace", "Add" = "add")),
+          div(modalButton("Cancel"), actionButton(ns("importSave"), "Save", status = "success"))))
       )
+      if(!is.null(currentModal)) currentModal(mod)
+      showModal(mod)
+    })
+
+    output$fileError = renderUI({
+      msg = req(fileError())
+      div(style = "color:red", strong("Error: "), msg)
     })
 
     # conditional panel of raw sample genotypes
@@ -160,7 +123,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         DT::DTOutput(ns("previewTable")),
         em("To import only certain samples, select them before clicking Save.",
            style = "color: gray;"),
-        if(identical(input$filetype, "gm"))
+        if(identical(importType(), "gm"))
           div(style = "margin:5px 0;",
               checkboxInput(ns("includeHidden"), width = "100%",
                             "Include blanks, controls and ladder samples")),
@@ -181,70 +144,35 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       pedIssueSummary(selectedAM()$issues)
     })
 
-    output$dviInfo = renderUI({ .debug2("render dvi info")
-      raw = req(completeDvi$raw)
-      info = capture.output(print(raw, printMax = 0))
-      info[1] = "<b>Contents of DVI dataset</b>"
-      s = paste(info, collapse = "\n")
-      s = HTML(gsub("\n ", "\n &bull; ", s))
-      tagList(
-        div(s, style = paste(
-          "white-space: pre-wrap; color: RoyalBlue; line-height: 1.2em; padding: 5px;",
-          "margin: 5px 0; background-color: #f9f9f9; border: 1px solid #ccc;")),
-        if(input$importWhat == "everything")
-          pedIssueSummary(attr(raw, "inspectAM")))
-    })
-
-    observeEvent(input$importWhat, { .debug2("importWhat =", input$importWhat)
-      if(input$importWhat == "samples") {
-        s = switch(id, AM = completeDvi$raw$am, PM = completeDvi$raw$pm)
-        mainTable$raw = genosWithAttrs(s, addCols = c("Sample", "Sex"))
-      }
-      else
-        mainTable$raw = NULL
-    })
-
     observeEvent(input$file, {
-      mainTable$raw = completeDvi$raw = completeDvi$import = NULL
+      mainTable$raw = NULL
       builtAM(NULL)
+      importedAM(NULL)
+      importType(NULL)
+      previewRows(NULL)
+      sources$current = NULL
       fileError(NULL)
       req(input$file)
       .debug2("import file", input$file$name)
       path = input$file$datapath
-      rawdvi = rawtable = NULL
-      tryCatch(switch(input$filetype,
-        fam   = { rawdvi = dvir::familias2dvir(path, missingFormat = "M[FAM]-[IDX]", verbose = FALSE)},
-        rdata = { rawdvi = readRdvi(path, name = input$file$name)},
-        gm    = { rawtable = readGenemapper(path)},
-        txt = {
-          hdr = names(read.delim(path, nrows = 0, check.names = FALSE))
-          if(id == "AM" && length(hdr) >= 3L &&
-             startsWith(tolower(hdr[1]), "family") &&
-             tolower(hdr[2]) %in% c("relationship", "kinship", "[relationship]", "[kinship]")) {
-            x = read.delim(path, check.names = FALSE, colClasses = "character")
-            b = dvir::buildAM(x, mpFormat = "M")
-            builtAM(list(source = x, result = b))
-            rawtable = b$geno
-          } else rawtable = readGenoFromTxt(path)
-        }
-      ),
-      error = function(e) {
-        msg = gsub(path, input$file$name, conditionMessage(e), fixed = TRUE)
-        fileError(msg)
-      })
-
-      if(!is.null(rawtable))
-        mainTable$raw = rawtable |> moveColsFirst("AMEL")
-      else if(!is.null(rawdvi)) {
-        if(id == "AM" && !length(rawdvi$am))
-          fileError("No AM samples found in this DVI dataset")
-        else if(id == "PM" && !length(rawdvi$pm))
-          fileError("No PM samples found in this DVI dataset")
-        else
-          completeDvi$raw = rawdvi
+      ext = tolower(tools::file_ext(input$file$name))
+      if(ext %notin% c("txt", "tsv", "csv")) {
+        fileError("Only .txt, .tsv and .csv files are accepted for sample import")
+        return()
       }
 
-      sources$current = input$file$name
+      tryCatch({
+        res = readTextImport(path, flavour = id)
+        builtAM(res$built)
+        importType(res$type)
+        mainTable$raw = moveColsFirst(res$data, "AMEL")
+        sources$current = input$file$name
+        updateCheckboxInput(session, "includeHidden", value = FALSE)
+        updateCheckboxInput(session, "createAM", value = TRUE)
+        updateRadioButtons(session, "action", selected = "replace")
+      }, error = function(e) {
+        fileError(gsub(path, input$file$name, conditionMessage(e), fixed = TRUE))
+      })
     })
 
     # Update column exclusion list (default: Y stuff)
@@ -257,7 +185,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     # Genemapper: Remove blanks, controls and ladder samples
     dfFiltered = reactive({ .debug2("import filter genemapper/text blanks")
       df = req(mainTable$raw)
-      if(identical(input$filetype, "gm") && !isTRUE(input$includeHidden)) {
+      if(identical(importType(), "gm") && !isTRUE(input$includeHidden)) {
         blanks = rowSums(df != "/", na.rm = TRUE) == 0
         controls = grepl("C[+-]", rownames(df))
         ladder = grepl("Ladder", rownames(df))
@@ -269,30 +197,21 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     # Build pedigrees from selected rows only
     selectedAM = reactive({
       b = req(builtAM())
-      sel = input$previewTable_rows_selected
+      sel = previewRows()
       if(length(sel)) dvir::buildAM(b$source[sort(sel), , drop = FALSE], mpFormat = "family")
       else b$result
     })
 
     output$previewTable = DT::renderDT(previewGenoDT(dfFiltered()))
+    observeEvent(input$previewTable_rows_selected, previewRows(input$previewTable_rows_selected),
+                 ignoreNULL = FALSE)
 
-    observeEvent(input$importSave, {
-      req(input$action)
-      importWhat = input$importWhat %||% "samples"
+    observeEvent(input$importSave, { .debug2("import save")
+      req(input$action, mainTable$raw)
 
-      .debug2("import save", importWhat)
-
-      if(!is.null(completeDvi$raw) && importWhat == "everything") {
-        completeDvi$import = completeDvi$raw
-        sources$all = sources$current
-        removeModal()
-        return()
-      }
-      req(mainTable$raw)
-      # If not complete DVI
       create = id == "AM" && !is.null(builtAM()) && isTRUE(input$createAM)
       df = standardiseGenoData(dfFiltered(), flavour = id,
-                               selectRows = input$previewTable_rows_selected,
+                               selectRows = previewRows(),
                                excludeCols = input$excludeCols)
       if(create) {
         b = selectedAM()
@@ -589,7 +508,6 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
 
     # Return reactive variables to main app
     list(main = reactive(mainTable$main),
-         completeDvi = reactive(completeDvi$import),
          idEdits = reactive(idEdits()),
          merge = reactive(input$mergeButton),
          sources = reactive(sources$all),
@@ -786,6 +704,18 @@ checkSex = function(x) {
     x[bad] = "?"
   }
   x
+}
+
+readDviFile = function(fil, name = basename(fil)) {
+  ext = tolower(tools::file_ext(name))
+  dvi = switch(ext,
+    fam = dvir::familias2dvir(fil, missingFormat = "M[FAM]-[IDX]", verbose = FALSE),
+    rds = readRdvi(fil, name = name),
+    rdata = readRdvi(fil, name = name),
+    stop2("Unsupported DVI file. Use .fam, .rds or .RData")
+  )
+  if(!inherits(dvi, "dviData")) stop2("File does not contain a valid dviData object")
+  dvi
 }
 
 readRdvi = function(fil, name = basename(fil)) {
