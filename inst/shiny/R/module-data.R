@@ -710,6 +710,10 @@ standardiseGenoData = function(df, flavour, selectRows = NULL, excludeCols = NUL
   else
     df$Sex = "?"
 
+  # Standardise genotype separators
+  genoCols = setdiff(names(df), c("Fam", "Sample", "Alias", "AMEL", "Sex", ".rowid"))
+  df[genoCols] = lapply(df[genoCols], \(x) gsub(",", "/", x, fixed = TRUE))
+
   # Key column for DT editing (not visible)
   df$.rowid = seq_len(nrow(df))
 
