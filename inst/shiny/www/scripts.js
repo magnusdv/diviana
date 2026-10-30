@@ -1,8 +1,4 @@
 
-window.onbeforeunload = function(){ Shiny.onInputChange('browserClosed', Math.random()); };
-
-
-
 window.sexEditCallback = function(table) {
   const id = $(table.table().container()).closest('.html-widget').attr('id') + '_sex_edit';
 

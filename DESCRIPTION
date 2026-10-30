@@ -26,7 +26,7 @@ Imports:
     pedtools (>= 2.11.0),
     plotly,
     ribd,
-    shiny,
+    shiny (>= 1.14.0),
     shinyWidgets,
     shinyjs,
     verbalisr

@@ -262,16 +262,6 @@ server = function(input, output, session) {
     cat("\n")
   }
 
-  isLocalHost = function() {
-    host = session$clientData$url_hostname %||% ""
-    host %in% c("localhost", "127.0.0.1", "::1")
-  }
-
-  # Close local app when browser closes
-  observeEvent(input$browserClosed, {
-    if(isLocalHost()) stopApp()
-  }, ignoreInit = TRUE)
-
   # Main reactive variables -------------------------------------------------
 
   pedigrees = reactiveVal(NULL)

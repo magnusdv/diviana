@@ -13,6 +13,6 @@
 #' @export
 launchApp = function() {
   suppressPackageStartupMessages({
-    shiny::runApp(system.file("shiny", package = "diviana"), launch.browser = TRUE)
+    invisible(shiny::startApp(system.file("shiny", package = "diviana"), launch.browser = TRUE))
   })
 }
