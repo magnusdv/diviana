@@ -132,8 +132,8 @@ relabelPedigreesDialog = function(opt) {
       ),
       br(),
       uiOutput("relabelPreview"),
-      div(class = "text-muted small", style = "font-style:italic;",
-          "Note: Names of families and individuals can also be changed in the pedigree editor.")
+      div(class = "text-muted small", style = "font-style:italic; margin-top:5px",
+          "Note: These labels can also be set individually in the pedigree editor.")
     ),
     footer = div(class = "aligned-row",
                  style = "justify-content:flex-end;gap:12px;width:100%",

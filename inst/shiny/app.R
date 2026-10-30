@@ -202,9 +202,11 @@ ui = bs4Dash::bs4DashPage(
              numericInput("pairLRmin", "Pairing LRmin", value = 0, min = 0)|>
                wrap_tooltip("pairLRmin"),
              br(),
-             checkboxInput("ignoresex", "Ignore Sex", value = FALSE),
-             checkboxInput("strictUndisputed", "Strict undisp.", value = FALSE) |>
-               wrap_tooltip("strictUndisputed"),
+             checkboxInput("ignoresex", "Ignore sex", value = FALSE),
+             checkboxInput("strictUndisputed", "Strict", value = FALSE) |>
+               wrap_tooltip("strictUndisp"),
+             checkboxInput("skipJoint", "Skip joint", value = FALSE) |>
+               wrap_tooltip("skipJoint"),
              hr(),
              downloadBttn('downloadTables', "Results", style = "material-flat", block = TRUE,
                           color = "warning") |> wrap_tooltip("downloadRes")
@@ -1247,8 +1249,10 @@ server = function(input, output, session) {
                           limit = input$pairLRmin,
                           maxAssign = settings$maxAssign,
                           computeLR0 = settings$computeLR0,
-                          ignoreSex = input$ignoresex, verbose = TRUE,
-                          debug = DEVMODE, detailedOutput = TRUE)
+                          ignoreSex = input$ignoresex,
+                          joint = !isTRUE(input$skipJoint),
+                          verbose = TRUE, debug = DEVMODE,
+                          detailedOutput = TRUE)
       },
       error = function(e) {
         msg = conditionMessage(e)
@@ -1451,6 +1455,7 @@ server = function(input, output, session) {
     updateNumericInput(session, "mutrateM", value = 0.002)
     updateNumericInput(session, "LRthresh", value = 10000)
     updateCheckboxInput(session, "strictUndisputed", value = FALSE)
+    updateCheckboxInput(session, "skipJoint", value = FALSE)
     updateNumericInput(session, "maxIncomp", value = 2)
     updateCheckboxInput(session, "ignoresex", value = FALSE)
     updateCheckboxInput(session, "acrossComps", value = FALSE)

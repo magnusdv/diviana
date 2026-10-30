@@ -44,8 +44,8 @@ missingLabelRadios = function(id, selected = "M", action = "loading") {
                    choices = c("M1, M2, M3, ...  (sequential)" = "M",
                                "F1-MP, F2-MP, ...  (family name prefix)" = "F"),
                    selected = selected),
-      div(class = "text-muted small",
-          sprintf("Note: Labels can also be changed after %s.", action)))
+      div(class = "text-muted small", style = "margin-top: 3px;",
+          sprintf("Note: Labels can be changed after %s.", action)))
 }
 
 helpBtn = function(id) {

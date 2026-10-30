@@ -386,12 +386,12 @@ formatJointTab = function(x, vics, miss, title = NULL, usealias = FALSE, aliasPM
     ) |>
     cols_align(align = "center") |>
     tooltipHeader(list(
-      loglik = "Log-likelihood of the assignment using all data reaching this stage",
-      loglik0 = "Log-likelihood with the assigned victims disconnected from the reference family",
-      LR = "LR comparing the assignment with the unrelated hypothesis",
+      loglik = "Joint log-likelihood of the assignment using all data",
+      loglik0 = "Reference-free log-likelihood, i.e., considering the victims alone",
+      LR = "Joint LR (against unrelated) using all data",
       `LR[1:k]` = "LR comparing the best assignment (row 1) with row k",
-      LR0 = "Reference-free LR; evidence for the victim relationships the assignment",
-      LRref = "Additional LR contribution from the reference data (LR/LR0)"
+      LR0 = "Reference-free LR: Evidence for the victim relationship alone",
+      LRref = "Additional LR contribution from the reference data (= LR/LR0)"
     ))
 }
 

@@ -83,7 +83,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
                          selected = s$defaultMethod)
           ),
           column(5,
-            radioButtons(ns("defaultNames"), "Default names", inline = TRUE,
+            radioButtons(ns("defaultNames"), "Default naming scheme", inline = TRUE,
                          choices = c("Combine" = "combine", "Most complete" = "mostcomplete"),
                          selected = s$defaultNames)
           ),
