@@ -246,6 +246,18 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       if(create) {
         b = selectedAM()
         if(input$action == "add") {
+
+          # Continue sequential missing labels from existing maximum
+          if((input$missingFmt %||% "M") == "M") {
+            m = grep("^M[0-9]+$", missingIDs(), value = TRUE)
+            k = if(length(m)) max(as.integer(substring(m, 2))) else 0L
+            mp = paste0("M", k + seq_along(b$missing))
+            b$am = Map(\(p, old, new) relabel(p, old = old, new = new),
+                       b$am, b$missing, mp)
+            b$missing = mp
+          }
+
+          # Reject duplicate family and individual IDs
           dup = c(intersect(names(b$am), existingFams()),
                   intersect(rownames(b$geno), rownames(mainTable$main)),
                   intersect(b$missing, missingIDs()))
