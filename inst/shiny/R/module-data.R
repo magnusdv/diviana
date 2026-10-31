@@ -235,6 +235,12 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
                                selectRows = previewRows(),
                                excludeCols = input$excludeCols)
 
+      if(id == "PM" && input$action == "replace" &&
+         (anyNA(df$Alias) || any(!nzchar(df$Alias)) || anyDuplicated(df$Alias))) {
+        fileError("PM aliases must be unique and nonempty. Edit the file or exclude the Alias column.")
+        return()
+      }
+
       if(input$action == "add") {
         dup = intersect(df$Sample, mainTable$main$Sample)
         if(length(dup)) {
@@ -383,7 +389,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
           stop2("Name cannot be empty")
         if(cl == "Sample" && val %in% dat$Sample[-i])
           stop2("Duplicate sample name: ", val)
-        if(cl == "Alias" && val %in% dat$Alias[-i])
+        if(id == "PM" && cl == "Alias" && val %in% dat$Alias[-i])
           stop2("Duplicate alias: ", val)
         if(cl == "Sample" && val %in% missing)
           stop2("Name is already in use by a missing person:", val)
@@ -520,8 +526,12 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         warning = function(w) NULL,
         error = function(e) aliasErrorMsg("Invalid regular expression")
       )
-      if(any(res == "") || anyDuplicated.default(res) )
-        aliasErrorMsg("Empty or duplicated aliases")
+      if(any(res == ""))
+        aliasErrorMsg("Empty aliases (not permitted)")
+      else if(anyDuplicated.default(res))
+        aliasErrorMsg(if(id == "AM")
+          "Warning: Duplicated aliases (this is ok for AM samples)" else
+            "Warning: Duplicated aliases (not permitted for PM samples)")
       res
     })
 
@@ -540,12 +550,22 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
 
     output$aliasErrorUI = renderUI({ .debug2("alias error ui")
       msg = aliasErrorMsg()
-      if (msg != "") tags$div(style = "color: red;", msg)
+      if(msg != "")
+        div(class = if(id == "AM" && startsWith(msg, "Duplicated")) "text-warning" else "text-danger", msg)
     })
 
     observeEvent(input$aliasSave, { .debug2("alias save")
+      al = generateAliases()
+      if(anyNA(al) || any(!nzchar(al))) {
+        showErr("Aliases must be nonempty")
+        return()
+      }
+      if(id == "PM" && anyDuplicated(al)) {
+        showErr("PM aliases must be unique")
+        return()
+      }
       dat = mainTable$main
-      dat$Alias = generateAliases()
+      dat$Alias = al
       mainTable$main = dat
       removeModal()
     })
@@ -553,6 +573,10 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     observeEvent(input$aliasReplace, { .debug2("alias replace")
       dat = mainTable$main
       al = generateAliases()
+      if(anyNA(al) || any(!nzchar(al)) || anyDuplicated(al)) {
+        showErr("Replacing sample IDs requires unique, nonempty aliases")
+        return()
+      }
 
       changes = list(ids = .setnames(al, dat$Sample))
       idEdits(changes)
