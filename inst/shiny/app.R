@@ -827,7 +827,7 @@ server = function(input, output, session) {
   nPed = reactive(length(pedigrees()))
   curPed = cardCounter("pedcard", nPed)
   defaultRelabelOptions = list(families = "keep", prefix = "F", missing = "keep",
-                             format = "[FNAME]_M[MIDX_FAM]")
+                             format = "[FNAME]-M[MIDX_FAM]")
   relabelOptions = reactiveVal(defaultRelabelOptions)
 
   # Flagged pedigrees can be opened and approved from the card header

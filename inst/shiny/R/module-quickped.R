@@ -108,6 +108,7 @@ relabelPedigreesDialog = function(opt) {
                          "Keep existing",
                          "M1, M2, ...",
                          "M1-1, M1-2, M2-1, ...",
+                         "Name after family",
                          tagList("Custom format ",
                            tags$details(
                              style = "display:inline-block;position:relative;margin-left:2px",
@@ -124,7 +125,8 @@ relabelPedigreesDialog = function(opt) {
                            )
                          )
                        ),
-                       choiceValues = c("keep", "M[MIDX]", "M[FIDX]-[MIDX_FAM]", "custom"),
+                       choiceValues = c("keep", "M[MIDX]", "M[FIDX]-[MIDX_FAM]",
+                                        "[FNAME]", "custom"),
                        selected = opt$missing),
           conditionalPanel("input.relabelMissing == 'custom'",
                            textInput("relabelFormat", NULL, opt$format, width = "100%"))
