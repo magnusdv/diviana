@@ -445,9 +445,9 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
           column(6,
             radioButtons(ns("aliasMethod"), "Choose method:",
                          choices = list("Sequence with prefix" = "prefix",
-                                        "Keep until first" = "cut",
+                                        "Keep part of text" = "cut",
                                         "Remove text" = "remove",
-                                        "Extract text" = "extract"),
+                                        "Regular expression" = "regex"),
                          selected = "prefix")
           ),
           column(6,
@@ -476,7 +476,9 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       origs = req(origs())
       aliasErrorMsg("")
       method = input$aliasMethod
-      inp = input[[method]]
+      inp = if(identical(method, "cut"))
+        paste0(input$cutFrom %||% "", input$cutUntil %||% "")
+      else input[[method]]
       if(is.null(inp) || inp == "")
         return(origs)
 
@@ -486,15 +488,29 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       }
       else tryCatch({ # catch invalid regexpr
         if(method == "cut") {
-          r = regexpr(inp, origs, fixed = TRUE)
-          res = origs
-          res[r > 0] = substr(origs[r > 0], 1, r[r > 0] - 1)
+          from = input$cutFrom %||% ""
+          until = input$cutUntil %||% ""
+          start = rep.int(1L, length(origs))
+          end = nchar(origs)
+          ok = rep(TRUE, length(origs))
+          if(nzchar(from)) {
+            r = regexpr(from, origs, fixed = TRUE)
+            ok = ok & r > 0L
+            start = r + nchar(from)
+          }
+          if(nzchar(until)) {
+            r = vapply(gregexpr(until, origs, fixed = TRUE), tail, integer(1), n = 1L)
+            ok = ok & r > 0L
+            end = r - 1L
+          }
+          ok = ok & start <= end
+          res[ok] = substr(origs[ok], start[ok], end[ok])
         }
         else if(method == "remove") {
           pattern = strsplit(inp, ",")[[1]] |> paste(collapse = "|")
           res = gsub(pattern, "", origs)
         }
-        else if(method == "extract") {
+        else if(method == "regex") {
           r = regexpr(inp, origs)
           al = origs
           al[r > -1] = regmatches(origs, r)
@@ -513,9 +529,13 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       ns = session$ns
       switch(input$aliasMethod,
              prefix = textInput(ns("prefix"), "Prefix:", value = switch(id, PM = "V", AM = "R", "ID")),
-             cut = textInput(ns("cut"), "Any character or space:"),
+             cut = div(class = "d-flex", style = "gap:6px",
+                       div(style = "flex:1;min-width:0",
+                           textInput(ns("cutFrom"), "From:", placeholder = "beginning", width = "100%")),
+                       div(style = "flex:1;min-width:0",
+                           textInput(ns("cutUntil"), "Until:", placeholder = "end", width = "100%"))),
              remove = textInput(ns("remove"), "Strings (separate w/comma):"),
-             extract = textInput(ns("extract"), "Regex pattern to match:"))
+             regex = textInput(ns("regex"), "Regex pattern to match:"))
     })
 
     output$aliasErrorUI = renderUI({ .debug2("alias error ui")
