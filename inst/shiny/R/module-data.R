@@ -26,6 +26,7 @@ dataUI = function(id, title = paste(id, "data")) {
       actionButton(ns("importButton"), label = tagList(myIcon("file-arrow-up", align = "-0.1em"), "Import")),
       actionButton(ns("editButton"), label = tagList(myIcon("edit", align = "-0.1em"), "Edit")),
       actionButton(ns("aliasButton"), label = tagList(icon("user-pen", align = "-0.1em"), "Aliases")),
+      actionButton(ns("exportButton"), label = tagList(icon("file-export"), "Export")),
       if(id == "PM")
         actionButton(ns("mergeButton"), label = tagList(icon("object-group"), "Merge PM"))
     )
@@ -588,6 +589,37 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     })
 
     # End alias ---------------------------------------------------------------
+
+    # Export ------------------------------------------------------------------
+
+    observeEvent(input$exportButton, {
+      req(mainTable$main)
+      showModal(modalDialog(
+        title = paste("Export", id, "data"),
+        textInput(ns("exportName"), "File name:", value = paste0(id, "-data")),
+        radioButtons(ns("exportFormat"), "Format:", inline = TRUE,
+                     choices = c("Tab-separated text (.txt)" = "txt", "Excel (.xlsx)" = "xlsx")),
+        footer = tagList(modalButton("Cancel"),
+                         downloadButton(ns("exportDownload"), "Download", class = "btn-success"))
+      ))
+    })
+
+    output$exportDownload = downloadHandler(
+      filename = function() {
+        name = trimws(input$exportName %||% "")
+        if(!nzchar(name)) name = paste0(id, "-data")
+        name = sub("\\.(txt|xlsx)$", "", name, ignore.case = TRUE)
+        paste0(basename(name), ".", input$exportFormat %||% "txt")
+      },
+      content = function(file) {
+        dat = req(mainTable$main)
+        dat$.rowid = NULL
+        if(identical(input$exportFormat, "xlsx"))
+          openxlsx::write.xlsx(dat, file, sheetName = id, rowNames = FALSE)
+        else
+          utils::write.table(dat, file, sep = "\t", quote = FALSE, row.names = FALSE, na = "")
+      }
+    )
 
     # Show warning banner. (Set session=session to restrict to shinyapps.io)
     output$banner = renderUI(banner(session = NULL))
