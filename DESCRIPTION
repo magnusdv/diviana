@@ -39,5 +39,8 @@ Language: en-GB
 LazyData: true
 Roxygen: list(markdown = TRUE)
 Suggests: 
+    pak, 
+    remotes,
+    jsonlite,
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
