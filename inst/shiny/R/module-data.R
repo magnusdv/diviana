@@ -27,15 +27,17 @@ dataUI = function(id, title = paste(id, "data")) {
       actionButton(ns("editButton"), label = tagList(myIcon("edit", align = "-0.1em"), "Edit")),
       actionButton(ns("aliasButton"), label = tagList(icon("user-pen", align = "-0.1em"), "Aliases")),
       actionButton(ns("exportButton"), label = tagList(icon("file-export"), "Export")),
-      if(id == "PM")
-        actionButton(ns("mergeButton"), label = tagList(icon("object-group"), "Merge PM"))
+      if(id == "PM") tagList(
+        actionButton(ns("mergeButton"), label = tagList(icon("object-group"), "Merge PM")),
+        actionButton(ns("pairingButton"), "PM \u2192 AM"))
     )
   )
 }
 
 dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = reactiveVal(),
                       missingIDs = reactiveVal(), existingFams = reactive(character()),
-                      currentModal = NULL, .debug = NULL) {
+                      muted = reactive(character()), currentModal = NULL, .debug = NULL,
+                      identifications = reactive(NULL)) {
 
   .debug2 = if(is.null(.debug)) function(...) NULL else function(...)
     .debug(sprintf("-%s data:", id), ...)
@@ -50,6 +52,30 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     importedAM = reactiveVal(NULL)
     importType = reactiveVal(NULL)
     previewRows = reactiveVal(NULL)
+
+    # Commit the complete table, including muted PM samples.
+    setData = function(dat) {
+      if(NROW(dat)) {
+        if(id == "PM")
+          dat = dat[order(dat$Sample), , drop = FALSE]
+        al = dat$Alias
+        empty = is.na(al)
+        if(any(empty)) {
+          candidates = paste0(switch(id, PM = "V", AM = "R"), seq_len(nrow(dat)))
+          al[empty] = head(setdiff(candidates, al), sum(empty))
+        }
+        if(any(!nzchar(al)))
+          stop2("Aliases must be nonempty")
+        if(id == "PM" && anyDuplicated(al))
+          stop2("PM aliases must be unique")
+        dat$Alias = al
+        dat$.rowid = seq_len(nrow(dat))
+        rownames(dat) = dat$Sample
+        dat = moveColsFirst(dat, ".rowid")
+      }
+      else dat = NULL
+      mainTable$main = dat
+    }
 
     # AM table: Clicking first column opens pedigree
     famClick = reactive({
@@ -73,7 +99,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         return()
       }
       else {
-        mainTable$main = ext |> standardiseGenoData(flavour = id)
+        setData(standardiseGenoData(ext))
         mainTable$raw = NULL
         builtAM(NULL)
         importedAM(NULL)
@@ -221,33 +247,27 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
 
       create = id == "AM" && !is.null(builtAM()) && isTRUE(input$createAM)
       df = tryCatch({
-        x = standardiseGenoData(dfFiltered(), flavour = id, selectRows = previewRows(),
+        x = standardiseGenoData(dfFiltered(), selectRows = previewRows(),
                                 excludeCols = input$excludeCols)
         # Try-out to catch errors!
         geno = x[setdiff(names(x), c(".rowid", "Fam", "Sample", "Alias", "AMEL", "Sex"))]
         splitGenotypes(geno)
         x
       }, error = function(e) {
-        fileError(conditionMessage(e)); NULL}
-      )
+        fileError(conditionMessage(e))
+        NULL
+      })
 
       if(is.null(df)) return()
-      df = standardiseGenoData(dfFiltered(), flavour = id,
-                               selectRows = previewRows(),
-                               excludeCols = input$excludeCols)
 
-      if(id == "PM" && input$action == "replace" &&
-         (anyNA(df$Alias) || any(!nzchar(df$Alias)) || anyDuplicated(df$Alias))) {
-        fileError("PM aliases must be unique and nonempty. Edit the file or exclude the Alias column.")
+      # Replacement affects active samples only; keep identified PM rows.
+      old = mainTable$main
+      keep = if(input$action == "add") old else if(id == "PM" && NROW(old))
+        old[old$Sample %in% muted(), , drop = FALSE]
+      dup = intersect(df$Sample, keep$Sample)
+      if(length(dup)) {
+        fileError(paste("Existing sample IDs:", toString(dup)))
         return()
-      }
-
-      if(input$action == "add") {
-        dup = intersect(df$Sample, mainTable$main$Sample)
-        if(length(dup)) {
-          fileError(paste("Existing sample IDs:", toString(dup)))
-          return()
-        }
       }
 
       if(create) {
@@ -274,21 +294,14 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
           }
         }
       }
-      if(input$action == "replace") {
-        mainTable$main = df
-        sources$all = sources$current
-      }
-      else {
-        # Generate unused aliases for added samples
-        prefix = switch(id, PM = "V", AM = "R")
-        candidates = paste0(prefix, seq_len(NROW(mainTable$main) + nrow(df)))
-        df$Alias = head(setdiff(candidates, mainTable$main$Alias), nrow(df))
-        mainTable$main = rbindSafe(mainTable$main, df)
-        sources$all = unique.default(c(sources$all, sources$current))
-      }
-      if(create)
-        importedAM(list(result = b, action = input$action))
-      removeModal()
+      tryCatch({
+        setData(rbindSafe(keep, df))
+        sources$all = if(input$action == "replace" && !NROW(keep)) sources$current else
+          unique.default(c(sources$all, sources$current))
+        if(create)
+          importedAM(list(result = b, action = input$action))
+        removeModal()
+      }, error = function(e) fileError(conditionMessage(e)))
     })
 
     output$mainTableUI = renderUI(
@@ -296,7 +309,8 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     )
 
     output$mainTable = DT::renderDT({
-      genoDT(mainTable$main, mode = "main", flavour = id, assigned = assignedRefs(), scrollY = "370px")
+      genoDT(mainTable$main, mode = "main", flavour = id, assigned = assignedRefs(),
+             muted = muted(), scrollY = "370px", identifications = identifications())
     }, server = FALSE)
 
     output$sourcefield = renderUI({
@@ -340,16 +354,20 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       rows = input$editTable_rows_selected
       req(length(rows))
       dat = editdata()
+      old = mainTable$main
+      samples = old$Sample[match(dat$.rowid[rows], old$.rowid)]
 
       # Keep references that belong to an AM pedigree
       if(id == "AM") {
-        old = mainTable$main
-        refs = old$Sample[match(dat$.rowid[rows], old$.rowid)]
-        assigned = intersect(refs, names(assignedRefs()))
+        assigned = intersect(samples, names(assignedRefs()))
         if(length(assigned)) {
           showErr("Cannot delete references assigned to pedigrees: ", toString(assigned))
           return()
         }
+      }
+      if(id == "PM" && any(samples %in% muted())) {
+        showErr("Cannot delete manually identified PM samples")
+        return()
       }
       deleteRows(dat$.rowid[rows])
       confirm = modalDialog(
@@ -390,12 +408,8 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
           stop2("Name cannot be empty")
         if(cl == "Sample" && val %in% dat$Sample[-i])
           stop2("Duplicate sample name: ", val)
-        if(id == "PM" && cl == "Alias" && val %in% dat$Alias[-i])
-          stop2("Duplicate alias: ", val)
         if(cl == "Sample" && val %in% missing)
           stop2("Name is already in use by a missing person:", val)
-        if(cl == "Alias" && val %in% missing)
-          stop2("Alias is already in use by a missing person:", val)
 
         # Update row name to match Sample
         if(cl == "Sample")
@@ -430,17 +444,17 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
 
       changes = if(length(ids) || length(sex)) list(ids = ids, sex = sex) else NULL
 
-      rownames(new) = new$Sample
-      mainTable$main = if(nrow(new)) new else NULL
-      idEdits(changes)
-      removeModal()
+      tryCatch({
+        setData(new)
+        idEdits(changes)
+        removeModal()
+      }, error = showErr)
     }
     observeEvent(input$editSave, saveEdit())
 
     # Alias -------------------------------------------------------------------
 
     origs = reactiveVal(NULL)
-    aliasInputs = reactiveValues(remove = "", keep = "", prefix = "")
     aliasErrorMsg = reactiveVal("")
 
     observeEvent(input$aliasButton, { .debug2("open Alias UI")
@@ -556,19 +570,12 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     })
 
     observeEvent(input$aliasSave, { .debug2("alias save")
-      al = generateAliases()
-      if(anyNA(al) || any(!nzchar(al))) {
-        showErr("Aliases must be nonempty")
-        return()
-      }
-      if(id == "PM" && anyDuplicated(al)) {
-        showErr("PM aliases must be unique")
-        return()
-      }
       dat = mainTable$main
-      dat$Alias = al
-      mainTable$main = dat
-      removeModal()
+      dat$Alias = generateAliases()
+      tryCatch({
+        setData(dat)
+        removeModal()
+      }, error = showErr)
     })
 
     observeEvent(input$aliasReplace, { .debug2("alias replace")
@@ -580,11 +587,9 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       }
 
       changes = list(ids = .setnames(al, dat$Sample))
-      idEdits(changes)
-
       dat$Alias = dat$Sample = al
-      rownames(dat) = al
-      mainTable$main = dat
+      setData(dat)
+      idEdits(changes)
       removeModal()
     })
 
@@ -626,8 +631,10 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
 
     # Return reactive variables to main app
     list(main = reactive(mainTable$main),
+         set = setData,
          idEdits = reactive(idEdits()),
          merge = reactive(input$mergeButton),
+         pairing = reactive(input$pairingButton),
          sources = reactive(sources$all),
          sourceValues = sources,
          famClick = famClick,
@@ -659,7 +666,7 @@ previewGenoDT = function(dat) {
 }
 
 
-formatGenoView = function(dat, mode, flavour = NULL, fam = NULL) {
+formatGenoView = function(dat, mode, flavour = NULL, fam = NULL, identifications = NULL) {
 
   if(mode == "main" && flavour == "AM") {
     if(is.null(fam))
@@ -668,7 +675,14 @@ formatGenoView = function(dat, mode, flavour = NULL, fam = NULL) {
       f = fam[dat$Sample]
       dat$Fam = ifelse(is.na(f), "", f)
     }
+    dat = dat[order(dat$Fam, dat$Sample), , drop = FALSE]
     dat = moveColsFirst(dat, c("Fam", "Sample", "Alias", "Sex"))
+
+    # Show the original PM sample without changing the stored AM ID.
+    j = match(dat$Sample, identifications$Missing)
+    fixed = !is.na(j)
+    if(any(fixed))
+      dat$Sample[fixed] = sprintf("%s (%s)", dat$Sample[fixed], identifications$Sample[j[fixed]])
   }
 
   if(mode == "main" && identical(dat$Alias, rownames(dat)))
@@ -688,12 +702,14 @@ formatGenoView = function(dat, mode, flavour = NULL, fam = NULL) {
   dat
 }
 
-genoDT = function(dat, mode = c("main", "edit"), flavour = NULL, assigned = NULL, scrollY = NULL) {
+genoDT = function(dat, mode = c("main", "edit"), flavour = NULL, assigned = NULL,
+                   muted = NULL, scrollY = NULL, identifications = NULL) {
   if(is.null(dat))
     return(NULL)
 
   mode = match.arg(mode)
-  dat = formatGenoView(dat, mode, flavour = flavour, fam = assigned)
+  dat = formatGenoView(dat, mode, flavour = flavour, fam = assigned,
+                       identifications = identifications)
 
   nms = names(dat)
   .cols = function(cols) .myintersect(cols, nms)
@@ -739,10 +755,14 @@ genoDT = function(dat, mode = c("main", "edit"), flavour = NULL, assigned = NULL
   if(mode == "main")
     dt = dt |> DT::formatStyle(.cols("Sex"), color = DT::styleEqual(c("F", "M"),
                                                                     c("hotpink", "steelblue")))
+  if(mode == "main" && length(muted))
+    dt = dt |> DT::formatStyle("Sample", target = "row",
+      backgroundColor = DT::styleEqual(muted, rep("#eeeeee", length(muted))),
+      color = DT::styleEqual(muted, rep("#999999", length(muted))))
   dt
 }
 
-standardiseGenoData = function(df, flavour, selectRows = NULL, excludeCols = NULL) {
+standardiseGenoData = function(df, selectRows = NULL, excludeCols = NULL) {
   if(is.null(df))
     return()
 
@@ -758,10 +778,6 @@ standardiseGenoData = function(df, flavour, selectRows = NULL, excludeCols = NUL
   nms = names(df)
   rownms = rownames(df)
 
-  # Don't include fam here; taken care of in formatGenoView
-  #if(flavour == "AM" && !"Fam" %in% nms)
-  #  df$Fam = ""
-
   if("Sample" %notin% nms && !is.null(rownms))
     df$Sample = rownms
 
@@ -769,10 +785,10 @@ standardiseGenoData = function(df, flavour, selectRows = NULL, excludeCols = NUL
     rownames(df) = rownms = df$Sample
   }
 
-  if("Alias" %notin% nms) {
-    al = switch(flavour, PM = "V", AM = "R") |> paste0(seq_len(nrow(df)))
-    df$Alias = if(!any(al %in% rownms)) al else rownms
-  }
+  # Aliases are allocated after combining imported and retained rows.
+  if("Alias" %notin% nms)
+    df$Alias = rep(NA_character_, nrow(df))
+  df$Alias[df$Alias == "" & !is.na(df$Alias)] = NA_character_
 
   # AMEL: First column starting with amel (case insensitive). NA if empty
   amel = grep("^amel", nms, ignore.case = TRUE, value = TRUE)[1]
@@ -790,10 +806,7 @@ standardiseGenoData = function(df, flavour, selectRows = NULL, excludeCols = NUL
   genoCols = setdiff(names(df), c("Fam", "Sample", "Alias", "AMEL", "Sex", ".rowid"))
   df[genoCols] = lapply(df[genoCols], \(x) gsub(",", "/", x, fixed = TRUE))
 
-  # Key column for DT editing (not visible)
-  df$.rowid = seq_len(nrow(df))
-
-  moveColsFirst(df, c(".rowid", "Fam", "Sample", "Alias", "Sex"))
+  moveColsFirst(df, c("Fam", "Sample", "Alias", "Sex"))
 }
 
 
@@ -860,6 +873,8 @@ readRdvi = function(fil, name = basename(fil)) {
     stop2("Illegal file extension. Accepted types are .RData and .rds")
   )
 
+  if(!is.null(dvi$identifications))
+    dvi$identifications$Alias = NULL
   dvi
 }
 

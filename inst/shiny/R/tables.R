@@ -345,10 +345,11 @@ formatLRmatrix = function(m, title = NULL, LRthresh = 1e4, usealias = FALSE,
 
 formatJointTab = function(x, vics, miss, title = NULL, usealias = FALSE, aliasPM = NULL, maxrows = 100) {
   clnms = colnames(x)
+  collabs = clnms
   vcol = clnms %in% vics
   mcol = clnms %in% miss
   if(usealias && !is.null(aliasPM))
-    colnames(x)[vcol] = aliasPM[clnms[vcol]]
+    collabs[vcol] = aliasPM[clnms[vcol]]
 
   nr = nrow(x)
   nc = ncol(x)
@@ -356,9 +357,10 @@ formatJointTab = function(x, vics, miss, title = NULL, usealias = FALSE, aliasPM
     x = x[1:maxrows, , drop = FALSE]
     nr = maxrows
   }
-  wraptxt = if(any(nchar(colnames(x)) > 7)) NULL else "nowrap"
+  wraptxt = if(any(nchar(collabs) > 7)) NULL else "nowrap"
 
   gt(x) |>
+    cols_label(.list = as.list(setNames(collabs, clnms))) |>
     .addTitle(title) |>
     opt_row_striping() |>
     tab_options(

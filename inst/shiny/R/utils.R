@@ -179,8 +179,10 @@ useAlias = function(labs, alias) {
 }
 
 rbindSafe = function(df1, df2) {
-  if(is.null(df1))
+  if(!NROW(df1))
     return(df2)
+  if(!NROW(df2))
+    return(df1)
 
   # Match column names ignoring case and whitespace
   idx = match(normaliseName(names(df2)), normaliseName(names(df1)), nomatch = 0L)
@@ -189,12 +191,7 @@ rbindSafe = function(df1, df2) {
   cols = union(names(df1), names(df2))
   df1[.mysetdiff(cols, names(df1))] = NA
   df2[.mysetdiff(cols, names(df2))] = NA
-  res = rbind(df1[, cols], df2[, cols])
-
-  if(".rowid" %in% cols)
-    res$.rowid = seq_len(nrow(res))
-
-  res
+  rbind(df1[, cols, drop = FALSE], df2[, cols, drop = FALSE])
 }
 
 # Expand getGenotypes() adding fam/id/sex as attributes or columns

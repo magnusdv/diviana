@@ -76,7 +76,7 @@ ui = bs4Dash::bs4DashPage(
           wrap_tooltip("settings", "bottom"),
         downloadBttn("downloaddata", NULL, style = "jelly", color = "warning", size = "m")|>
           wrap_tooltip("downloaddata", "bottom"),
-        selectInput("example", NULL, choices = c("Load example" = "", DATASETS), width = "200px", selectize = FALSE),
+        selectInput("example", NULL, choices = c("Load example" = "", DATASETS), width = "200px", selectize = TRUE),
         actionBttn("resetall", icon("redo"), style = "jelly", color = "danger", size = "m") |>
           wrap_tooltip("resetall", "bottom"),
       )
@@ -268,6 +268,7 @@ server = function(input, output, session) {
   pedIssues = reactiveVal(character())
   DB = reactiveVal(NULL) # list of freq vectors
   mainMissing = reactiveVal(NULL)
+  identifications = reactiveVal(NULL)
 
   # Import data ------------------------------------------------------------
 
@@ -279,8 +280,10 @@ server = function(input, output, session) {
 
   dataServerAM = dataServer("AM", externalAM, assignedRefs, missingIDs = mainMissing,
                             existingFams = reactive(names(pedigrees())),
-                            currentModal = currentModal, .debug = .debug)
+                            currentModal = currentModal, .debug = .debug,
+                            identifications = identifications)
   dataServerPM = dataServer("PM", externalPM, missingIDs = mainMissing,
+                            muted = reactive(identifications()$Sample),
                             currentModal = currentModal, .debug = .debug)
 
   genoAM = reactive({ .debug("genoAM", dataServerAM$main())
@@ -345,9 +348,19 @@ server = function(input, output, session) {
       mutparams = lapply(mutmods, \(mut) pedmut::getParams(mut, format = 4))
     }
 
+    # Reconstruct fixed PM samples for display only; they are absent from dvi$pm.
+    am = genosWithAttrs(dvi$am, addCols = c("Sample", "Sex"))
+    pm = genosWithAttrs(dvi$pm, addCols = c("Sample", "Sex"))
+    ids = dvi$identifications
+    if(NROW(ids)) {
+      fixed = if(is.null(am)) data.frame(Sample = ids$Sample) else
+        am[match(ids$Missing, am$Sample), , drop = FALSE]
+      fixed$Sample = ids$Sample
+      pm = rbindSafe(pm, fixed)
+    }
+
     # appData containing all info to reconstruct the dvi state
-    list(am = genosWithAttrs(dvi$am, addCols = c("Sample", "Sex")),
-         pm = genosWithAttrs(dvi$pm, addCols = c("Sample", "Sex")),
+    list(am = am, pm = pm,
          peds = peds,
          db = db,
          mutparams = mutparams,
@@ -381,6 +394,7 @@ server = function(input, output, session) {
     pedIssues(pedIssueReasons(attr(dvi, "inspectAM")))
 
     appData(dat)
+    identifications(dvi$identifications)
     pedigrees(dat$peds)
     externalAM(dat$am)
     externalPM(dat$pm)
@@ -702,10 +716,9 @@ server = function(input, output, session) {
     }
     s = pedtools::singletons(rownames(a), sex = sexPM()) |> .setnames(rownames(a))
 
-    tryCatch(
-      setMarkersDiviana(s, alleleMatrix = a, loci = loci[idx]),
-      error = showErr
-    )
+    pm = tryCatch(setMarkersDiviana(s, alleleMatrix = a, loci = loci[idx]),
+                  error = showErr)
+    pm[!names(pm) %in% identifications()$Sample]
   })
 
   currentDviData = reactive({ .debug("currentDviData")
@@ -722,9 +735,15 @@ server = function(input, output, session) {
     if(length(missing) && anyNA(match(missing, labels(am))))
       message("Something wrong: missing person not in AM!", toString(missing))
 
-    tryCatch(dviData(am = am, pm = pm, missing = missing),
+    tryCatch(dviData(am = am, pm = pm, missing = missing,
+                     identifications = identifications()),
       error = function(e) {showErr(conditionMessage(e)); NULL})
   })
+
+  setPairingServer("setPairing", trigger = dataServerPM$pairing,
+                   dvi = currentDviData, pedigrees = pedigrees,
+                   am = dataServerAM, pm = dataServerPM,
+                   identifications = identifications)
 
   observeEvent(currentDviData(), {
     resetAnalysis(resetAnalysis() + 1)
@@ -734,8 +753,12 @@ server = function(input, output, session) {
                            reset = reactive(input$resetall))
 
   observeEvent(mergedPm(), {
-    pm = genosWithAttrs(req(mergedPm())$pm, addCols = c("Sample", "Sex"))
-    externalPM(pm)
+    z = req(mergedPm())
+    pm = genosWithAttrs(z$pm, addCols = c("Sample", "Sex"))
+    old = dataServerPM$main()
+    pm$Alias = old$Alias[match(pm$Sample, old$Sample)]
+    fixed = old[old$Sample %in% identifications()$Sample, , drop = FALSE]
+    externalPM(rbindSafe(pm, fixed))
   })
 
   observeEvent(c(dataServerAM$sources(), dataServerPM$sources()), { .debug("source changed")
@@ -1016,6 +1039,7 @@ server = function(input, output, session) {
       names(issues) = names(peds)[match(names(issues), old)]
       pedIssues(issues)
       mainMissing(dvi$missing)
+      identifications(dvi$identifications)
       pedigrees(peds)
       relabelOptions(z$opt)
       pendingRelabel(NULL)
@@ -1230,7 +1254,8 @@ server = function(input, output, session) {
 
   observeEvent(input$solve, { .debug("solve")
     dvi = currentDviData()
-    req(length(dvi$am) > 0, length(dvi$pm) > 0, length(dvi$missing) > 0)
+    req(length(dvi$am) > 0, (length(dvi$pm) > 0 && length(dvi$missing) > 0) ||
+          NROW(dvi$identifications) > 0)
     res = NULL
     tryCatch({
       res = captureOutput(dviSolve, dvi, threshold = input$LRthresh,
@@ -1264,19 +1289,9 @@ server = function(input, output, session) {
   })
 
   observeEvent(currentDviData(), {  .debug("reset result tables")
-    dvi = currentDviData()
-
-    # AM and PM data frames
-    e1 = character(length(miss <- dvi$missing))
-    solutionTable$AM = data.frame(Family = getFamily(dvi, miss), Missing = miss,
-      Sample = e1, LR = e1, GLR = e1, Conclusion = e1, Comment = e1)
-
-    e2 = character(length(vics <- names(dvi$pm)))
-    solutionTable$PM = data.frame(Sample = vics, Missing = e2, Family = e2,
-                                  LR = e2, GLR = e2, Conclusion = e2, Comment = e2)
-    # LR and exclusion matrices
+    solutionTable$AM = solutionTable$PM = NULL
     solutionTable$LR = solutionTable$EX = solutionTable$JT = NULL
-  })
+  }, ignoreNULL = FALSE)
 
   output$amcentric = gt::render_gt({  .debug("render result AM")
     formatResultTable(req(solutionTable$AM), title = "AM-centered result table",
@@ -1292,10 +1307,13 @@ server = function(input, output, session) {
 
   output$lrmatrix = gt::render_gt({ .debug("render LR matrix")
     dvi = currentDviData()
-    m = req(solutionTable$LR) |> completeMatrix(names(dvi$pm), dvi$missing)
-    if(isTRUE(input$compactTabs))
-      m = m[.compactRows(solutionTable$PM),
-            .compactRows(solutionTable$AM), drop = FALSE]
+    m = req(solutionTable$LR) |>
+      completeMatrix(names(dvi$pm), dvi$missing)
+    if(isTRUE(input$compactTabs)) {
+      pmRows = solutionTable$PM[match(rownames(m), solutionTable$PM$Sample), , drop = FALSE]
+      amRows = solutionTable$AM[match(colnames(m), solutionTable$AM$Missing), , drop = FALSE]
+      m = m[.compactRows(pmRows), .compactRows(amRows), drop = FALSE]
+    }
 
     formatLRmatrix(m, title = "Pairwise LR matrix",
                    input$LRthresh, settings$useAliases, aliasPM = aliasPM())
@@ -1303,7 +1321,8 @@ server = function(input, output, session) {
 
   output$exmatrix = gt::render_gt({ .debug("render exclusion matrix")
     dvi = currentDviData()
-    m = req(solutionTable$EX) |> completeMatrix(names(dvi$pm), dvi$missing)
+    m = req(solutionTable$EX) |>
+      completeMatrix(names(dvi$pm), dvi$missing)
     formatExclusionMatrix(m, title = "Pairwise exclusion matrix",
                           input$maxIncomp, settings$useAliases, aliasPM = aliasPM())
   }, height = 600)
@@ -1349,7 +1368,9 @@ server = function(input, output, session) {
     pednrs = pages()[[curSols()]]
 
     labfun = getLabfun(dvi, settings$hideUnimportantLabs, settings$useAliases, aliasAM())
-    plotSolutionDIVIANA(dvi, solutionTable$AM, pednrs = pednrs, labs = labfun)
+    activeAM = solutionTable$AM[match(dvi$missing, solutionTable$AM$Missing), , drop = FALSE]
+    activeAM$Conclusion[is.na(activeAM$Conclusion)] = ""
+    plotSolutionDIVIANA(dvi, activeAM, pednrs = pednrs, labs = labfun)
   }, res = 96, width = "auto", height = 600, execOnResize = TRUE)
 
   # Download solution tables ------------------------------------------------
@@ -1357,11 +1378,13 @@ server = function(input, output, session) {
   output$downloadTables = downloadHandler(
     filename = function() sprintf("diviana-%s.xlsx", Sys.Date()),
     content = function(file) { .debug("download")
-      req(solutionTable$AM, solutionTable$LR, solutionTable$EX)
+      req(solutionTable$AM, solutionTable$PM)
       dvi = req(currentDviData())
       tables = reactiveValuesToList(solutionTable)
-      tables$LR = tables$LR |> completeMatrix(names(dvi$pm), dvi$missing)
-      tables$EX = tables$EX |> completeMatrix(names(dvi$pm), dvi$missing)
+      if(!is.null(tables$LR)) {
+        tables$LR = tables$LR |> completeMatrix(names(dvi$pm), dvi$missing)
+        tables$EX = tables$EX |> completeMatrix(names(dvi$pm), dvi$missing)
+      }
       downloadTables(tables, file)
     },
     contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -1428,6 +1451,7 @@ server = function(input, output, session) {
     externalAM("reset")
     externalPM("reset")
     appData(NULL)
+    identifications(NULL)
     dbChoice("builtin")
     mutChoice("none")
     externalLoci$db = externalLoci$mut = NULL
@@ -1438,7 +1462,7 @@ server = function(input, output, session) {
     DB(NULL)
     relabelOptions(defaultRelabelOptions)
     pendingRelabel(NULL)
-    isolate(updateSelectInput(session, "example", selected = ""))
+    updateSelectInput(session, "example", choices = c("Load example" = "", DATASETS), selected = "")
     updateRadioButtons(session, "dbtype", selected = "builtin")
     updateRadioButtons(session, "muttype", selected = "none")
     updateNumericInput(session, "mutrateF", value = 0.001)

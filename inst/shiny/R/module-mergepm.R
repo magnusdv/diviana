@@ -83,7 +83,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
                          selected = s$defaultMethod)
           ),
           column(5,
-            radioButtons(ns("defaultNames"), "Default naming scheme", inline = TRUE,
+            radioButtons(ns("defaultNames"), "Default names", inline = TRUE,
                          choices = c("Combine" = "combine", "Most complete" = "mostcomplete"),
                          selected = s$defaultNames)
           ),
@@ -465,7 +465,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
 
       res = req(analysis())
       d = req(dvi())
-      outside = setdiff(names(d$pm), res$groups[[gn]])
+      outside = setdiff(c(names(d$pm), d$identifications$Sample), res$groups[[gn]])
       other = setdiff(approved(), gn)
       if(nm %in% c(outside, mergedNames()[other])) {
         showNotification("Merged sample name is already in use", type = "error")
@@ -578,7 +578,11 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
         relabel(prof, new = unname(nms[gn]))
       })
 
-      dvir::setVictims(d, newpm[lengths(newpm) > 0L])
+      newpm = newpm[lengths(newpm) > 0L]
+      newids = c(vapply(newpm, `[[`, "", "ID"), d$identifications$Sample)
+      if(anyDuplicated(newids))
+        stop2("Merged sample name is already in use")
+      dvir::setVictims(d, newpm)
     }
 
     observeEvent(input$save, {
