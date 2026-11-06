@@ -64,7 +64,9 @@ db2locattrs = function(db, mutparams = NULL) {
 }
 
 normaliseName = function(x) {
-  toupper(gsub("[-._ ]", "", x))
+  x = toupper(gsub("[-._ ]", "", x))
+  x[x == "APOAI1"] = "APOC3"
+  x
 }
 
 # Observed alleles not seen in database
