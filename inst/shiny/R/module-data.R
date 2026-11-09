@@ -541,152 +541,11 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     }
     observeEvent(input$editSave, saveEdit())
 
-    # Alias -------------------------------------------------------------------
 
-    origs = reactiveVal(NULL)
-    aliasErrorMsg = reactiveVal("")
+    # Aliases -----------------------------------------------------------------
 
-    observeEvent(input$aliasButton, { .debug2("open Alias UI")
-      origs(rownames(req(mainTable$main)))
-
-      showModal(modalDialog(
-        title = "Generate Aliases",
-        fluidRow(
-          column(6,
-            radioButtons(ns("aliasMethod"), "Choose method:",
-                         choices = list("Sequence with prefix" = "prefix",
-                                        "Keep part of text" = "cut",
-                                        "Remove text" = "remove",
-                                        "Regular expression" = "regex"),
-                         selected = "prefix")
-          ),
-          column(6,
-            uiOutput(ns("conditional_inputs")),
-            uiOutput(ns("aliasErrorUI"))
-          )
-        ),
-        div(style = "margin-top: 10px;", DT::DTOutput(ns("aliasTable"))),
-        footer = tagList(
-          tagAppendAttributes(
-            actionButton(ns("aliasReplace"), HTML("Replace originals<br>with aliases"), warning = "info"),
-            class = "btn-xs",
-            style = "float:left; margin-right:auto; color:tomato; font-size:80%; font-weight:550; line-height:1.1; border-radius: 12px; padding: 2px 6px;"
-          ),
-          modalButton("Cancel"),
-          actionButton(ns("aliasSave"), "Save",status = "success"))
-      ))
-    })
-
-    output$aliasTable = DT::renderDT({
-      df = data.frame(Original = origs(), Alias = generateAliases())
-      aliasDT(df)
-    })
-
-    generateAliases = reactive({ .debug2("generate aliases")
-      origs = req(origs())
-      aliasErrorMsg("")
-      method = input$aliasMethod
-      inp = if(identical(method, "cut"))
-        paste0(input$cutFrom %||% "", input$cutUntil %||% "")
-      else input[[method]]
-      if(is.null(inp) || inp == "")
-        return(origs)
-
-      res = origs
-      if(method == "prefix") {
-        res = paste0(inp, seq_along(origs))
-      }
-      else tryCatch({ # catch invalid regexpr
-        if(method == "cut") {
-          from = input$cutFrom %||% ""
-          until = input$cutUntil %||% ""
-          start = rep.int(1L, length(origs))
-          end = nchar(origs)
-          ok = rep(TRUE, length(origs))
-          if(nzchar(from)) {
-            r = regexpr(from, origs, fixed = TRUE)
-            ok = ok & r > 0L
-            start = r + nchar(from)
-          }
-          if(nzchar(until)) {
-            r = vapply(gregexpr(until, origs, fixed = TRUE), tail, integer(1), n = 1L)
-            ok = ok & r > 0L
-            end = r - 1L
-          }
-          ok = ok & start <= end
-          res[ok] = substr(origs[ok], start[ok], end[ok])
-        }
-        else if(method == "remove") {
-          pattern = strsplit(inp, ",")[[1]] |> paste(collapse = "|")
-          res = gsub(pattern, "", origs)
-        }
-        else if(method == "regex") {
-          r = regexpr(inp, origs)
-          al = origs
-          al[r > -1] = regmatches(origs, r)
-          res = al
-        }
-      },
-        warning = function(w) NULL,
-        error = function(e) aliasErrorMsg("Invalid regular expression")
-      )
-      if(any(res == ""))
-        aliasErrorMsg("Empty aliases (not permitted)")
-      else if(anyDuplicated.default(res))
-        aliasErrorMsg(if(id == "AM")
-          "Warning: Duplicated aliases (this is ok for AM samples)" else
-            "Warning: Duplicated aliases (not permitted for PM samples)")
-      res
-    })
-
-    output$conditional_inputs = renderUI({ .debug2("conditional alias input")
-      ns = session$ns
-      switch(input$aliasMethod,
-             prefix = textInput(ns("prefix"), "Prefix:", value = switch(id, PM = "V", AM = "R", "ID")),
-             cut = div(class = "d-flex", style = "gap:6px",
-                       div(style = "flex:1;min-width:0",
-                           textInput(ns("cutFrom"), "From:", placeholder = "beginning", width = "100%")),
-                       div(style = "flex:1;min-width:0",
-                           textInput(ns("cutUntil"), "Until:", placeholder = "end", width = "100%"))),
-             remove = textInput(ns("remove"), "Strings (separate w/comma):"),
-             regex = textInput(ns("regex"), "Regex pattern to match:"))
-    })
-
-    output$aliasErrorUI = renderUI({ .debug2("alias error ui")
-      msg = aliasErrorMsg()
-      if(msg != "")
-        div(class = if(id == "AM" && startsWith(msg, "Duplicated")) "text-warning" else "text-danger", msg)
-    })
-
-    observeEvent(input$aliasSave, { .debug2("alias save")
-      dat = mainTable$main
-      dat$Alias = generateAliases()
-      tryCatch({
-        setData(dat)
-        removeModal()
-      }, error = showErr)
-    })
-
-    observeEvent(input$aliasReplace, { .debug2("alias replace")
-      dat = mainTable$main
-      al = generateAliases()
-      if(anyNA(al) || any(!nzchar(al)) || anyDuplicated(al)) {
-        showErr("Replacing sample IDs requires unique, nonempty aliases")
-        return()
-      }
-      if(any(al %in% missingIDs())) {
-        showErr("Replacement ID already in use by missing person: ",
-                toString(intersect(al, missingIDs())))
-        return()
-      }
-      changes = list(ids = .setnames(al, dat$Sample))
-      dat$Alias = dat$Sample = al
-      setData(dat)
-      idEdits(changes)
-      removeModal()
-    })
-
-    # End alias ---------------------------------------------------------------
+    registerAliases(id, input, output, session, mainTable, setData,
+                    missingIDs, idEdits, .debug2)
 
     # Export ------------------------------------------------------------------
 
@@ -903,24 +762,6 @@ standardiseGenoData = function(df, selectRows = NULL, excludeCols = NULL) {
 }
 
 
-aliasDT = function(dat, scrollY = "250px") {
-  res = DT::datatable(dat,
-                      rownames = FALSE,
-                      selection = "none",
-                      class = "stripe hover compact",
-                      options = list(dom = 't',
-                                     scrollX = FALSE,
-                                     scrollY = scrollY,
-                                     scrollCollapse = TRUE,
-                                     paging = FALSE)) |>
-    DT::formatStyle(names(dat), target = "row", lineHeight = "80%")
-
-  # Highlight empty or duplicated aliases
-  bad = c("", unique.default(dat$Alias[duplicated.default(dat$Alias)]))
-  cols = c("lightgray", "pink", "lightblue", "yellow", "lightgreen", "orange")[seq_along(bad)]
-  DT::formatStyle(res, "Alias", backgroundColor = DT::styleEqual(bad, cols))
-}
-
 # Check sex vector
 checkSex = function(x) {
   x[x %in% c("", NA, 0)] = "?"
@@ -985,23 +826,3 @@ banner = function(session) {
   )
 }
 
-# Test app ------------------------------------------------------------
-
-of = sys.frame(1)$ofile
-if(!is.null(of) && basename(of) == "module-import.R") { cat("Test app for import module\n")
-  library(bs4Dash)
-  ui = bs4DashPage(dark = NULL, help = NULL,
-    bs4DashNavbar(status = "info", title = "test import"),
-    bs4DashSidebar(disable = TRUE, minified = FALSE),
-    bs4DashBody(fluidRow(column(width = 6, dataUI("PM")),
-                         column(width = 6, dataUI("AM"))))
-  )
-
-  server = function(input, output, session) {
-    externalData = reactiveVal(data.frame(a=1:3, b=4:6, row.names = c("A", "B", "C")))
-    importA = dataServer("PM", externalData)
-    importB = dataServer("AM")
-  }
-
-  shinyApp(ui = ui, server = server)
-}
