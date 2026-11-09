@@ -37,7 +37,7 @@ dataUI = function(id, title = paste(id, "data")) {
 dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = reactiveVal(),
                       missingIDs = reactiveVal(), existingFams = reactive(character()),
                       muted = reactive(character()), currentModal = NULL, .debug = NULL,
-                      identifications = reactive(NULL)) {
+                      identifications = reactive(NULL), existingIDs = reactive(character())) {
 
   .debug2 = if(is.null(.debug)) function(...) NULL else function(...)
     .debug(sprintf("-%s data:", id), ...)
@@ -52,6 +52,21 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     importedAM = reactiveVal(NULL)
     importType = reactiveVal(NULL)
     previewRows = reactiveVal(NULL)
+
+    # Preserve import settings across files and dialog openings.
+    importOpts = reactiveValues(action = "add", longNames = TRUE, createAM = TRUE,
+                                missingFmt = "M", includeHidden = FALSE, excludeCols = NULL)
+    pendingImport = reactiveVal(NULL)
+
+    observeEvent(input$action, {importOpts$action = input$action})
+    observeEvent(input$longNames, {importOpts$longNames = input$longNames})
+    observeEvent(input$createAM, {importOpts$createAM = input$createAM})
+    observeEvent(input$missingFmt, {importOpts$missingFmt = input$missingFmt})
+    observeEvent(input$includeHidden, {importOpts$includeHidden = input$includeHidden})
+    observeEvent(input$excludeCols, {
+      if(!is.null(mainTable$raw))
+        importOpts$excludeCols = input$excludeCols %||% character()
+    }, ignoreNULL = FALSE)
 
     # Commit the complete table, including muted PM samples.
     setData = function(dat) {
@@ -113,15 +128,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
 
     fileError = reactiveVal(NULL)
 
-    observeEvent(input$importButton, { .debug2("open import UI")
-      mainTable$raw = NULL
-      builtAM(NULL)
-      importedAM(NULL)
-      importType(NULL)
-      previewRows(NULL)
-      sources$current = NULL
-      fileError(NULL)
-
+    showImport = function() {
       mod = modalDialog(
         title = div(class = "aligned-row-wide", paste("Import", id, "samples"),
                     uiOutput(ns("banner")), helpBtn("help-import")),
@@ -130,13 +137,25 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         fileInput(ns("file"), NULL, width = "100%", accept = c(".txt", ".tsv", ".csv")),
         uiOutput(ns("fileError")),
         uiOutput(ns("tableContent")),
-        footer = tagList(div(class = "aligned-row-wide",
-          radioButtons(ns("action"), NULL, inline = TRUE, selected = "replace",
-                       choices = c("Replace existing data" = "replace", "Add" = "add")),
-          div(modalButton("Cancel"), actionButton(ns("importSave"), "Save", status = "success"))))
+          footer = div(class = "aligned-row-wide",
+            radioButtons(ns("action"), NULL, inline = TRUE, selected = isolate(importOpts$action),
+                         choices = c("Add samples" = "add", "Replace" = "replace")),
+            div(modalButton("Cancel"), actionButton(ns("importSave"), "Save", status = "success")))
       )
       if(!is.null(currentModal)) currentModal(mod)
       showModal(mod)
+    }
+
+    observeEvent(input$importButton, { .debug2("open import UI")
+      mainTable$raw = NULL
+      builtAM(NULL)
+      importedAM(NULL)
+      importType(NULL)
+      previewRows(NULL)
+      pendingImport(NULL)
+      sources$current = NULL
+      fileError(NULL)
+      showImport()
     })
 
     output$fileError = renderUI({
@@ -144,34 +163,50 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       div(style = "color:red", strong("Error: "), msg)
     })
 
-    # conditional panel of raw sample genotypes
+        # Arrange import controls below the genotype preview.
     output$tableContent = renderUI({ .debug2("update raw table")
-      req(mainTable$raw)
+      cols = names(req(mainTable$raw))
+      excluded = isolate(input$excludeCols %||% importOpts$excludeCols)
+      if(is.null(excluded))
+        excluded = c("Yindel", grep("^DY", cols, value = TRUE))
+
       tagList(
         DT::DTOutput(ns("previewTable")),
-        em("To import only certain samples, select them before clicking Save.",
-           style = "color: gray;"),
+        div(class = "text-muted", style = "font-size:0.85rem;margin:4px 0 12px",
+            "Select rows to import only those samples."),
+        div(style = "max-width:420px",
+            selectizeInput(ns("excludeCols"), "Exclude columns", width = "100%",
+                           choices = cols, selected = intersect(excluded, cols), multiple = TRUE)),
         if(identical(importType(), "gm"))
-          div(style = "margin:5px 0;",
-              checkboxInput(ns("includeHidden"), width = "100%",
-                            "Include blanks, controls and ladder samples")),
-        div(class = "aligned-row-wide", style = "margin-top: 5px",
-            p("Exclude columns:",
-              style = "white-space: nowrap; font-weight: bolder; margin:0; padding-right:10px"),
-            selectizeInput(ns("excludeCols"), NULL, width = "100%",
-                           choices = character(), multiple = TRUE)),
+          checkboxInput(ns("includeHidden"), "Include blanks, controls and ladder samples",
+                        value = isolate(input$includeHidden %||% importOpts$includeHidden),
+                        width = "auto"),
+
+
         if(id == "AM" && !is.null(builtAM()))
-          div(style = "margin-top:12px",
-              checkboxInput(ns("createAM"), strong("Create pedigrees automatically"), TRUE),
-              conditionalPanel("input.createAM", ns = ns,
-                               missingLabelRadios(ns("missingFmt"), action = "importing"))),
+          tagList(
+            div(style = "display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px;margin:4px 0 12px",
+                tagAppendAttributes(
+                  checkboxInput(ns("longNames"), "Add family and relationship to sample IDs",
+                                value = isolate(input$longNames %||% importOpts$longNames),
+                                width = "auto"),
+                  style = "margin:0"),
+                tagAppendAttributes(
+                  checkboxInput(ns("createAM"), "Create pedigrees automatically",
+                                value = isolate(input$createAM %||% importOpts$createAM),
+                                width = "auto"),
+                  style = "margin:0")),
+            conditionalPanel("input.createAM", ns = ns,
+                             missingLabelRadios(ns("missingFmt"), action = "importing",
+                                                selected = isolate(input$missingFmt %||% importOpts$missingFmt)))),
         if(id == "AM") uiOutput(ns("buildIssues"))
       )
     })
 
     output$buildIssues = renderUI({
       req(isTRUE(input$createAM))
-      pedIssueSummary(selectedAM()$issues)
+      tryCatch(pedIssueSummary(selectedAM()$issues),
+               error = function(e) span(class = "text-danger", conditionMessage(e)))
     })
 
     observeEvent(input$file, {
@@ -193,28 +228,32 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
 
       tryCatch({
         res = readTextImport(path, flavour = id)
+        if(!ncol(res$data)) stop2("No genotype columns found in file")
         builtAM(res$built)
         importType(res$type)
         mainTable$raw = moveColsFirst(res$data, "AMEL")
         sources$current = input$file$name
-        updateCheckboxInput(session, "includeHidden", value = FALSE)
-        updateCheckboxInput(session, "createAM", value = TRUE)
-        updateRadioButtons(session, "action", selected = "replace")
       }, error = function(e) {
         fileError(gsub(path, input$file$name, conditionMessage(e), fixed = TRUE))
       })
     })
 
-    # Update column exclusion list (default: Y stuff)
-    observeEvent(mainTable$raw, {
-      cls = names(mainTable$raw)
-      updateSelectizeInput(session, "excludeCols", choices = cls,
-                           selected = c("Yindel", grep("^DY", cls, value = TRUE)))
-    })
 
-    # Genemapper: Remove blanks, controls and ladder samples
+    # Prepare sample names and show original family information for short names
     dfFiltered = reactive({ .debug2("import filter genemapper/text blanks")
       df = req(mainTable$raw)
+      if(id == "AM" && !is.null(builtAM())) {
+        if(isFALSE(input$longNames)) {
+          src = builtAM()$source
+          df$Family = trimws(src[[1]])
+          df$Relationship = trimws(src[[2]])
+          df$Sample = trimws(src[[3]])
+          df = moveColsFirst(df, c("Family", "Relationship", "Sample"))
+        } else {
+          df$Sample = rownames(df)
+          df = moveColsFirst(df, "Sample")
+        }
+      }
       if(identical(importType(), "gm") && !isTRUE(input$includeHidden)) {
         blanks = rowSums(df != "", na.rm = TRUE) == 0
         controls = grepl("C[+-]", rownames(df))
@@ -229,28 +268,55 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       b = req(builtAM())
       sel = previewRows()
       fmt = input$missingFmt %||% "M"
-      if(length(sel) || fmt != "M") {
+      long = input$longNames %||% TRUE
+      if(length(sel) || fmt != "M" || !long) {
         source = b$source
         if(length(sel))
           source = source[sort(sel), , drop = FALSE]
-        dvir::buildAM(source, mpFormat = fmt)
+        dvir::buildAM(source, mpFormat = fmt, longNames = long)
       }
       else b$result
     })
 
-    output$previewTable = DT::renderDT(previewGenoDT(dfFiltered()))
+    output$previewTable = DT::renderDT(
+      previewGenoDT(dfFiltered(), selected = if(!is.null(builtAM())) isolate(previewRows())))
     observeEvent(input$previewTable_rows_selected, previewRows(input$previewTable_rows_selected),
                  ignoreNULL = FALSE)
 
+    # Save validated data independently of the confirmation dialog inputs.
+    commitImport = function(z) {
+      tryCatch({
+        setData(rbindSafe(z$keep, z$df))
+        sources$all = if(z$action == "replace" && !NROW(z$keep)) z$source else
+          unique.default(c(sources$all, z$source))
+        if(z$create)
+          importedAM(list(result = z$build, action = z$action))
+        pendingImport(NULL)
+        removeModal()
+      }, error = function(e) {
+        fileError(conditionMessage(e))
+        if(!is.null(pendingImport())) showImport()
+      })
+    }
+
     observeEvent(input$importSave, { .debug2("import save")
       req(input$action, mainTable$raw)
+      fileError(NULL)
+
+      if(id == "AM" && input$action == "replace" && NROW(identifications())) {
+        fileError("Reset the dataset before replacing AM data with fixed identifications")
+        return()
+      }
 
       create = id == "AM" && !is.null(builtAM()) && isTRUE(input$createAM)
       df = tryCatch({
-        x = standardiseGenoData(dfFiltered(), selectRows = previewRows(),
-                                excludeCols = input$excludeCols)
-        # Try-out to catch errors!
+        b = if(id == "AM" && !is.null(builtAM())) selectedAM()
+        x = if(is.null(b))
+          standardiseGenoData(dfFiltered(), selectRows = previewRows(), excludeCols = input$excludeCols)
+        else standardiseGenoData(b$geno, excludeCols = input$excludeCols)
+        # Check genotypes before saving any data
         geno = x[setdiff(names(x), c(".rowid", "Fam", "Sample", "Alias", "AMEL", "Sex"))]
+        if(!ncol(geno)) stop2("No genotype columns selected")
         splitGenotypes(geno)
         x
       }, error = function(e) {
@@ -270,15 +336,16 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         return()
       }
 
-      if(create) {
-        b = selectedAM()
-        if(input$action == "add") {
+      tryCatch({
+        if(create && input$action == "add") {
 
           # Continue sequential missing labels from existing maximum
           if((input$missingFmt %||% "M") == "M") {
-            m = grep("^M[0-9]+$", missingIDs(), value = TRUE)
+            m = grep("^M[0-9]+$", c(existingIDs(), keep$Sample), value = TRUE)
             k = if(length(m)) max(as.integer(substring(m, 2))) else 0L
             mp = paste0("M", k + seq_along(b$missing))
+            dup = intersect(mp, c(keep$Sample, df$Sample))
+            if(length(dup)) stop2("Missing person IDs already used by samples: ", toString(dup))
             b$am = Map(\(p, old, new) relabel(p, old = old, new = new),
                        b$am, b$missing, mp)
             b$missing = mp
@@ -286,23 +353,39 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
 
           # Reject duplicate family and individual IDs
           dup = c(intersect(names(b$am), existingFams()),
-                  intersect(rownames(b$geno), rownames(mainTable$main)),
-                  intersect(b$missing, missingIDs()))
+                  intersect(c(rownames(b$geno), b$missing), existingIDs()),
+                  intersect(unlist(lapply(b$am, labels), use.names = FALSE), c(keep$Sample, missingIDs())))
           if(length(dup)) {
             fileError(paste("Existing family or individual IDs:", toString(unique(dup))))
             return()
           }
         }
-      }
-      tryCatch({
-        setData(rbindSafe(keep, df))
-        sources$all = if(input$action == "replace" && !NROW(keep)) sources$current else
-          unique.default(c(sources$all, sources$current))
-        if(create)
-          importedAM(list(result = b, action = input$action))
-        removeModal()
+
+        z = list(df = df, keep = keep, build = b, create = create,
+                 action = input$action, source = sources$current)
+        replacing = z$action == "replace" && (NROW(old) ||
+          (id == "AM" && create && length(existingFams())))
+
+        if(!replacing) {
+          commitImport(z)
+          return()
+        }
+
+        pendingImport(z)
+        msg = switch(id,
+          AM = sprintf("Existing AM samples %swill be replaced.", if(create) "and pedigrees " else ""),
+          PM = "Existing PM samples will be replaced; manually identified samples are kept."
+        )
+        showModal(confirmModal(msg, ns("replaceBack"), ns("replaceConfirm")))
       }, error = function(e) fileError(conditionMessage(e)))
     })
+
+    observeEvent(input$replaceBack, {
+      pendingImport(NULL)
+      showImport()
+    })
+
+    observeEvent(input$replaceConfirm, commitImport(req(pendingImport())))
 
     output$mainTableUI = renderUI(
       if(!is.null(mainTable$main)) DT::DTOutput(ns("mainTable")) else NULL
@@ -445,6 +528,12 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       changes = if(length(ids) || length(sex)) list(ids = ids, sex = sex) else NULL
 
       tryCatch({
+        fixed = old$Sample %in% muted()
+        cols = setdiff(names(new), c(".rowid", "Sample", "Alias"))
+        if(id == "PM" && any(fixed) &&
+           !identical(unname(as.matrix(old[fixed, cols, drop = FALSE])),
+                      unname(as.matrix(new[fixed, cols, drop = FALSE]))))
+          stop2("Edit identified profiles in the AM table")
         setData(new)
         idEdits(changes)
         removeModal()
@@ -585,7 +674,11 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
         showErr("Replacing sample IDs requires unique, nonempty aliases")
         return()
       }
-
+      if(any(al %in% missingIDs())) {
+        showErr("Replacement ID already in use by missing person: ",
+                toString(intersect(al, missingIDs())))
+        return()
+      }
       changes = list(ids = .setnames(al, dat$Sample))
       dat$Alias = dat$Sample = al
       setData(dat)
@@ -646,14 +739,14 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
 
 # Utils -------------------------------------------------------------------
 
-previewGenoDT = function(dat) {
+previewGenoDT = function(dat, selected = NULL) {
   DT::datatable(
     dat,
     class = "stripe hover nowrap compact",
     rownames = "Sample" %notin% colnames(dat),
     escape = TRUE,
     plugins = "natural",
-    selection = "multiple",
+    selection = list(mode = "multiple", selected = selected),
     options = list(
       dom = "t",
       ordering = FALSE,

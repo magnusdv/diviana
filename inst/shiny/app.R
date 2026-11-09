@@ -280,6 +280,7 @@ server = function(input, output, session) {
 
   dataServerAM = dataServer("AM", externalAM, assignedRefs, missingIDs = mainMissing,
                             existingFams = reactive(names(pedigrees())),
+                            existingIDs = reactive(labels(lapply(pedigrees(), `[[`, "ped"))),
                             currentModal = currentModal, .debug = .debug,
                             identifications = identifications)
   dataServerPM = dataServer("PM", externalPM, missingIDs = mainMissing,
@@ -684,8 +685,16 @@ server = function(input, output, session) {
 
     idx = match(normaliseName(markersAM()), normaliseName(names(loci)), nomatch = 0L)
     if(any(idx == 0L)) {
-      showErr("Database does not contain these AM markers: ", markersAM()[idx == 0L])
-      return(NULL)
+      missing = markersAM()[idx == 0L]
+      if(all(idx == 0L)) {
+        showErr("No AM markers found in database: ", toString(missing))
+        return(NULL)
+      }
+      showNotification(paste("Ignoring AM markers absent from database:",
+                             toString(missing)), type = "warning")
+      keep = idx > 0L
+      a = a[, rep(keep, each = 2L), drop = FALSE]
+      idx = idx[keep]
     }
 
     peds = lapply(peddata, `[[`, "ped")
@@ -711,8 +720,12 @@ server = function(input, output, session) {
 
     idx = match(normaliseName(markersPM()), normaliseName(names(loci)), nomatch = 0L)
     if(any(idx == 0L)) {
-      showErr("Database does not contain these PM markers: ", markersPM()[idx == 0L])
-      return(NULL)
+      showNotification(paste("Ignoring PM markers absent from database:",
+                             toString(markersPM()[idx == 0L])), type = "warning")
+      keep = idx > 0L
+      if(!any(keep)) return(NULL)
+      a = a[, rep(keep, each = 2L), drop = FALSE]
+      idx = idx[keep]
     }
     s = pedtools::singletons(rownames(a), sex = sexPM()) |> .setnames(rownames(a))
 
@@ -727,13 +740,11 @@ server = function(input, output, session) {
 
     am = mainAM()
     pm = mainPM()
-    missing = mainMissing()
+    missing = unlist(lapply(pedigrees(), `[[`, "miss"), use.names = FALSE)
 
-    if(is.null(am) && is.null(pm))
+    # Stop here if AM preparation failed; its error has already been shown
+    if(is.null(am) && (length(pedigrees()) || is.null(pm)))
       return(NULL)
-
-    if(length(missing) && anyNA(match(missing, labels(am))))
-      message("Something wrong: missing person not in AM!", toString(missing))
 
     tryCatch(dviData(am = am, pm = pm, missing = missing,
                      identifications = identifications()),
@@ -907,11 +918,14 @@ server = function(input, output, session) {
     isNewPed(TRUE)
     uniqueID = uniquify("quickpedModule")
 
-    avoidLabs = list(famids = names(mainAM()),
-                     vics = names(mainPM()),
-                     refs = if(nPed() > 0) typedMembers(mainAM()) else NULL, # TODO: use assignedRefs()?
-                     miss = mainMissing(),
-                     labs = labels(mainAM()))
+    # Name conflicts (depend on stored IDs, not marker attachment)
+    peds = pedigrees()
+    avoidLabs = list(
+      famids = names(peds),
+      vics = dataServerPM$main()$Sample,
+      refs = unlist(lapply(peds, `[[`, "refs"), use.names = FALSE),
+      miss = mainMissing(),
+      labs = unlist(lapply(peds, \(x) x$ped$ID), use.names = FALSE))
 
     pedigreeServer(uniqueID, resultVar = pedFromModule, initialDat = NULL,
                    famid = paste0("F", nPed() + 1),
@@ -923,7 +937,6 @@ server = function(input, output, session) {
   })
 
   observeEvent(input$editped, { .debug("edit current pedigree")
-
     curped = curPed()
     if(curped == 0) {
       showErr("No pedigree to edit.")
@@ -931,19 +944,20 @@ server = function(input, output, session) {
     }
 
     isNewPed(FALSE)
-    curr = req(pedigrees()[[curped]])
+    peds = pedigrees()
+    curr = req(peds[[curped]])
     uniqueID = uniquify("quickpedModule")
-    famids = names(mainAM())
+    others = peds[-curped]
 
-    otherFams = mainAM()[-curped]
-    avoidLabs = list(famids = famids[-curped],
-                     vics = names(mainPM()),
-                     refs = if(nPed() > 1) typedMembers(otherFams) else NULL,
-                     miss = .mysetdiff(mainMissing(), curr$ped$ID),
-                     labs = labels(otherFams))
+    avoidLabs = list(
+      famids = names(others),
+      vics = dataServerPM$main()$Sample,
+      refs = unlist(lapply(others, `[[`, "refs"), use.names = FALSE),
+      miss = .mysetdiff(mainMissing(), curr$ped$ID),
+      labs = unlist(lapply(others, \(x) x$ped$ID), use.names = FALSE))
 
     pedigreeServer(uniqueID, resultVar = pedFromModule, initialDat = curr,
-                   famid = famids[curped],
+                   famid = names(peds)[curped],
                    allrefs = rownames(genoAM()),
                    refsex = sexAM(),
                    avoidLabs = avoidLabs,

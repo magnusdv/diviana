@@ -36,10 +36,7 @@ detectTextFormat = function(file) {
 readTextImport = function(file, flavour = c("AM", "PM")) {
   flavour = match.arg(flavour)
   fmt = detectTextFormat(file)
-  if(fmt$type == "am") {
-    if(flavour != "AM")
-      stop2("Family/relationship files can only be imported as AM data")
-
+  if(fmt$type == "am" && flavour == "AM") {
     x = read.table(file, header = TRUE, sep = fmt$sep, colClasses = "character",
                    check.names = FALSE, fill = TRUE, quote = "\"", comment.char = "")
     if(!nrow(x)) stop2("No samples found in AM file")
@@ -52,7 +49,7 @@ readTextImport = function(file, flavour = c("AM", "PM")) {
   }
   data = if(fmt$type == "gm") readGenemapper(file, sep = fmt$sep) else
     readGenoFromTxt(file, sep = fmt$sep)
-  list(data = data, built = NULL, type = fmt$type)
+  list(data = data, built = NULL, type = if(fmt$type == "am") "geno" else fmt$type)
 }
 
 readGenemapper = function(file, format = NULL, sep = "\t") {
@@ -96,22 +93,23 @@ readGenoFromTxt = function(file, sep = "\t") {
                  fill = TRUE, quote = "\"", comment.char = "")
   if(!nrow(x)) stop2("No samples found in genotype table")
 
-  # Remove unnamed columns and identify sample IDs.
+  # Family and relationship columns are metadata, not sample IDs.
   x = x[nzchar(names(x))]
   nm = names(x)
+  if(!length(nm)) stop2("Missing sample ID column")
   sample = grep("sample|^id", nm, ignore.case = TRUE)
-  idcols = if(length(sample))
-    c(grep("Family", nm, ignore.case = TRUE), sample[1L],
-      grep("Relationship", nm, ignore.case = TRUE),
-      grep("Kinship", nm, ignore.case = TRUE))
-  else 1L
-  if(!length(nm) || any(idcols > length(nm))) stop2("Missing sample ID column")
+  idcol = if(length(sample)) sample[1L] else 1L
+  meta = unique(c(grep("Family", nm, ignore.case = TRUE),
+                  grep("Relationship|Kinship", nm, ignore.case = TRUE)))
+  meta = setdiff(meta, idcol)
 
-  if(anyNA(x[idcols])) stop2("Missing sample IDs in genotype table")
-  ids = do.call(paste, c(lapply(x[idcols], trimws), list(sep = "_")))
-  if(anyDuplicated(ids) || any(!nzchar(ids))) stop2("Empty or duplicated sample IDs")
+  ids = trimws(x[[idcol]])
+  if(anyNA(ids) || any(!nzchar(ids)) || anyDuplicated.default(ids))
+    stop2("Empty or duplicated sample IDs")
+  if(length(meta))
+    warning("Ignoring metadata columns: ", toString(nm[meta]), call. = FALSE)
   rownames(x) = ids
-  x = x[-idcols]
+  x = x[-unique(c(idcol, meta))]
 
   # Combine adjacent pairs of allele columns.
   nm = names(x)
@@ -131,7 +129,9 @@ readGenoFromTxt = function(file, sep = "\t") {
     x = x[-cols]
   }
 
-  x = x[vapply(x, \(v) any(!is.na(v) & nzchar(v)), logical(1))]
+  # Drop completely missing markers
+  x = x[vapply(x, \(v) any(!is.na(v) & nzchar(v) & v != "0/0"), logical(1))]
+
   if(!length(setdiff(names(x), c("Sex", "Alias", "Fam"))))
     stop2("No genotype columns found in text file")
   x
