@@ -600,18 +600,9 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
         return()
       pending(x)
 
-      confirm = modalDialog(
+      showModal(confirmModal(
         "Replace the current PM data with the approved merges?",
-        footer = div(style = "display:flex; justify-content:center; gap:8px; width:100%;",
-          actionButton(ns("confirmBack"), "No, go back"),
-          actionButton(ns("confirmSave"), "Yes, replace", status = "danger"))
-      )
-      # Center the confirmation dialog
-      confirm$children[[1]]$attribs$class = paste(
-        confirm$children[[1]]$attribs$class, "modal-dialog-centered")
-      confirm$children[[1]]$attribs$style = "max-width:420px; top:-15vh;"
-
-      showModal(confirm)
+        ns("confirmBack"), ns("confirmSave")))
     })
 
     observeEvent(input$confirmBack, showMain())

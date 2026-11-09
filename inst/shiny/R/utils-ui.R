@@ -23,6 +23,20 @@ showErr = function(..., html = TRUE) {
   showNotification(mess, type = "error")
 }
 
+confirmModal = function(message, backId, confirmId, confirmLabel = "Yes, replace",
+                         status = "danger") {
+  mod = modalDialog(
+    message,
+    footer = div(style = "display:flex;justify-content:center;gap:8px;width:100%",
+                 actionButton(backId, "No, go back"),
+                 actionButton(confirmId, confirmLabel, status = status))
+  )
+  mod$children[[1]]$attribs$class = paste(
+    mod$children[[1]]$attribs$class, "modal-dialog-centered")
+  mod$children[[1]]$attribs$style = "max-width:420px; top:-15vh;"
+  mod
+}
+
 
 # Not used
 textInput2 = function(inputId, value) {
