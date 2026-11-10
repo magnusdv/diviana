@@ -331,43 +331,6 @@ server = function(input, output, session) {
   ignoreDbInput = reactiveVal(FALSE)
   ignoreMutInput = reactiveVal(FALSE)
 
-  normalizeLoadedDvi = function(dvi) { .debug("normalizeLoadedDvi")
-    dvi = dvir:::consolidateDVI(dvi, dedup = TRUE)
-    peds = db = mutparams = NULL
-
-    if(length(dvi$am))
-      db = getFreqDatabase(dvi$am)
-    else if(length(dvi$pm))
-      db = getFreqDatabase(dvi$pm)
-
-    if(length(dvi$am)) {
-      peds = lapply(dvi$am, function(a) list(ped = a,
-                                             miss = .myintersect(dvi$missing, a$ID),
-                                             refs = typedMembers(a)))
-
-      mutmods = getLocusAttributes(dvi$am, attribs = "mutmod", simplify = TRUE)
-      mutparams = lapply(mutmods, \(mut) pedmut::getParams(mut, format = 4))
-    }
-
-    # Reconstruct fixed PM samples for display only; they are absent from dvi$pm.
-    am = genosWithAttrs(dvi$am, addCols = c("Sample", "Sex"))
-    pm = genosWithAttrs(dvi$pm, addCols = c("Sample", "Sex"))
-    ids = dvi$identifications
-    if(NROW(ids)) {
-      fixed = if(is.null(am)) data.frame(Sample = ids$Sample) else
-        am[match(ids$Missing, am$Sample), , drop = FALSE]
-      fixed$Sample = ids$Sample
-      pm = rbindSafe(pm, fixed)
-    }
-
-    # appData containing all info to reconstruct the dvi state
-    list(am = am, pm = pm,
-         peds = peds,
-         db = db,
-         mutparams = mutparams,
-         hasMut = sum(lengths(mutparams)) > 0)
-  }
-
   syncRadio = function(id, value, flag) {
     flag(TRUE)
     freezeReactiveValue(input, id)
@@ -411,101 +374,14 @@ server = function(input, output, session) {
     session$onFlushed(function() loading(FALSE), once = TRUE)
   }
 
-  # Complete dataset loading stays separate from AM/PM sample import.
-  pendingDvi = reactiveVal(NULL)
-  loadDviError = reactiveVal(NULL)
-  loadedDvi = reactiveVal(NULL)
+  # Complete DVI loading
+  registerDviLoad(input, output, session, loadDvi, currentModal,
+    hasData = reactive(
+      !is.null(appData()) || length(pedigrees()) > 0L ||
+      NROW(dataServerAM$main()) > 0L || NROW(dataServerPM$main()) > 0L ||
+      NROW(identifications()) > 0L))
 
-  observeEvent(input$loadDviButton, {
-    loadedDvi(NULL)
-    pendingDvi(NULL)
-    loadDviError(NULL)
-    mod = modalDialog(
-      title = div(class = "aligned-row-wide", "Load DVI dataset", banner(session = NULL)),
-      p("Select a Familias (.fam) or dviData (.rds, .RData) file."),
-      fileInput("loadDviFile", NULL, width = "100%", accept = c(".fam", ".rds", ".RData")),
-      uiOutput("loadDviError"),
-      uiOutput("loadDviInfo"),
-      uiOutput("loadDviMissingUI"),
-      footer = div(class = "d-flex justify-content-between align-items-center w-100",
-                   strong("Loading replaces all data"),
-                   div(class = "d-flex", style = "gap:8px",
-                       modalButton("Cancel"),
-                       actionButton("loadDviSave", "Load", status = "success")))
-    )
-    currentModal(mod)
-    showModal(mod)
-  })
-
-  output$loadDviMissingUI = renderUI({
-    x = req(loadedDvi())
-    if(!x$isFam) return(NULL)
-    missingLabelRadios("loadDviMissing", selected = x$defaultMissing)
-  })
-
-  # Relabel the cached file without repeating the Familias import
-  previewLoadedDvi = function(x, fmt) {
-    raw = x$raw
-    if(x$isFam && fmt == "F" && length(raw$missing)) {
-      inspect = attr(raw, "inspectAM")
-      raw = dvir::relabelDVI(raw, missingFormat = "[FNAME]-MP")
-      attr(raw, "inspectAM") = inspect
-    }
-    list(raw = raw, dat = normalizeLoadedDvi(raw), source = x$source)
-  }
-
-  observeEvent(input$loadDviFile, {
-    loadedDvi(NULL)
-    pendingDvi(NULL)
-    loadDviError(NULL)
-    f = req(input$loadDviFile)
-    tryCatch({
-      raw = readDviFile(f$datapath, name = f$name)
-      isFam = tolower(tools::file_ext(f$name)) == "fam"
-      fmt = "M"
-      x = list(raw = raw, source = f$name, isFam = isFam, defaultMissing = fmt)
-      pending = previewLoadedDvi(x, fmt)
-      loadedDvi(x)
-      pendingDvi(pending)
-    }, error = function(e) {
-      loadDviError(gsub(f$datapath, f$name, conditionMessage(e), fixed = TRUE))
-    })
-  })
-
-  observeEvent(input$loadDviMissing, {
-    x = req(loadedDvi())
-    if(!x$isFam) return()
-    pendingDvi(NULL)
-    loadDviError(NULL)
-    tryCatch(pendingDvi(previewLoadedDvi(x, input$loadDviMissing)),
-             error = function(e) loadDviError(conditionMessage(e)))
-  })
-
-  output$loadDviError = renderUI({
-    msg = req(loadDviError())
-    div(style = "color:red", strong("Error: "), msg)
-  })
-
-  output$loadDviInfo = renderUI({
-    raw = req(pendingDvi())$raw
-    info = capture.output(print(raw, printMax = 0))
-    info[1] = "<b>Contents of DVI dataset</b>"
-    s = HTML(gsub("\n ", "\n &bull; ", paste(info, collapse = "\n")))
-    tagList(
-      div(s, style = paste(
-        "white-space: pre-wrap; color: RoyalBlue; line-height: 1.2em; padding: 5px;",
-        "margin: 5px 0; background-color: #f9f9f9; border: 1px solid #ccc;")),
-      pedIssueSummary(attr(raw, "inspectAM"), when = "loading")
-    )
-  })
-
-  observeEvent(input$loadDviSave, {
-    x = req(pendingDvi())
-    loadDvi(x$raw, source = x$source, dat = x$dat)
-    pendingDvi(NULL)
-    removeModal()
-  })
-
+  # Example loading
   observeEvent(input$example, {
     req(input$example)
     loadDvi(get(input$example))

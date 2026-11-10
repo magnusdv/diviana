@@ -386,3 +386,203 @@ previewGenoDT = function(dat, selected = NULL) {
   ) |>
     DT::formatStyle(names(dat), target = "row", lineHeight = "75%")
 }
+
+
+
+# Complete DVI import -------------------------------------------------------
+
+
+normalizeLoadedDvi = function(dvi) {
+  dvi = dvir:::consolidateDVI(dvi, dedup = TRUE)
+  peds = db = mutparams = NULL
+
+  if(length(dvi$am))
+    db = getFreqDatabase(dvi$am)
+  else if(length(dvi$pm))
+    db = getFreqDatabase(dvi$pm)
+
+  if(length(dvi$am)) {
+    peds = lapply(dvi$am, function(a) list(ped = a,
+                                           miss = .myintersect(dvi$missing, a$ID),
+                                           refs = typedMembers(a)))
+
+    mutmods = getLocusAttributes(dvi$am, attribs = "mutmod", simplify = TRUE)
+    mutparams = lapply(mutmods, \(mut) pedmut::getParams(mut, format = 4))
+  }
+
+  # Reconstruct fixed PM samples for display only; they are absent from dvi$pm
+  am = genosWithAttrs(dvi$am, addCols = c("Sample", "Sex"))
+  pm = genosWithAttrs(dvi$pm, addCols = c("Sample", "Sex"))
+  ids = dvi$identifications
+  if(NROW(ids)) {
+    fixed = if(is.null(am)) data.frame(Sample = ids$Sample) else
+      am[match(ids$Missing, am$Sample), , drop = FALSE]
+    fixed$Sample = ids$Sample
+    pm = rbindSafe(pm, fixed)
+  }
+
+  # appData containing all info to reconstruct the dvi state
+  list(am = am, pm = pm,
+       peds = peds,
+       db = db,
+       mutparams = mutparams,
+       hasMut = sum(lengths(mutparams)) > 0)
+}
+
+readDviFile = function(fil, name = basename(fil)) {
+  ext = tolower(tools::file_ext(name))
+  dvi = switch(ext,
+    fam = dvir::familias2dvir(fil, missingFormat = "M[MIDX]", verbose = FALSE),
+    rds = readRdvi(fil, name = name),
+    rdata = readRdvi(fil, name = name),
+    stop2("Unsupported DVI file. Use .fam, .rds or .RData")
+  )
+  if(!inherits(dvi, "dviData")) stop2("File does not contain a valid dviData object")
+  dvi
+}
+
+readRdvi = function(fil, name = basename(fil)) {
+  ext = tolower(tools::file_ext(name)) # temporary path has unstable extension
+  switch(ext,
+    rds = {
+      content = readRDS(fil)
+      if(!inherits(content, "dviData"))
+        stop2("File does not contain a `dviData` object")
+      dvi = content
+    },
+    rdata = {
+      env = new.env()
+      load(fil, envir = env)
+      objs = mget(ls(envir = env), envir = env)
+      dviDatas = Filter(function(x) inherits(x, "dviData"), objs)
+      if(!length(dviDatas))
+        stop2("No `dviData` objects found in this .RData file")
+      dvi = dviDatas[[1]]
+    },
+    stop2("Illegal file extension. Accepted types are .RData and .rds")
+  )
+
+  if(!is.null(dvi$identifications))
+    dvi$identifications$Alias = NULL
+  dvi
+}
+
+# Register complete-DVI loading in the main server
+registerDviLoad = function(input, output, session, loadDvi, currentModal, hasData) {
+
+  loadedDvi = reactiveVal(NULL)
+  pendingDvi = reactiveVal(NULL)
+  loadDviError = reactiveVal(NULL)
+  missingFmt = reactiveVal("M")
+
+  showDviDialog = function(restored = FALSE) {
+    mod = modalDialog(
+      title = div(class = "aligned-row-wide", "Load DVI dataset", banner(session = NULL)),
+      p("Select a Familias (.fam) or dviData (.rds, .RData) file."),
+      fileInput("loadDviFile", NULL, width = "100%",
+                accept = c(".fam", ".rds", ".RData"),
+                placeholder = if(restored) isolate(loadedDvi()$source) else "No file selected"),
+      uiOutput("loadDviError"),
+      uiOutput("loadDviInfo"),
+      conditionalPanel("output.showDviMissing",
+        missingLabelRadios("loadDviMissing", selected = isolate(missingFmt()))),
+      footer = div(class = "d-flex justify-content-end w-100", style = "gap:8px",
+                   modalButton("Cancel"),
+                   actionButton("loadDviSave", "Load", status = "success"))
+    )
+    currentModal(mod)
+    showModal(mod)
+  }
+
+  observeEvent(input$loadDviButton, {
+    loadedDvi(NULL)
+    pendingDvi(NULL)
+    loadDviError(NULL)
+    showDviDialog()
+  })
+
+  # Keep the naming control mounted, but show it only for Familias files
+  output$showDviMissing = reactive(isTRUE(loadedDvi()$isFam))
+  outputOptions(output, "showDviMissing", suspendWhenHidden = FALSE)
+
+  # Relabel the cached file without repeating the Familias import
+  previewLoadedDvi = function(x, fmt) {
+    raw = x$raw
+    if(x$isFam && fmt == "F" && length(raw$missing)) {
+      inspect = attr(raw, "inspectAM")
+      raw = dvir::relabelDVI(raw, missingFormat = "[FNAME]-MP")
+      attr(raw, "inspectAM") = inspect
+    }
+    list(raw = raw, dat = normalizeLoadedDvi(raw), source = x$source)
+  }
+
+  observeEvent(input$loadDviFile, {
+    loadedDvi(NULL)
+    pendingDvi(NULL)
+    loadDviError(NULL)
+    f = req(input$loadDviFile)
+
+    tryCatch({
+      raw = readDviFile(f$datapath, name = f$name)
+      x = list(raw = raw, source = f$name,
+               isFam = tolower(tools::file_ext(f$name)) == "fam")
+      pending = previewLoadedDvi(x, isolate(missingFmt()))
+      loadedDvi(x)
+      pendingDvi(pending)
+    }, error = function(e) {
+      loadDviError(gsub(f$datapath, f$name, conditionMessage(e), fixed = TRUE))
+    })
+  })
+
+  observeEvent(input$loadDviMissing, {
+    missingFmt(input$loadDviMissing)
+    x = req(loadedDvi())
+    if(!x$isFam) return()
+    pendingDvi(NULL)
+    loadDviError(NULL)
+    tryCatch(pendingDvi(previewLoadedDvi(x, input$loadDviMissing)),
+             error = function(e) loadDviError(conditionMessage(e)))
+  })
+
+  observeEvent(input$resetall, missingFmt("M"))
+
+  output$loadDviError = renderUI({
+    msg = req(loadDviError())
+    div(style = "color:red", strong("Error: "), msg)
+  })
+
+  output$loadDviInfo = renderUI({
+    raw = req(pendingDvi())$raw
+    info = capture.output(print(raw, printMax = 0))
+    info[1] = "<b>Contents of DVI dataset</b>"
+    s = HTML(gsub("\n ", "\n &bull; ", paste(info, collapse = "\n")))
+    tagList(
+      div(s, style = paste(
+        "white-space: pre-wrap; color: RoyalBlue; line-height: 1.2em; padding: 5px;",
+        "margin: 5px 0; background-color: #f9f9f9; border: 1px solid #ccc;")),
+      pedIssueSummary(attr(raw, "inspectAM"), when = "loading")
+    )
+  })
+
+  # Apply the prepared dataset only after confirmation when data already exist
+  commitDvi = function() {
+    x = req(pendingDvi())
+    loadDvi(x$raw, source = x$source, dat = x$dat)
+    pendingDvi(NULL)
+    removeModal()
+  }
+
+  observeEvent(input$loadDviSave, {
+    x = req(pendingDvi())
+    if(!hasData()) {
+      commitDvi()
+      return()
+    }
+    showModal(confirmModal(
+      sprintf("Replace all current data with '%s'?", x$source),
+      "loadDviBack", "loadDviConfirm"))
+  })
+
+  observeEvent(input$loadDviBack, showDviDialog(restored = TRUE))
+  observeEvent(input$loadDviConfirm, commitDvi())
+}

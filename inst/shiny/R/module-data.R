@@ -470,43 +470,6 @@ checkSex = function(x) {
   x
 }
 
-readDviFile = function(fil, name = basename(fil)) {
-  ext = tolower(tools::file_ext(name))
-  dvi = switch(ext,
-    fam = dvir::familias2dvir(fil, missingFormat = "M[MIDX]", verbose = FALSE),
-    rds = readRdvi(fil, name = name),
-    rdata = readRdvi(fil, name = name),
-    stop2("Unsupported DVI file. Use .fam, .rds or .RData")
-  )
-  if(!inherits(dvi, "dviData")) stop2("File does not contain a valid dviData object")
-  dvi
-}
-
-readRdvi = function(fil, name = basename(fil)) {
-  ext = tolower(tools::file_ext(name)) # use 'name' here (temporary path has unstable extension)
-  switch(ext,
-    rds = {
-      content = readRDS(fil)
-      if(!inherits(content, "dviData"))
-        stop2("File does not contain a `dviData` object")
-      dvi = content
-    },
-    rdata = {
-      load(fil, envir = (env <- new.env()))
-      objs = mget(ls(envir = env), envir = env)
-      dviDatas = Filter(function(x) inherits(x, "dviData"), objs)
-      if(!length(dviDatas))
-        stop2("No `dviData` objects found in this .RData file")
-      dvi = dviDatas[[1]]
-    },
-    stop2("Illegal file extension. Accepted types are .RData and .rds")
-  )
-
-  if(!is.null(dvi$identifications))
-    dvi$identifications$Alias = NULL
-  dvi
-}
-
 
 banner = function(session) {
   if(!is.null(session)) {
