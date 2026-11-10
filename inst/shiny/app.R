@@ -736,9 +736,10 @@ server = function(input, output, session) {
   isNewPed = reactiveVal(FALSE)
   nPed = reactive(length(pedigrees()))
   curPed = cardCounter("pedcard", nPed)
-  defaultRelabelOptions = list(families = "keep", prefix = "F", missing = "keep",
-                             format = "[FNAME]-M[MIDX_FAM]")
-  relabelOptions = reactiveVal(defaultRelabelOptions)
+
+  # Set up handlers for relabelling Families and MPs
+  setupRelabel(input, output, session, pedigrees, pedIssues, mainMissing,
+                  identifications, currentDviData)
 
   # Flagged pedigrees can be opened and approved from the card header
     output$reviewControl = renderUI({
@@ -874,68 +875,6 @@ server = function(input, output, session) {
     pedigrees(peds)
     curPed(idx)
     isolate(updateSelectInput(session, "example", selected = ""))
-  })
-
-  # Relabel family names and missing persons without changing other data
-  observeEvent(input$relabelPeds, {
-    req(nPed() > 0)
-    showModal(relabelPedigreesDialog(relabelOptions()))
-  })
-
-  relabeled = reactive({
-    req(input$relabelFamilies, input$relabelMissing)
-    fmt = input$relabelMissing
-    if(fmt == "keep") fmt = NULL
-    else if(fmt == "custom") fmt = input$relabelFormat
-    families = if(input$relabelFamilies == "mp")
-      vapply(pedigrees(), function(p) if(length(p$miss)) p$miss[1] else p$famid, "")
-    dvir::relabelDVI(req(currentDviData()), families = families,
-                     familyPrefix = if(input$relabelFamilies == "prefix") input$relabelPrefix,
-                     missingFormat = fmt)
-  })
-
-  output$relabelPreview = renderUI({
-    tryCatch(relabelPreviewTable(req(currentDviData()), relabeled()),
-             error = function(e) span(class = "text-danger", conditionMessage(e)))
-  })
-
-  pendingRelabel = reactiveVal()
-  observeEvent(input$applyRelabel, {
-    tryCatch({
-      pendingRelabel(list(dvi = relabeled(),
-                          opt = list(families = input$relabelFamilies, prefix = input$relabelPrefix,
-                                     missing = input$relabelMissing, format = input$relabelFormat)))
-      showModal(relabelConfirmDialog())
-    }, error = showErr)
-  })
-
-  observeEvent(input$relabelBack,
-               showModal(relabelPedigreesDialog(req(pendingRelabel())$opt)))
-
-  observeEvent(input$confirmRelabel, {
-    tryCatch({
-      z = req(pendingRelabel())
-      dvi = z$dvi
-      old = names(pedigrees())
-      peds = Map(function(dat, ped, fam) {
-        dat$ped = ped
-        dat$famid = fam
-        dat$miss = intersect(dvi$missing, ped$ID)
-        dat
-      }, pedigrees(), dvi$am, names(dvi$am))
-      names(peds) = names(dvi$am)
-
-      issues = pedIssues()
-      names(issues) = names(peds)[match(names(issues), old)]
-      pedIssues(issues)
-      mainMissing(dvi$missing)
-      identifications(dvi$identifications)
-      pedigrees(peds)
-      relabelOptions(z$opt)
-      pendingRelabel(NULL)
-      removeModal()
-      isolate(updateSelectInput(session, "example", selected = ""))
-    }, error = showErr)
   })
 
   output$pedplot = renderPlot({ .debug("plot current pedigree:", curPed());
@@ -1350,8 +1289,6 @@ server = function(input, output, session) {
     pedIssues(character())
     mainMissing(NULL)
     DB(NULL)
-    relabelOptions(defaultRelabelOptions)
-    pendingRelabel(NULL)
     updateSelectInput(session, "example", choices = c("Load example" = "", DATASETS), selected = "")
     updateRadioButtons(session, "dbtype", selected = "builtin")
     updateRadioButtons(session, "muttype", selected = "none")

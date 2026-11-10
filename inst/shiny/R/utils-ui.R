@@ -60,12 +60,12 @@ missingLabelRadios = function(id, selected = "M", action = "loading") {
             span("M1, M2, ...", style = "display:inline-block;width:100px"),
             tags$small("(sequential)", class = "text-muted")),
           tagList(
-            span("[Family]-MP", style = "display:inline-block;width:100px"),
+            span("[Family]-MP", style = "display:inline-block; width:100px"),
             tags$small("(family name prefix)", class = "text-muted"))
         ),
         choiceValues = c("M", "F"),
         selected = selected),
-      div(class = "text-muted small", style = "margin-top: 3px;",
+      div(class = "text-muted small", style = "font-style: italic; margin-top: 3px;",
           sprintf("Note: Labels can be changed after %s.", action)))
 }
 

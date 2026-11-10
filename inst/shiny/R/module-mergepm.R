@@ -600,8 +600,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
         return()
       pending(x)
 
-      showModal(confirmModal(
-        "Replace the current PM data with the approved merges?",
+      showModal(confirmModal("Replace the current PM data with the approved merges?",
         ns("confirmBack"), ns("confirmSave")))
     })
 
