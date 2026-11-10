@@ -55,9 +55,16 @@ inlineRadioButtons = function(inputId, label, ...) {
 missingLabelRadios = function(id, selected = "M", action = "loading") {
   div(style = "margin:12px 0 8px",
       radioButtons(id, "Naming scheme for missing persons",
-                   choices = c("M1, M2, M3, ...  (sequential)" = "M",
-                               "F1-MP, F2-MP, ...  (family name prefix)" = "F"),
-                   selected = selected),
+        choiceNames = list(
+          tagList(
+            span("M1, M2, ...", style = "display:inline-block;width:100px"),
+            tags$small("(sequential)", class = "text-muted")),
+          tagList(
+            span("[Family]-MP", style = "display:inline-block;width:100px"),
+            tags$small("(family name prefix)", class = "text-muted"))
+        ),
+        choiceValues = c("M", "F"),
+        selected = selected),
       div(class = "text-muted small", style = "margin-top: 3px;",
           sprintf("Note: Labels can be changed after %s.", action)))
 }
