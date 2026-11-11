@@ -21,6 +21,8 @@ pedIssueSummary = function(x, when = "saving") {
 dataUI = function(id, title = paste(id, "data")) {
   ns = NS(id)
   bs4Card(width = NULL, title = title, collapsible = TRUE, collapsed = FALSE,
+    label = span(textOutput(ns("sampleInfo"), inline = TRUE),
+                 style = "font-size:0.9rem;margin-right:10px;white-space:nowrap"),
     uiOutput(ns("mainTableUI")),
     uiOutput(ns("infofield")),
     footer = div(class = "btn-group",
@@ -118,21 +120,26 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
              muted = muted(), scrollY = "370px", identifications = identifications())
     }, server = FALSE)
 
-    output$infofield = renderUI({
-      dat = req(mainTable$main)
-      src = vapply(sources$all, \(s) as.character(em(s)), character(1))
+    # Show sample counts in the card header
+    output$sampleInfo = renderText({
+      dat = mainTable$main
+      if(is.null(dat)) return("")
       n = nrow(dat)
       count = sprintf("%d sample%s", n, if(n == 1L) "" else "s")
       if(id == "AM")
         count = sprintf("%s · %d assigned", count,
                         sum(dat$Sample %in% names(assignedRefs())))
+      count
+    })
 
-      div(class = "d-flex justify-content-between align-items-start",
-          style = "margin-top:10px;line-height:1.25;font-size:0.9rem;gap:12px",
-          div(if(length(src))
-            HTML(paste(c(if(length(src) == 1L) "Source:" else "Sources:", src),
-                       collapse = if(length(src) == 1L) " " else "<br>"))),
-          span(count, style = "white-space:nowrap"))
+    # Show data sources below the table
+    output$infofield = renderUI({
+      src = vapply(sources$all, \(s) as.character(em(s)), character(1))
+      if(!length(src)) return(NULL)
+
+      div(style = "margin-top:10px;line-height:1.25;font-size:0.9rem",
+          HTML(paste(c(if(length(src) == 1L) "Source:" else "Sources:", src),
+                     collapse = if(length(src) == 1L) " " else "<br>")))
     })
 
     # Edit -------------------------------------------------------------------
@@ -324,7 +331,8 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
          sources = reactive(sources$all),
          sourceValues = sources,
          famClick = famClick,
-         constructedAM = import$constructedAM)
+         constructedAM = import$constructedAM,
+         imported = import$imported)
   })
 
 }
@@ -349,7 +357,7 @@ formatGenoView = function(dat, mode, flavour = NULL, fam = NULL, identifications
 
   if(mode == "main" && flavour == "AM") {
     dat = displayFamily(dat, fam)
-    dat$Assigned = ifelse(dat$Sample %in% names(fam), '<i class="fas fa-link"></i>', "")
+    dat$Assigned = ifelse(dat$Sample %in% names(fam), '<i class="fas fa-link fa-sm"></i>', "")
     dat = moveColsFirst(dat, c("Fam", "Assigned", "Sample", "Alias", "Sex"))
 
     # Show the original PM sample without changing the stored AM ID.
