@@ -1,5 +1,5 @@
 
-pedigreeUI = function(id, famid = "F1") {
+pedigreeUI = function(id, famid = "F1", showAllRefs = FALSE) {
   ns = NS(id)
 
   ### Button factory
@@ -58,6 +58,10 @@ pedigreeUI = function(id, famid = "F1") {
                  style = "padding:0 3px 0 0; background-color:inherit; border: none"),
        ),
        DTOutput(ns("refTable"), width = "100%"),
+       if(!showAllRefs)
+         div(style = "font-size:small;",
+             checkboxInput(ns("showAllRefs"), "Show all unassigned refs", FALSE, width = "100%")),
+
        #-------
        br(),
        div(class = "aligned-row-wide",
@@ -89,8 +93,10 @@ pedigreeUI = function(id, famid = "F1") {
 
 
 pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
-                          allrefs = NULL, refsex = NULL, avoidLabs = NULL, currentModal = NULL,
-                          .debug = NULL) {
+                          allrefs = NULL, refsex = NULL, refFamily = NULL,
+                          avoidLabs = NULL, currentModal = NULL, .debug = NULL) {
+
+  isNew = is.null(initialDat)
 
   .debug2 = if(is.null(.debug)) function(...) NULL else function(...) .debug("-ped module:", ...)
 
@@ -133,7 +139,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
         title = div(class = "aligned-row-wide", "Pedigree builder",
                     helpBtn("help-ped") |> wrap_tooltip("pedhelp", "left")),
         uiOutput(ns("modalWidth")),
-        pedigreeUI(id, famid),
+        pedigreeUI(id, famid, showAllRefs = isNew),
         footer = div(class = "aligned-row-wide",
           prettySwitch(ns("builderLarge"), "Large window", slim = TRUE, status = "primary"),
           div(class = "aligned-row", style = "gap:8px",
@@ -298,7 +304,15 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       updatePedData(ped = newped, refs = newrefs, refOrigName = newron)
     })
 
-    remainingRefs = reactive(.mysetdiff(allrefs, c(avoidLabs$refs, currData$refs)))
+    remainingRefs = reactive({
+      refs = .mysetdiff(allrefs, c(avoidLabs$refs, currData$refs))
+      if(!isNew && !isTRUE(input$showAllRefs)) {
+        f = refFamily[refs]
+        family = if(isNew) currData$famid else famid
+        refs = refs[is.na(f) | f == "" | f == family]
+      }
+      refs
+    })
 
     output$refTable = renderDT({ .debug2("render ref table:", remainingRefs())
       df = data.frame(Refs = remainingRefs() %||% character())
@@ -306,7 +320,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
                 class = "compact stripe",
                 selection = "single",
                 colnames = "",
-                options = list(dom = 't', pageLength = -1, scrollY = "200px",
+                options = list(dom = 't', pageLength = -1, scrollY = "160px",
                              scrollCollapse = TRUE, ordering = FALSE,
                              language = list(zeroRecords = "No unassigned refs!"))) |>
         DT::formatStyle(names(df),
@@ -390,7 +404,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       famid = currData$famid
       miss = currData$miss
       refs = currData$refs
-      labs = if(input$showall) x$ID else c(miss, refs)
+      labs = if(isTRUE(input$showall)) x$ID else c(miss, refs)
       dat = tryCatch(
         plot(x, title = famid, margins = if(largeMode()) 1 else 2, labs = labs,
              hatched = refs, cex = if(largeMode()) 1 else 1.2, cex.main = 1.5,

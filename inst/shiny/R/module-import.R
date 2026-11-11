@@ -122,7 +122,7 @@ registerImport = function(id, input, output, session, mainTable, setData, source
 
   # Genotype preview and import controls
   output$tableContent = renderUI({ .debug2("update raw table")
-    cols = names(req(raw()))
+    cols = setdiff(names(req(raw())), "Family")
     excluded = isolate(importOpts$excludeCols)
     if(is.null(excluded))
       excluded = c("Yindel", grep("^DY", cols, value = TRUE))
@@ -195,20 +195,17 @@ registerImport = function(id, input, output, session, mainTable, setData, source
     })
   })
 
-  # Prepare sample names and show original family information for short names
+  # Prepare sample names and display original family information
   dfFiltered = reactive({ .debug2("import filter genemapper/text blanks")
     df = req(raw())
     if(id == "AM" && !is.null(builtAM())) {
+      src = builtAM()$source
+      df$Family = trimws(src[[1]])
       if(isFALSE(input$longNames %||% importOpts$longNames)) {
-        src = builtAM()$source
-        df$Family = trimws(src[[1]])
         df$Relationship = trimws(src[[2]])
         df$Sample = trimws(src[[3]])
-        df = moveColsFirst(df, c("Family", "Relationship", "Sample"))
-      } else {
-        df$Sample = rownames(df)
-        df = moveColsFirst(df, "Sample")
-      }
+      } else df$Sample = rownames(df)
+      df = moveColsFirst(df, c("Family", "Relationship", "Sample"))
     }
     if(identical(importType(), "gm") &&
        !isTRUE(input$includeHidden %||% importOpts$includeHidden)) {
@@ -277,13 +274,19 @@ registerImport = function(id, input, output, session, mainTable, setData, source
     create = id == "AM" && !is.null(builtAM()) && isTRUE(input$createAM)
     df = tryCatch({
       b = if(id == "AM" && !is.null(builtAM())) selectedAM()
-      x = if(is.null(b))
-        standardiseGenoData(dfFiltered(), selectRows = previewRows(),
-                            excludeCols = input$excludeCols)
-      else standardiseGenoData(b$geno, excludeCols = input$excludeCols)
+      x = if(is.null(b)) dfFiltered() else b$geno
+
+      # Store source family separately from pedigree assignments
+      if(id == "AM") {
+        if(!is.null(b)) x$Family = unname(b$family[rownames(x)])
+        names(x)[names(x) == "Family"] = "origFam"
+      }
+      x = standardiseGenoData(x, selectRows = if(is.null(b)) previewRows(),
+                              excludeCols = input$excludeCols)
 
       # Check genotypes before saving any data
-      geno = x[setdiff(names(x), c(".rowid", "Fam", "Sample", "Alias", "AMEL", "Sex"))]
+      geno = x[setdiff(names(x),
+        c(".rowid", "Fam", "origFam", "Sample", "Alias", "AMEL", "Sex"))]
       if(!ncol(geno)) stop2("No genotype columns selected")
       splitGenotypes(geno)
       x

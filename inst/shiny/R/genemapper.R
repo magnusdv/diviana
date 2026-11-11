@@ -48,7 +48,7 @@ readTextImport = function(file, flavour = c("AM", "PM")) {
     return(list(data = b$geno, built = list(source = x, result = b), type = "am"))
   }
   data = if(fmt$type == "gm") readGenemapper(file, sep = fmt$sep) else
-    readGenoFromTxt(file, sep = fmt$sep)
+    readGenoFromTxt(file, sep = fmt$sep, flavour = flavour)
   list(data = data, built = NULL, type = if(fmt$type == "am") "geno" else fmt$type)
 }
 
@@ -87,27 +87,30 @@ readGenemapper = function(file, format = NULL, sep = "\t") {
   as.data.frame(gmat)
 }
 
-readGenoFromTxt = function(file, sep = "\t") {
+readGenoFromTxt = function(file, sep = "\t", flavour = c("AM", "PM")) {
+  flavour = match.arg(flavour)
   x = read.table(file, header = TRUE, sep = sep, colClasses = "character",
                  check.names = FALSE, row.names = NULL, strip.white = TRUE,
                  fill = TRUE, quote = "\"", comment.char = "")
   if(!nrow(x)) stop2("No samples found in genotype table")
 
-  # Family and relationship columns are metadata, not sample IDs.
+  # Family and relationship columns are metadata
   x = x[nzchar(names(x))]
   nm = names(x)
   if(!length(nm)) stop2("Missing sample ID column")
   sample = grep("sample|^id", nm, ignore.case = TRUE)
   idcol = if(length(sample)) sample[1L] else 1L
-  meta = unique(c(grep("Family", nm, ignore.case = TRUE),
-                  grep("Relationship|Kinship", nm, ignore.case = TRUE)))
+  famcol = grep("family|^fam$", trimws(nm), ignore.case = TRUE)
+  meta = unique(c(famcol, grep("Relationship|Kinship", nm, ignore.case = TRUE)))
   meta = setdiff(meta, idcol)
 
   ids = trimws(x[[idcol]])
   if(anyNA(ids) || any(!nzchar(ids)) || anyDuplicated.default(ids))
     stop2("Empty or duplicated sample IDs")
-  if(length(meta))
-    warning("Ignoring metadata columns: ", toString(nm[meta]), call. = FALSE)
+  family = if(flavour == "AM" && length(famcol)) trimws(x[[famcol[1]]])
+  ignored = if(flavour == "AM") setdiff(meta, famcol) else meta
+  if(length(ignored))
+    warning("Ignoring metadata columns: ", toString(nm[ignored]), call. = FALSE)
   rownames(x) = ids
   x = x[-unique(c(idcol, meta))]
 
@@ -134,5 +137,7 @@ readGenoFromTxt = function(file, sep = "\t") {
 
   if(!length(setdiff(names(x), c("Sex", "Alias", "Fam"))))
     stop2("No genotype columns found in text file")
+
+  if(!is.null(family)) x$Family = family
   x
 }

@@ -288,7 +288,7 @@ server = function(input, output, session) {
                             currentModal = currentModal, .debug = .debug)
 
   genoAM = reactive({ .debug("genoAM", dataServerAM$main())
-    g = dataServerAM$main(); g$.rowid = g$Fam = g$Sample = g$Alias = g$AMEL = g$Sex = NULL; g})
+    g = dataServerAM$main(); g$.rowid = g$Fam = g$origFam = g$Sample = g$Alias = g$AMEL = g$Sex = NULL; g})
   genoPM = reactive({ .debug("genoPM", dataServerPM$main())
     g = dataServerPM$main(); g$.rowid = g$Fam = g$Sample = g$Alias = g$AMEL = g$Sex = NULL; g})
 
@@ -739,7 +739,7 @@ server = function(input, output, session) {
 
   # Set up handlers for relabelling Families and MPs
   setupRelabel(input, output, session, pedigrees, pedIssues, mainMissing,
-                  identifications, currentDviData)
+               identifications, currentDviData, dataServerAM)
 
   # Flagged pedigrees can be opened and approved from the card header
     output$reviewControl = renderUI({
@@ -804,10 +804,13 @@ server = function(input, output, session) {
       miss = mainMissing(),
       labs = unlist(lapply(peds, \(x) x$ped$ID), use.names = FALSE))
 
+    reffam = setNames(dataServerAM$main()$origFam, dataServerAM$main()$Sample)
+
     pedigreeServer(uniqueID, resultVar = pedFromModule, initialDat = NULL,
                    famid = paste0("F", nPed() + 1),
                    allrefs = rownames(genoAM()),
                    refsex = sexAM(),
+                   refFamily = reffam,
                    avoidLabs = avoidLabs,
                    currentModal = currentModal,
                    .debug = .debug)
@@ -833,10 +836,13 @@ server = function(input, output, session) {
       miss = .mysetdiff(mainMissing(), curr$ped$ID),
       labs = unlist(lapply(others, \(x) x$ped$ID), use.names = FALSE))
 
+    reffam = setNames(dataServerAM$main()$origFam, dataServerAM$main()$Sample)
+
     pedigreeServer(uniqueID, resultVar = pedFromModule, initialDat = curr,
                    famid = names(peds)[curped],
                    allrefs = rownames(genoAM()),
                    refsex = sexAM(),
+                   refFamily = reffam,
                    avoidLabs = avoidLabs,
                    currentModal = currentModal,
                    .debug = .debug)
@@ -858,20 +864,37 @@ server = function(input, output, session) {
   observeEvent(pedFromModule(), { .debug("pedigree returned from module")
     newdat = req(pedFromModule())
     peds = pedigrees()
+
     if(isNewPed()) {
       idx = nPed() + 1
       peds[[newdat$famid]] = newdat
     }
     else {
       idx = curPed()
-      if(names(peds)[idx] != newdat$famid && names(peds)[idx] %in% names(pedIssues())) {
+      oldname = names(peds)[idx]
+
+      if(oldname != newdat$famid) {
         issues = pedIssues()
-        names(issues)[names(issues) == names(peds)[idx]] = newdat$famid
-        pedIssues(issues)
+        if(oldname %in% names(issues)) {
+          names(issues)[names(issues) == oldname] = newdat$famid
+          pedIssues(issues)
+        }
+
+        # Update original family labels, including unassigned references
+        dat = dataServerAM$main()
+        if(NROW(dat)) {
+          j = dat$origFam == oldname
+          if(any(j)) {
+            dat$origFam[j] = newdat$famid
+            dataServerAM$set(dat)
+          }
+        }
       }
+
       peds[[idx]] = newdat
       names(peds)[idx] = newdat$famid
     }
+
     pedigrees(peds)
     curPed(idx)
     isolate(updateSelectInput(session, "example", selected = ""))
@@ -1275,7 +1298,7 @@ server = function(input, output, session) {
     session$sendCustomMessage("clearOutputs", c(
       "amcentric", "pmcentric", "lrmatrix", "exmatrix", "jointtabs", "solvelog",
       "solutionplot", "pedplot", "dvisummary", "AM-mainTableUI", "PM-mainTableUI",
-      "AM-sourcefield", "PM-sourcefield", "reviewControl")
+      "AM-infofield", "PM-infofield", "reviewControl")
     )
     externalAM("reset")
     externalPM("reset")

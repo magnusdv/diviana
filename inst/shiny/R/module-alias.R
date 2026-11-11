@@ -1,6 +1,6 @@
 # Register alias controls within the existing data module
 registerAliases = function(id, input, output, session, mainTable, setData,
-                           missingIDs, idEdits, .debug2) {
+                           assignedRefs, missingIDs, idEdits, .debug2) {
   ns = session$ns
 
   origs = reactiveVal(NULL)
@@ -22,7 +22,9 @@ registerAliases = function(id, input, output, session, mainTable, setData,
 
   # Function for opening the alias dialog
   showAliasDialog = function() {
-    origs(rownames(req(mainTable$main)))
+    dat = req(mainTable$main)
+    or = if(id == "AM") displayFamily(dat, assignedRefs())$Sample else dat$Sample
+    origs(or)
 
     showModal(modalDialog(
       title = "Generate Aliases",
@@ -146,7 +148,7 @@ registerAliases = function(id, input, output, session, mainTable, setData,
 
   observeEvent(input$aliasSave, { .debug2("alias save")
     dat = mainTable$main
-    dat$Alias = generateAliases()
+    dat$Alias = generateAliases()[match(dat$Sample, origs())]
     tryCatch({
       setData(dat)
       removeModal()
@@ -155,7 +157,8 @@ registerAliases = function(id, input, output, session, mainTable, setData,
 
   observeEvent(input$aliasReplace, { .debug2("alias replace")
     dat = mainTable$main
-    al = generateAliases()
+    al = generateAliases()[match(dat$Sample, origs())]
+
     if(anyNA(al) || any(!nzchar(al)) || anyDuplicated(al)) {
       showErr("Replacing sample IDs requires unique, nonempty aliases")
       return()

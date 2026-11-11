@@ -52,19 +52,25 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     # Commit the complete table, including muted PM samples.
     setData = function(dat) {
       if(NROW(dat)) {
+        if(id == "AM") {
+          if(is.null(dat$origFam)) dat$origFam = ""
+          dat$origFam[is.na(dat$origFam)] = ""
+          dat$Fam = NULL
+        }
         if(id == "PM")
           dat = dat[order(dat$Sample), , drop = FALSE]
+
+        # Aliases
         al = dat$Alias
         empty = is.na(al)
-        if(any(empty)) {
-          candidates = paste0(switch(id, PM = "V", AM = "R"), seq_len(nrow(dat)))
-          al[empty] = head(setdiff(candidates, al), sum(empty))
-        }
+        if(any(empty))
+          al[empty] = dat$Sample[empty]
         if(any(!nzchar(al)))
           stop2("Aliases must be nonempty")
         if(id == "PM" && anyDuplicated(al))
           stop2("PM aliases must be unique")
         dat$Alias = al
+
         dat$.rowid = seq_len(nrow(dat))
         rownames(dat) = dat$Sample
         dat = moveColsFirst(dat, ".rowid")
@@ -139,7 +145,8 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     ))
 
     observeEvent(input$editButton, { .debug2("open edit UI")
-      editdata(req(mainTable$main))
+      dat = req(mainTable$main)
+      editdata(if(id == "AM") displayFamily(dat, assignedRefs()) else dat)
       showEdit()
     })
 
@@ -243,6 +250,10 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       changes = if(length(ids) || length(sex)) list(ids = ids, sex = sex) else NULL
 
       tryCatch({
+        if(id == "AM") {
+          new$origFam = old$origFam
+          new$Fam = NULL
+        }
         fixed = old$Sample %in% muted()
         cols = setdiff(names(new), c(".rowid", "Sample", "Alias"))
         if(id == "PM" && any(fixed) &&
@@ -260,7 +271,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     # Aliases -----------------------------------------------------------------
 
     registerAliases(id, input, output, session, mainTable, setData,
-                    missingIDs, idEdits, .debug2)
+                    assignedRefs, missingIDs, idEdits, .debug2)
 
     # Export ------------------------------------------------------------------
 
@@ -285,6 +296,7 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       },
       content = function(file) {
         dat = req(mainTable$main)
+        if(id == "AM") dat = displayFamily(dat, assignedRefs())
         dat$.rowid = NULL
         if(identical(input$exportFormat, "xlsx"))
           openxlsx::write.xlsx(dat, file, sheetName = id, rowNames = FALSE)
@@ -313,17 +325,25 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
 
 # Utils -------------------------------------------------------------------
 
+# Show assigned families without changing the imported family information
+displayFamily = function(dat, assigned) {
+  dat$Fam = dat$origFam
+  if(length(assigned)) {
+    f = assigned[dat$Sample]
+    j = !is.na(f)
+    dat$Fam[j] = f[j]
+  }
+  dat$origFam = NULL
+  dat = dat[order(dat$Fam, dat$Sample), , drop = FALSE]
+  moveColsFirst(dat, c(".rowid", "Fam", "Sample", "Alias", "Sex"))
+}
+
 formatGenoView = function(dat, mode, flavour = NULL, fam = NULL, identifications = NULL) {
 
   if(mode == "main" && flavour == "AM") {
-    if(is.null(fam))
-      dat$Fam = ""
-    else {
-      f = fam[dat$Sample]
-      dat$Fam = ifelse(is.na(f), "", f)
-    }
-    dat = dat[order(dat$Fam, dat$Sample), , drop = FALSE]
-    dat = moveColsFirst(dat, c("Fam", "Sample", "Alias", "Sex"))
+    dat = displayFamily(dat, fam)
+    dat$Assigned = ifelse(dat$Sample %in% names(fam), '<i class="fas fa-link"></i>', "")
+    dat = moveColsFirst(dat, c("Fam", "Assigned", "Sample", "Alias", "Sex"))
 
     # Show the original PM sample without changing the stored AM ID.
     j = match(dat$Sample, identifications$Missing)
@@ -359,6 +379,8 @@ genoDT = function(dat, mode = c("main", "edit"), flavour = NULL, assigned = NULL
                        identifications = identifications)
 
   nms = names(dat)
+  headers = nms
+  headers[headers == "Assigned"] = ""
   .cols = function(cols) .myintersect(cols, nms)
   .colIdx = function(cols) {
     i = match(cols, nms, nomatch = 0L)
@@ -375,13 +397,15 @@ genoDT = function(dat, mode = c("main", "edit"), flavour = NULL, assigned = NULL
     dat,
     class = "stripe hover nowrap compact",
     rownames = FALSE,
-    escape = if(mode == "edit") .mysetdiff(nms, "Sex") else TRUE,
+    colnames = headers,
+    escape = if(mode == "edit") which(nms != "Sex") else which(nms != "Assigned"),
     callback = callback,
     plugins = "natural",
     selection = if(mode == "edit") "multiple" else "none",
     editable = editopt,
     options = list(
       dom = "t",
+      order = list(),
       paging = FALSE,
       scrollX = TRUE,
       scrollY = scrollY,
@@ -396,16 +420,21 @@ genoDT = function(dat, mode = c("main", "edit"), flavour = NULL, assigned = NULL
   ) |>
     DT::formatStyle(names(dat), target = "row", lineHeight = "75%") |>
     DT::formatStyle(.cols("Sex"), borderRight = "1px solid #ccc") |>
-    DT::formatStyle(.cols("Fam"), fontWeight = "bold", color = "darkblue",
-                cursor = "pointer")
+    DT::formatStyle(.cols("Fam"), fontWeight = "bold", color = "#4E657A",
+                  cursor = "pointer")
 
+  if("Assigned" %in% nms)
+    dt = dt |> DT::formatStyle("Assigned", width = "24px", textAlign = "center",
+                               color = "#808080")
   if(mode == "main")
-    dt = dt |> DT::formatStyle(.cols("Sex"), color = DT::styleEqual(c("F", "M"),
-                                                                    c("hotpink", "steelblue")))
+    dt = dt |> DT::formatStyle(.cols("Sex"), color = DT::styleEqual(
+      c("F", "M"), c("#B46E8B", "#607F9D")))
+
   if(mode == "main" && length(muted))
-    dt = dt |> DT::formatStyle("Sample", target = "row",
-      backgroundColor = DT::styleEqual(muted, rep("#eeeeee", length(muted))),
-      color = DT::styleEqual(muted, rep("#999999", length(muted))))
+    dt = dt |>
+      DT::formatStyle("Sample", target = "row",
+                      backgroundColor = DT::styleEqual(muted, rep("#eeeeee", length(muted))),
+                      color = DT::styleEqual(muted, rep("#999999", length(muted))))
   dt
 }
 
@@ -450,10 +479,10 @@ standardiseGenoData = function(df, selectRows = NULL, excludeCols = NULL) {
     df$Sex = "?"
 
   # Standardise genotype separators
-  genoCols = setdiff(names(df), c("Fam", "Sample", "Alias", "AMEL", "Sex", ".rowid"))
+  genoCols = setdiff(names(df), c("Fam", "origFam", "Sample", "Alias", "AMEL", "Sex", ".rowid"))
   df[genoCols] = lapply(df[genoCols], \(x) gsub(",", "/", x, fixed = TRUE))
 
-  moveColsFirst(df, c("Fam", "Sample", "Alias", "Sex"))
+  moveColsFirst(df, c("origFam", "Fam", "Sample", "Alias", "Sex"))
 }
 
 

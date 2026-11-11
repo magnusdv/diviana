@@ -1,7 +1,8 @@
 # Relabel families and missing persons --------------------------------------
 
-setupRelabel = function(input, output, session, pedigrees, pedIssues,
-                            mainMissing, identifications, currentDviData) {
+setupRelabel = function(input, output, session, pedigrees, pedIssues, mainMissing,
+                        identifications, currentDviData, amData) {
+
   defaultRelabelOptions = list(families = "keep", prefix = "F", missing = "keep",
                                format = "[FNAME]-M[MIDX_FAM]")
   pendingRelabel = reactiveVal(NULL)
@@ -54,6 +55,17 @@ setupRelabel = function(input, output, session, pedigrees, pedIssues,
         dat
       }, pedigrees(), dvi$am, names(dvi$am))
       names(peds) = names(dvi$am)
+
+      # Update original family information, including unassigned references
+      if(!identical(old, names(peds))) {
+        dat = amData$main()
+        if(!is.null(dat)) {
+          i = match(dat$origFam, old)
+          ok = !is.na(i)
+          dat$origFam[ok] = names(peds)[i[ok]]
+          amData$set(dat)
+        }
+      }
 
       issues = pedIssues()
       names(issues) = names(peds)[match(names(issues), old)]
