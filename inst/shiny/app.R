@@ -287,6 +287,18 @@ server = function(input, output, session) {
                             muted = reactive(identifications()$Sample),
                             currentModal = currentModal, .debug = .debug)
 
+  # Initialise accordion when the combined sample count exceeds 22
+  showImported = function(which) {
+    am = NROW(dataServerAM$main())
+    pm = NROW(dataServerPM$main())
+    large = am > 0L && pm > 0L && am + pm > 22L
+    session$onFlushed(function()
+      session$sendCustomMessage("initDataAccordion", list(card = which, large = large)), once = TRUE)
+  }
+
+  observeEvent(dataServerAM$imported(), showImported("AM"), ignoreInit = TRUE)
+  observeEvent(dataServerPM$imported(), showImported("PM"), ignoreInit = TRUE)
+
   genoAM = reactive({ .debug("genoAM", dataServerAM$main())
     g = dataServerAM$main(); g$.rowid = g$Fam = g$origFam = g$Sample = g$Alias = g$AMEL = g$Sex = NULL; g})
   genoPM = reactive({ .debug("genoPM", dataServerPM$main())
@@ -371,7 +383,11 @@ server = function(input, output, session) {
     syncRadio("dbtype", "original", ignoreDbInput)
     syncRadio("muttype", if(dat$hasMut) "original" else "none", ignoreMutInput)
 
-    session$onFlushed(function() loading(FALSE), once = TRUE)
+    large = NROW(dat$am) > 0L && NROW(dat$pm) > 0L && NROW(dat$am) + NROW(dat$pm) > 22L
+    session$onFlushed(function() {
+      loading(FALSE)
+      session$sendCustomMessage("initDataAccordion", list(card = "AM", large = large))
+    }, once = TRUE)
   }
 
   # Complete DVI loading

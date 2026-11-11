@@ -16,14 +16,16 @@ window.sexEditCallback = function(table) {
 
 
 $(document).on('expanded.lte.cardwidget', '#data-accordion .card', function() {
-  let n = 0;
+  let n = 0, nonempty = 0;
   $('#data-accordion table.dataTable').each(function() {
     if ($.fn.dataTable.isDataTable(this)) {
-      n += $(this).DataTable().rows().count();
+      const k = $(this).DataTable().rows().count();
+      n += k;
+      if(k > 0) nonempty++;
     }
   });
 
-  if (n > 22) {
+  if(n > 22 && nonempty === 2) {
     $('#data-accordion .card').not(this).each(function() {
       if (!$(this).hasClass('collapsed-card')) {
         $(this).CardWidget('collapse');
@@ -32,6 +34,18 @@ $(document).on('expanded.lte.cardwidget', '#data-accordion .card', function() {
   }
 });
 
+
+Shiny.addCustomMessageHandler('initDataAccordion', function(x) {
+  const cards = $('#data-accordion .card');
+  const i = x.card === 'PM' ? 1 : 0;
+  cards.each(function(j) {
+    const open = !x.large || j === i;
+    if(open && $(this).hasClass('collapsed-card'))
+      $(this).CardWidget('expand');
+    if(!open && !$(this).hasClass('collapsed-card'))
+      $(this).CardWidget('collapse');
+  });
+});
 
 
 Shiny.addCustomMessageHandler('clearOutputs', function(ids) {
