@@ -12,6 +12,7 @@ registerImport = function(id, input, output, session, mainTable, setData, source
   previewRows = reactiveVal(NULL)
   fileError = reactiveVal(NULL)
   pendingImport = reactiveVal(NULL)
+  importEvent = reactiveVal(0L)
 
   # Preserve import settings separately for AM and PM
   importOpts = reactiveValues(action = "add", longNames = TRUE, createAM = TRUE,
@@ -116,7 +117,7 @@ registerImport = function(id, input, output, session, mainTable, setData, source
   })
 
   observeEvent(list(input$longNames, input$createAM, input$missingFmt,
-                  input$includeHidden, input$excludeCols,
+                  input$includeHidden, input$prependFam, input$excludeCols,
                   input$previewTable_rows_selected, input$action),
                fileError(NULL), ignoreInit = TRUE)
 
@@ -208,8 +209,9 @@ registerImport = function(id, input, output, session, mainTable, setData, source
   # Prepare sample names and display original family information
   dfFiltered = reactive({ .debug2("import filter genemapper/text blanks")
     df = req(raw())
-    if(id == "AM" && !is.null(builtAM())) {
-      src = builtAM()$source
+    am = builtAM()
+    if(id == "AM" && !is.null(am)) {
+      src = am$source
       df$Family = trimws(src[[1]])
       if(isFALSE(input$longNames %||% importOpts$longNames)) {
         df$Relationship = trimws(src[[2]])
@@ -268,6 +270,7 @@ registerImport = function(id, input, output, session, mainTable, setData, source
       if(z$create)
         importedAM(list(result = z$build, action = z$action))
       pendingImport(NULL)
+      importEvent(isolate(importEvent()) + 1L)
       removeModal()
     }, error = function(e) {
       fileError(conditionMessage(e))
@@ -335,7 +338,7 @@ registerImport = function(id, input, output, session, mainTable, setData, source
           mp = paste0("M", k + seq_along(b$missing))
           dup = intersect(mp, c(keep$Sample, df$Sample))
           if(length(dup))
-            stop2("Missing person IDs already used by samples: ", toString(dup))
+            stop2("Missing person IDs already used by samples: ", dup)
           b$am = Map(\(p, old, new) relabel(p, old = old, new = new),
                      b$am, b$missing, mp)
           b$missing = mp
@@ -369,8 +372,8 @@ registerImport = function(id, input, output, session, mainTable, setData, source
       pendingImport(z)
 
       msg = switch(id,
-        AM = sprintf("Replace existing AM samples%s?", if(create) " and pedigrees" else ""),
-        PM = "Replace existing PM samples? Manually identified samples will be kept."
+        AM = sprintf("Replace all existing AM samples%s?", if(create) " and pedigrees" else ""),
+        PM = "Replace all existing PM samples?"
       )
       showModal(confirmModal(msg, ns("replaceBack"), ns("replaceConfirm")))
     }, error = function(e) fileError(conditionMessage(e)))
@@ -385,7 +388,8 @@ registerImport = function(id, input, output, session, mainTable, setData, source
 
   observeEvent(input$replaceConfirm, commitImport(req(pendingImport())))
 
-  list(constructedAM = reactive(importedAM()), clear = clearImport)
+  list(constructedAM = reactive(importedAM()), imported = reactive(importEvent()),
+       clear = clearImport)
 }
 
 

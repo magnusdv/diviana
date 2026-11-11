@@ -148,7 +148,7 @@ registerAliases = function(id, input, output, session, mainTable, setData,
   output$aliasErrorUI = renderUI({ .debug2("alias error ui")
     msg = aliasErrorMsg()
     if(msg != "")
-      div(class = if(id == "AM" && startsWith(msg, "Duplicated")) "text-warning" else "text-danger", msg)
+      div(class = if(startsWith(msg, "Warning")) "text-warning" else "text-danger", msg)
   })
 
   observeEvent(input$aliasSave, { .debug2("alias save")

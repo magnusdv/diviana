@@ -1314,7 +1314,7 @@ server = function(input, output, session) {
     session$sendCustomMessage("clearOutputs", c(
       "amcentric", "pmcentric", "lrmatrix", "exmatrix", "jointtabs", "solvelog",
       "solutionplot", "pedplot", "dvisummary", "AM-mainTableUI", "PM-mainTableUI",
-      "AM-infofield", "PM-infofield", "reviewControl")
+      "AM-infofield", "PM-infofield", "AM-sampleInfo", "PM-sampleInfo", "reviewControl")
     )
     externalAM("reset")
     externalPM("reset")

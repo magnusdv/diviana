@@ -123,7 +123,8 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     # Show sample counts in the card header
     output$sampleInfo = renderText({
       dat = mainTable$main
-      if(is.null(dat)) return("")
+      if(is.null(dat))
+        return("No data loaded")
       n = nrow(dat)
       count = sprintf("%d sample%s", n, if(n == 1L) "" else "s")
       if(id == "AM")
@@ -471,6 +472,10 @@ standardiseGenoData = function(df, selectRows = NULL, excludeCols = NULL) {
 
   if("Sample" %notin% nms && !is.null(rownms))
     df$Sample = rownms
+
+  dup = anyDuplicated.default(df$Sample)
+  if(dup)
+    stop2("Duplicated sample ID: ", df$Sample[dup])
 
   if(!identical(rownms, df$Sample)) {
     rownames(df) = rownms = df$Sample
