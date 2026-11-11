@@ -1,3 +1,4 @@
+
 # Convert import issues to reasons indexed by family
 pedIssueReasons = function(x) {
   if(!length(x)) return(character())
@@ -21,7 +22,7 @@ dataUI = function(id, title = paste(id, "data")) {
   ns = NS(id)
   bs4Card(width = NULL, title = title, collapsible = TRUE, collapsed = FALSE,
     uiOutput(ns("mainTableUI")),
-    uiOutput(ns("sourcefield")),
+    uiOutput(ns("infofield")),
     footer = div(class = "btn-group",
       actionButton(ns("importButton"), label = tagList(myIcon("file-arrow-up", align = "-0.1em"), "Import")),
       actionButton(ns("editButton"), label = tagList(myIcon("edit", align = "-0.1em"), "Edit")),
@@ -117,15 +118,21 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
              muted = muted(), scrollY = "370px", identifications = identifications())
     }, server = FALSE)
 
-    output$sourcefield = renderUI({
+    output$infofield = renderUI({
+      dat = req(mainTable$main)
       src = vapply(sources$all, \(s) as.character(em(s)), character(1))
-      if(!length(src))
-        return(NULL)
+      n = nrow(dat)
+      count = sprintf("%d sample%s", n, if(n == 1L) "" else "s")
+      if(id == "AM")
+        count = sprintf("%s · %d assigned", count,
+                        sum(dat$Sample %in% names(assignedRefs())))
 
-      tags$div(
-        style = "margin-top: 10px; line-height: 1.1;",
-        HTML(paste(c("Sources:", src), collapse = if(length(src) == 1) " " else "<br>"))
-      )
+      div(class = "d-flex justify-content-between align-items-start",
+          style = "margin-top:10px;line-height:1.25;font-size:0.9rem;gap:12px",
+          div(if(length(src))
+            HTML(paste(c(if(length(src) == 1L) "Source:" else "Sources:", src),
+                       collapse = if(length(src) == 1L) " " else "<br>"))),
+          span(count, style = "white-space:nowrap"))
     })
 
     # Edit -------------------------------------------------------------------
@@ -512,4 +519,3 @@ banner = function(session) {
     icon("circle-exclamation", style = "margin: 6px; color:red; font-size: 20px;")
   )
 }
-
