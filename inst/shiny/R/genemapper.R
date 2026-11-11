@@ -57,7 +57,7 @@ readGenemapper = function(file, format = NULL, sep = "\t") {
                   check.names = FALSE, fill = TRUE, quote = "\"", comment.char = "")
   needed = c("Sample Name", "Marker", "Allele 1", "Allele 2")
   if(!all(needed %in% names(x0)))
-    stop2("GeneMapper file requires columns: ", toString(needed))
+    stop2("GeneMapper file requires columns: ", needed)
   if(sum(names(x0) == "Marker") > 1L)
     stop2("Unsupported GeneMapper format (multiple markers per line)")
   if(!nrow(x0)) stop2("No samples found in GeneMapper file")
@@ -106,20 +106,13 @@ readGenoFromTxt = function(file, sep = "\t", flavour = c("AM", "PM")) {
 
   ids = trimws(x[[idcol]])
   family = if(flavour == "AM" && length(famcol)) trimws(x[[famcol[1]]])
-
   if(anyNA(ids) || any(!nzchar(ids)))
     stop2("Empty sample IDs")
-
-  if(!is.null(family))
-    ids = paste(family, ids, sep = "_")
-
-  if(anyDuplicated.default(ids))
-    stop2("Duplicated sample ID: ", ids[duplicated(ids)][1])
 
   ignored = if(flavour == "AM") setdiff(meta, famcol) else meta
   if(length(ignored))
     warning("Ignoring metadata columns: ", toString(nm[ignored]), call. = FALSE)
-  rownames(x) = ids
+
   x = x[-unique(c(idcol, meta))]
 
   # Combine adjacent pairs of allele columns.
@@ -136,6 +129,7 @@ readGenoFromTxt = function(file, sep = "\t", flavour = c("AM", "PM")) {
     geno = Map(\(a, b) paste(a, b, sep = "/"),
                x[cols[odd]], x[cols[odd + 1L]])
     names(geno) = markers[odd]
+
     x[names(geno)] = geno
     x = x[-cols]
   }
@@ -146,6 +140,9 @@ readGenoFromTxt = function(file, sep = "\t", flavour = c("AM", "PM")) {
   if(!length(setdiff(names(x), c("Sex", "Alias", "Fam"))))
     stop2("No genotype columns found in text file")
 
-  if(!is.null(family)) x$Family = family
-  x
+  x$Sample = ids
+  if(!is.null(family))
+    x$Family = family
+
+  moveColsFirst(x, c("Family", "Sample"))
 }

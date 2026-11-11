@@ -15,13 +15,16 @@ registerImport = function(id, input, output, session, mainTable, setData, source
 
   # Preserve import settings separately for AM and PM
   importOpts = reactiveValues(action = "add", longNames = TRUE, createAM = TRUE,
-                              missingFmt = "M", includeHidden = FALSE, excludeCols = NULL)
+                              missingFmt = "M", includeHidden = FALSE,
+                              prependFam = FALSE, excludeCols = NULL)
 
   observeEvent(input$action, {importOpts$action = input$action})
   observeEvent(input$longNames, {importOpts$longNames = input$longNames})
   observeEvent(input$createAM, {importOpts$createAM = input$createAM})
   observeEvent(input$missingFmt, {importOpts$missingFmt = input$missingFmt})
   observeEvent(input$includeHidden, {importOpts$includeHidden = input$includeHidden})
+  observeEvent(input$prependFam, {importOpts$prependFam = input$prependFam})
+
   observeEvent(input$excludeCols, {
     if(!is.null(raw()) && is.null(pendingImport()))
       importOpts$excludeCols = input$excludeCols %||% character()
@@ -42,6 +45,7 @@ registerImport = function(id, input, output, session, mainTable, setData, source
       importOpts$createAM = TRUE
       importOpts$missingFmt = "M"
       importOpts$includeHidden = FALSE
+      importOpts$prependFam = FALSE
       importOpts$excludeCols = NULL
     }
   }
@@ -63,6 +67,9 @@ registerImport = function(id, input, output, session, mainTable, setData, source
       conditionalPanel("output.showHiddenControls", ns = ns,
         checkboxInput(ns("includeHidden"), "Include blanks, controls and ladder samples",
                       value = isolate(importOpts$includeHidden), width = "auto")),
+      conditionalPanel("output.showPrependFam", ns = ns,
+        checkboxInput(ns("prependFam"), "Prepend family name to sample IDs",
+                      value = isolate(importOpts$prependFam), width = "auto")),
       if(id == "AM")
         conditionalPanel("output.showFamilyControls", ns = ns,
           div(
@@ -119,10 +126,13 @@ registerImport = function(id, input, output, session, mainTable, setData, source
   output$showHiddenControls = reactive(identical(importType(), "gm"))
   outputOptions(output, "showHiddenControls", suspendWhenHidden = FALSE)
 
+  output$showPrependFam = reactive(id == "AM" && is.null(builtAM()) &&
+                                   "Family" %in% names(raw()))
+  outputOptions(output, "showPrependFam", suspendWhenHidden = FALSE)
 
   # Genotype preview and import controls
   output$tableContent = renderUI({ .debug2("update raw table")
-    cols = setdiff(names(req(raw())), "Family")
+    cols = setdiff(names(req(raw())), c("Family", "Sample"))
     excluded = isolate(importOpts$excludeCols)
     if(is.null(excluded))
       excluded = c("Yindel", grep("^DY", cols, value = TRUE))
@@ -207,6 +217,14 @@ registerImport = function(id, input, output, session, mainTable, setData, source
       } else df$Sample = rownames(df)
       df = moveColsFirst(df, c("Family", "Relationship", "Sample"))
     }
+
+    # Preview optional family prefixes without changing the uploaded data
+    if(id == "AM" && is.null(am) && "Family" %in% names(df) &&
+       isTRUE(input$prependFam %||% importOpts$prependFam)) {
+      j = !is.na(df$Family) & nzchar(df$Family)
+      df$Sample[j] = paste0(df$Family[j], "_", df$Sample[j])
+    }
+
     if(identical(importType(), "gm") &&
        !isTRUE(input$includeHidden %||% importOpts$includeHidden)) {
       blanks = rowSums(df != "", na.rm = TRUE) == 0
