@@ -105,9 +105,17 @@ readGenoFromTxt = function(file, sep = "\t", flavour = c("AM", "PM")) {
   meta = setdiff(meta, idcol)
 
   ids = trimws(x[[idcol]])
-  if(anyNA(ids) || any(!nzchar(ids)) || anyDuplicated.default(ids))
-    stop2("Empty or duplicated sample IDs")
   family = if(flavour == "AM" && length(famcol)) trimws(x[[famcol[1]]])
+
+  if(anyNA(ids) || any(!nzchar(ids)))
+    stop2("Empty sample IDs")
+
+  if(!is.null(family))
+    ids = paste(family, ids, sep = "_")
+
+  if(anyDuplicated.default(ids))
+    stop2("Duplicated sample ID: ", ids[duplicated(ids)][1])
+
   ignored = if(flavour == "AM") setdiff(meta, famcol) else meta
   if(length(ignored))
     warning("Ignoring metadata columns: ", toString(nm[ignored]), call. = FALSE)
