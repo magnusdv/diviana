@@ -7,7 +7,7 @@ registerAliases = function(id, input, output, session, mainTable, setData,
   aliasErrorMsg = reactiveVal("")
 
   # Preserve alias rules across dialog openings
-  aliasOpts = reactiveValues(method = "prefix",
+  aliasOpts = reactiveValues(method = "none",
                              prefix = switch(id, PM = "V", AM = "R", "ID"),
                              cutFrom = "", cutUntil = "", remove = "", regex = "")
 
@@ -31,7 +31,8 @@ registerAliases = function(id, input, output, session, mainTable, setData,
       fluidRow(
         column(6,
           radioButtons(ns("aliasMethod"), "Choose method:",
-                       choices = list("Sequence with prefix" = "prefix",
+                       choices = list("Do not use aliases" = "none",
+                                      "Sequence with prefix" = "prefix",
                                       "Keep part of text" = "cut",
                                       "Remove text" = "remove",
                                       "Regular expression" = "regex"),
@@ -94,10 +95,14 @@ registerAliases = function(id, input, output, session, mainTable, setData,
       return(origs)
 
     res = origs
-    if(method == "prefix") {
-      res = paste0(inp, seq_along(origs))
-    }
-    else tryCatch({ # catch invalid regexpr
+    if(method == "none")
+      return(origs)
+
+    if(method == "prefix")
+      return(paste0(inp, seq_along(origs)))
+
+    # Remaining methods
+    tryCatch({
       if(method == "cut") {
         from = input$cutFrom %||% ""
         until = input$cutUntil %||% ""
@@ -135,8 +140,8 @@ registerAliases = function(id, input, output, session, mainTable, setData,
       aliasErrorMsg("Empty aliases (not permitted)")
     else if(anyDuplicated.default(res))
       aliasErrorMsg(if(id == "AM")
-        "Warning: Duplicated aliases (this is ok for AM samples)" else
-          "Warning: Duplicated aliases (not permitted for PM samples)")
+        "Warning: Duplicated aliases (ok for AM samples)" else
+          "Duplicated aliases (not permitted for PM samples)")
     res
   })
 
@@ -194,7 +199,7 @@ registerAliases = function(id, input, output, session, mainTable, setData,
       pendingReplace(NULL)
 
       # Start with default alias rules after replacing IDs
-      aliasOpts$method = "prefix"
+      aliasOpts$method = "none"
       aliasOpts$prefix = switch(id, PM = "V", AM = "R", "ID")
       aliasOpts$cutFrom = ""
       aliasOpts$cutUntil = ""
@@ -207,15 +212,20 @@ registerAliases = function(id, input, output, session, mainTable, setData,
 }
 
 aliasDT = function(dat, scrollY = "250px") {
-  res = DT::datatable(dat,
-                      rownames = FALSE,
-                      selection = "none",
-                      class = "stripe hover compact",
-                      options = list(dom = 't',
-                                     scrollX = FALSE,
-                                     scrollY = scrollY,
-                                     scrollCollapse = TRUE,
-                                     paging = FALSE)) |>
+  res = DT::datatable(
+    dat,
+    rownames = FALSE,
+    selection = "none",
+    class = "stripe hover compact",
+    plugins = "natural",
+    options = list(dom = 't',
+                   scrollX = FALSE,
+                   scrollY = scrollY,
+                   scrollCollapse = TRUE,
+                   paging = FALSE,
+                   order = list(),
+                   columnDefs = list(list(type = "natural", targets = 0:1)))
+    ) |>
     DT::formatStyle(names(dat), target = "row", lineHeight = "80%")
 
   # Highlight empty or duplicated aliases
