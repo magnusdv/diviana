@@ -1,3 +1,33 @@
+# dev
+
+## Imports
+
+* Redesigned AM/PM import dialogs.
+* Added confirmation before replacing complete DVI datasets.
+* AM text import now includes an option to prepend family name to sample IDs.
+* Fixed missing-person numbering and family-prefixed labels when adding AM data.
+* Allow complete DVI datasets without PM samples.
+
+## AM data and pedigrees
+
+* A link icon (🔗) indicates that an AM sample is assigned to a pedigree.
+* Improved reference selection in the pedigree editor, prioritising unassigned references from the current family.
+* Extended relabelling options, including naming missing persons after families.
+* Added a `PM -> AM` button for manual identifications.
+
+## Aliases
+
+* Added a "Do not use aliases" option, which is now the default.
+* Improved alias generation, text extraction and preview ordering.
+* Allow duplicate AM aliases, but not PM aliases.
+
+## Other
+
+* Added AM/PM export to text and Excel.
+* Added sample and assignment counts to data card headers.
+* Improved automatic accordion behaviour for large datasets.
+* Use `startApp()` instead of `runApp()` in `launchApp()`.
+
 
 # diviana 0.5.2
 
