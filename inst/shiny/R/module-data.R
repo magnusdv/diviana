@@ -58,8 +58,8 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
           dat$origFam[is.na(dat$origFam)] = ""
           dat$Fam = NULL
         }
-        if(id == "PM")
-          dat = dat[order(dat$Sample), , drop = FALSE]
+
+        # if(id == "PM") dat = dat[order(dat$Sample), , drop = FALSE]
 
         # Aliases
         al = dat$Alias
@@ -341,7 +341,7 @@ displayFamily = function(dat, assigned) {
     dat$Fam[j] = f[j]
   }
   dat$origFam = NULL
-  dat = dat[order(dat$Fam, dat$Sample), , drop = FALSE]
+  #dat = dat[order(dat$Fam, dat$Sample), , drop = FALSE]
   moveColsFirst(dat, c(".rowid", "Fam", "Sample", "Alias", "Sex"))
 }
 
