@@ -82,7 +82,8 @@ pedigreeUI = function(id, famid = "F1", showAllRefs = FALSE) {
                       width = "auto", height = "420px"),
            div(
              style = "display:flex; align-items:center; justify-content:space-between; font-size:small;",
-             p("Double-click symbols to edit names", style = "margin-top: 0; margin-bottom: 0"),
+             p("Double-click symbols to edit names", class = "text-muted",
+               style = "font-style:italic;margin-top: 0; margin-bottom: 0"),
              checkboxInput(ns("showall"), "Show all names", value = FALSE, width = "auto")
            ),
            uiOutput(ns("editlabel")),
@@ -334,7 +335,7 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
                 colnames = "",
                 options = list(dom = 't', pageLength = -1, scrollY = "160px",
                              scrollCollapse = TRUE, ordering = FALSE,
-                             language = list(zeroRecords = "No unassigned refs!"))) |>
+                             language = list(zeroRecords = "No unassigned refs"))) |>
         DT::formatStyle(names(df),
                         target = "row",
                         lineHeight = "80%",

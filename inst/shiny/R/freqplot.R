@@ -71,5 +71,3 @@ plotFreqs = function(freqs, marker = NULL) {
       legend.key.width = grid::unit(12, "pt"),
     )
 }
-
-# plotFreqs(forrel::NorwegianFrequencies$D12S391)
