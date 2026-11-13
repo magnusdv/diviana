@@ -1,5 +1,11 @@
 databaseUI = function() {
   fluidRow(
+    tags$style(HTML("
+      .marker-summary-scroll { width: fit-content; max-width: 100%; max-height: 500px; overflow: auto; }
+      #markersummary table.dataTable { width: auto !important; margin: 0; }
+      #markersummary table.dataTable th, #markersummary table.dataTable td { padding: 2px 12px; }
+      #markersummary table.dataTable thead th { position: sticky; top: 0; z-index: 1; background: #fff; padding: 6px 12px; }
+    ")),
     column(3,
       bs4Card(width = 12, collapsible = FALSE, title = "Allele frequencies",
         freqRadios("dbtype")),
@@ -8,8 +14,10 @@ databaseUI = function() {
     ),
     column(9,
       bs4Card(width = 12, collapsible = FALSE, title = "Marker summary",
+        label = span(textOutput("markerInfo", inline = TRUE),
+                     style = "font-size:0.9rem;white-space:nowrap"),
         uiOutput("databaseStatus"),
-        DT::DTOutput("markersummary", width = "100%"),
+        div(class = "marker-summary-scroll", DT::DTOutput("markersummary", width = "auto")),
         uiOutput("addedAllelesNote"),
         footer = div(class = "btn-group",
           actionButton("chartButton",
@@ -21,7 +29,7 @@ databaseUI = function() {
   )
 }
 
-registerDatabase = function(input, output, session, am, pm, settings, loading, dvi) {
+registerDatabase = function(input, output, session, am, pm, settings, loading) {
   original = reactiveVal(NULL)
   dbChoice = reactiveVal("")
   mutChoice = reactiveVal("none")
@@ -118,9 +126,13 @@ registerDatabase = function(input, output, session, am, pm, settings, loading, d
     if(loading()) return(NULL)
     switch(dbChoice(),
       builtin = switch(input$builtinDB %||% "",
-        "norSTR: Africa" = norSTR::africaDB,
-        "norSTR: Europe" = norSTR::europeDB,
         "norSTR: Norway" = norSTR::norwayDB,
+        "norSTR: Europe" = norSTR::europeDB,
+        "norSTR: Africa" = norSTR::africaDB,
+        "norSTR: South America" = norSTR::southAmericaDB,
+        "norSTR: West Asia" = norSTR::westAsiaDB,
+        "norSTR: Middle Asia" = norSTR::midAsiaDB,
+        "norSTR: East Asia" = norSTR::eastAsiaDB,
         "NorwegianFrequencies (legacy)" = forrel::NorwegianFrequencies,
         NULL),
       custom = customDB(),
@@ -225,15 +237,36 @@ registerDatabase = function(input, output, session, am, pm, settings, loading, d
         "Added alleles have frequency 0.001. Existing frequencies are adjusted.")
   })
 
-  output$markersummary = DT::renderDT({
+  markerTable = reactive({
     loc = locusAttrs()
     if(!length(loc)) return(NULL)
-    mtab = markerSummaryDiviana(loc, dvi = dvi())
+    mtab = markerSummaryDiviana(loc, am = am(), pm = pm())
     if(!ready()) mtab$PIC = NULL
     added = attr(DBext(), "added")
     if(any(lengths(added)))
-      mtab[["Added alleles"]] = vapply(added[mtab$Marker], toString, "")
-    formatDatabaseTable(mtab)
+      mtab[["Added alleles"]] = vapply(added[mtab$Marker], function(a)
+        toString(a[order(suppressWarnings(as.numeric(a)), a)]), "")
+    mtab
+  })
+
+  output$markerInfo = renderText({
+    tab = markerTable()
+    n = NROW(tab)
+    if(!n) return("No markers")
+    count = sprintf("%d marker%s", n, if(n == 1L) "" else "s")
+
+    if(all(is.na(tab$AM)) && all(is.na(tab$PM))) return(count)
+    if(all(is.na(tab$AM)) || all(is.na(tab$PM)) || identical(tab$AM, tab$PM)) {
+      used = sum(tab$AM %in% TRUE | tab$PM %in% TRUE)
+      return(if(used == n) count else paste(count, paste(used, "in data"), sep = " · "))
+    }
+    paste(count, paste(sum(tab$AM), "in AM"), paste(sum(tab$PM), "in PM"), sep = " · ")
+  })
+
+  output$markersummary = DT::renderDT({
+    tab = markerTable()
+    if(is.null(tab)) return(NULL)
+    formatDatabaseTable(tab)
   })
 
   showFrequencies = function(i) {
@@ -281,7 +314,8 @@ registerDatabase = function(input, output, session, am, pm, settings, loading, d
 }
 
 freqRadios = function(id) {
-  norstr = paste("norSTR:", c("Africa", "Europe", "Norway"))
+  norstr = paste("norSTR:", c("Norway", "Europe", "Africa", "South America",
+                             "West Asia", "Middle Asia", "East Asia"))
   tagList(
     tags$style(HTML("
       .freq-radios .shiny-input-container { margin-bottom: 1rem; }
@@ -400,24 +434,22 @@ styleBool = function(x, keep = TRUE) ifelse(
 formatDatabaseTable = function(df) {
   req(!is.null(df))
 
-  for(cl in c("Rate", "Rate2", "Range", "Stat", "Lump")) {
-    if(all(is.na(df[[cl]])))
-      df[[cl]] = NULL
-  }
+  cols = intersect(c("Rate", "Rate2", "Range", "Stationary", "Lumpable"), names(df))
+  df[cols[vapply(df[cols], function(x) all(is.na(x)), logical(1))]] = NULL
 
-  df$keep = df$AM | df$PM
-  if(all(is.na(df$keep)))
-    df$keep = TRUE
+  df$keep = if(all(is.na(df$AM)) && all(is.na(df$PM))) TRUE else
+    df$AM %in% TRUE | df$PM %in% TRUE
   df$AM = styleBool(df$AM, keep = df$keep)
   df$PM = styleBool(df$PM, keep = df$keep)
 
-  DT::datatable(df,
+  numericCols = intersect(c("Alleles", "PIC", "Rate", "Rate2", "Range"), names(df))
+  tab = DT::datatable(df,
     class = "stripe nowrap",
+    rownames = FALSE,
     escape = .mysetdiff(names(df), c("AM", "PM")),
     selection = "single",
     callback = DT::JS("
       table.on('dblclick', 'tbody tr', function() {
-        window.getSelection().removeAllRanges();
         const i = table.row(this).index();
         if(i !== undefined)
           Shiny.setInputValue('markersummary_dblclick', i + 1, {priority: 'event'});
@@ -428,13 +460,10 @@ formatDatabaseTable = function(df) {
       paging = FALSE,
       ordering = FALSE,
       autoWidth = FALSE,
-      scrollX = TRUE,
-      scrollY = "500px",
-      scrollCollapse = TRUE,
       columnDefs = list(list(targets = "keep", visible = FALSE),
-                        list(className = 'dt-center', targets = c("AM", "PM")))
+                        list(className = "dt-center", targets = c("AM", "PM")),
+                        list(className = "dt-right", targets = numericCols))
     )) |>
-    DT::formatStyle("Model", borderLeft = "2px solid #ddd") |>
     DT::formatStyle(
       names(df) |> .mysetdiff(c("AM", "PM")),
       valueColumns = "keep",
@@ -444,6 +473,12 @@ formatDatabaseTable = function(df) {
       fontSize = DT::styleEqual(c(TRUE, FALSE), c(NA, "90%"))
     ) |>
     DT::formatStyle(names(df), target = "row", lineHeight = "1rem")
+
+  if("PIC" %in% names(df))
+    tab = DT::formatRound(tab, "PIC", digits = 2, mark = "")
+  if("Added alleles" %in% names(df))
+    tab = DT::formatStyle(tab, "Added alleles", color = "#dc3545")
+  tab
 }
 
 

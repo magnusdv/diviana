@@ -1,25 +1,13 @@
+
 #' Summary table of marker information
 #'
-#' @param dvi A `dvir::dviData` object.
-#' @param locAttrs Optional locus attributes, typically from
-#'   `pedtools::getLocusAttributes(dvi$am)`, supplied instead of `dvi`.
+#' @param locAttrs A list of locus attributes.
+#' @param am,pm Allele matrices from the loaded sample tables, with two columns
+#'   per marker and column names ending in `.1` and `.2`.
 #'
 #' @return A data frame.
 #'
-#' @examples
-#' markerSummary(planecrash)
-#'
-markerSummaryDiviana = function(locAttrs = NULL, dvi = NULL) {
-  if(is.null(dvi))
-    dvi = dvir::dviData(NULL, NULL, NULL)
-
-  nonemptyDvi = length(dvi$am)
-
-  if(is.null(locAttrs) && nonemptyDvi) {
-    dvi = dvir:::consolidateDVI(dvi)
-    locAttrs = pedtools::getLocusAttributes(dvi$am, checkComps = TRUE)
-  }
-
+markerSummaryDiviana = function(locAttrs, am = NULL, pm = NULL) {
   if(!length(locAttrs))
     return()
 
@@ -42,15 +30,20 @@ markerSummaryDiviana = function(locAttrs = NULL, dvi = NULL) {
                Alleles = length(a$alleles),
                PIC = PIC(a$afreq) |> round(2),
                pars,
-               Stat = stattxt,
-               Lump = lumptxt)
+               Stationary = stattxt,
+               Lumpable = lumptxt)
   })
 
   res = do.call(rbind, reslist)
 
-  usedinAM = if(length(dvi$am)) res$Marker %in% pedtools::name(dvi$am) else NA
-  usedinPM = if(length(dvi$pm)) res$Marker %in% pedtools::name(dvi$pm) else NA
-  res = cbind(AM = usedinAM, PM = usedinPM, res)
+  # Marker presence depends on loaded samples, not pedigree assignments
+  markers = normaliseName(res$Marker)
+  inData = function(a) {
+    if(!NROW(a)) return(NA)
+    nm = colnames(a)[2L * seq_len(ncol(a)/2L) - 1L]
+    markers %in% normaliseName(substr(nm, 1L, nchar(nm) - 2L))
+  }
+  res = cbind(res["Marker"], AM = inData(am), PM = inData(pm), res[-1L])
 
   rownames(res) = NULL
   res

@@ -302,8 +302,7 @@ server = function(input, output, session) {
   loading = reactiveVal(FALSE)
 
   database = registerDatabase(input, output, session, am = alleleMatAM, pm = alleleMatPM,
-                              settings = settings, loading = loading,
-                              dvi = reactive(currentDviData()))
+                              settings = settings, loading = loading)
 
   loadDvi = function(dvi, source = "Example", dat = normalizeLoadedDvi(dvi)) { .debug("loadDvi")
     loading(TRUE)
