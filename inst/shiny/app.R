@@ -1139,8 +1139,13 @@ server = function(input, output, session) {
     })
 
     req(res)
-    solutionTable$AM = res$result$AM
-    solutionTable$PM = res$result$PM
+    # Preserve the recorded family and sample order
+    # TODO: Make sorting optional in dvir::formatSummary
+    am = res$result$AM
+    pm = res$result$PM
+
+    solutionTable$AM = am[order(match(am$Family, names(pedigrees()))), , drop = FALSE]
+    solutionTable$PM = pm[order(match(pm$Sample, dataServerPM$main()$Sample)), , drop = FALSE]
     solutionTable$LR = res$result$LRmatrix
     solutionTable$EX = res$result$exclusionMatrix
     solutionTable$JT = res$result$jointTable
