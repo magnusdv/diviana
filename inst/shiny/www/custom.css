@@ -14,6 +14,8 @@
   font-weight: 600;
 }
 
+#data-accordion .card > .card-header { cursor: pointer; }
+
 .dataTables_scrollBody {
   overflow-y: auto !important;
 }

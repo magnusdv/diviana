@@ -1331,6 +1331,11 @@ server = function(input, output, session) {
     settings$computeLR0 = FALSE
     settings$standardmodel = "equal"
     settings$maxAssign = 1e4
+
+     # Restore both data cards
+    session$onFlushed(function()
+      session$sendCustomMessage("initDataAccordion", list(card = "AM", large = FALSE)),
+      once = TRUE)
   })
 
   observeEvent(list(currentDviData(), input$resetall), { .debug("reset results")
