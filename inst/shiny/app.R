@@ -1148,7 +1148,7 @@ server = function(input, output, session) {
     solutionTable$PM = pm[order(match(pm$Sample, dataServerPM$main()$Sample)), , drop = FALSE]
     solutionTable$LR = res$result$LRmatrix
     solutionTable$EX = res$result$exclusionMatrix
-    solutionTable$JT = res$result$jointTable
+    solutionTable$JT = res$result$jointTables
     logMessage(res$log)
   })
 
