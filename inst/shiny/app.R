@@ -24,7 +24,6 @@ addResourcePath("icons", "www/static_icons")
 # TODO----------------------------------------------------------------
 #
 # MARKERS
-# * indicate markers with added alleles
 # * store original mutmods for faster rendering of original+original
 # * Handle cases where custom db is missing some markers (warn, but allow)
 #
@@ -139,38 +138,7 @@ ui = bs4Dash::bs4DashPage(
 
    # Tab: Marker database -------------------------------------------
 
-   tabItem("database",
-    fluidRow(
-      column(width = 3,
-
-        # Frequency source- -----------------------------------------
-
-        bs4Card(width = 12, collapsible = FALSE, title = "Allele frequencies",
-          freqRadios("dbtype")
-        ),
-
-        # Mutation model --------------------------------------------
-
-        bs4Card(width = 12, collapsible = FALSE, title = "Mutation model",
-          mutRadios("muttype")
-        )
-      ),
-
-      # Main marker table ---------------------------------------------------------------------------
-
-      column(width = 9,
-        bs4Card(width = 12, collapsible = FALSE, title = "Marker summary",
-          DT::DTOutput("markersummary", width = "100%"),
-          footer = div(class = "btn-group",
-            actionButton("chartButton",
-                         label = tagList(myIcon("simple-chart", align = "-0.1em"), " Frequencies")),
-            actionButton("mutMatrixButton",
-                         label = tagList(myIcon("bolt", align = "-0.1em"), "Mutation matrix"))
-          )
-        ),
-      ),
-    ),
-   ),
+   tabItem("database", databaseUI()),
 
 
   # Tab: Relatedness ---------------------------------------------------------
@@ -309,8 +277,8 @@ server = function(input, output, session) {
   aliasAM = reactive({g = dataServerAM$main(); .setnames(g$Alias, rownames(g))})
   aliasPM = reactive({g = dataServerPM$main(); .setnames(g$Alias, rownames(g))})
 
-  alleleMatAM = reactive(splitGenotypes(genoAM()))
-  alleleMatPM = reactive(splitGenotypes(genoPM()))
+  alleleMatAM = reactive(splitGenotypes(genoAM(), colNames = TRUE))
+  alleleMatPM = reactive(splitGenotypes(genoPM(), colNames = TRUE))
 
   # React to ID edits ---------------------------------------------------------------------------
 
@@ -333,33 +301,9 @@ server = function(input, output, session) {
   appData = reactiveVal(NULL)
   loading = reactiveVal(FALSE)
 
-  dbChoice = reactiveVal("builtin")
-  mutChoice = reactiveVal("none")
-
-  ignoreDbInput = reactiveVal(FALSE)
-  ignoreMutInput = reactiveVal(FALSE)
-
-  syncRadio = function(id, value, flag) {
-    flag(TRUE)
-    freezeReactiveValue(input, id)
-    updateRadioButtons(session, id, selected = value)
-  }
-
-  observeEvent(input$dbtype, {
-    if(ignoreDbInput()) {
-      ignoreDbInput(FALSE)
-      return()
-    }
-    dbChoice(input$dbtype)
-  }, ignoreInit = TRUE, priority = 100)
-
-  observeEvent(input$muttype, {
-    if(ignoreMutInput()) {
-      ignoreMutInput(FALSE)
-      return()
-    }
-    mutChoice(input$muttype)
-  }, ignoreInit = TRUE, priority = 100)
+  database = registerDatabase(input, output, session, am = alleleMatAM, pm = alleleMatPM,
+                              settings = settings, loading = loading,
+                              dvi = reactive(currentDviData()))
 
   loadDvi = function(dvi, source = "Example", dat = normalizeLoadedDvi(dvi)) { .debug("loadDvi")
     loading(TRUE)
@@ -374,11 +318,7 @@ server = function(input, output, session) {
     dataServerAM$sourceValues$all = if(!is.null(dat$am)) source
     dataServerPM$sourceValues$all = if(!is.null(dat$pm)) source
 
-    dbChoice("original")
-    mutChoice(if(dat$hasMut) "original" else "none")
-
-    syncRadio("dbtype", "original", ignoreDbInput)
-    syncRadio("muttype", if(dat$hasMut) "original" else "none", ignoreMutInput)
+    database$load(dat, if(source == "Example") input$example else source)
 
     large = NROW(dat$am) > 0L && NROW(dat$pm) > 0L && NROW(dat$am) + NROW(dat$pm) > 22L
     session$onFlushed(function()
@@ -397,146 +337,6 @@ server = function(input, output, session) {
     req(input$example)
     loadDvi(get(input$example))
   }, ignoreInit = TRUE)
-
-  # Database and mutation settings ----------------------------------------
-
-  customDB = reactive({ .debug("customDB")
-    path = req(input$customDB$datapath)
-    ext = tools::file_ext(input$customDB$name)
-
-    tryCatch({
-      if(ext == "fam") {
-        y = pedFamilias::readFam(path, verbose = FALSE)
-        if(length(y) && is.ped(y[[1]]))
-          getFreqDatabase(y[[1]])
-        else if(length(y[[1]]) && is.ped(y[[1]][[1]]))
-          getFreqDatabase(y[[1]][[1]])
-        else { # if database only
-          names(y) = vapply(y, function(lst) lst$name, FUN.VALUE = "")
-          lapply(y, function(lst) .setnames(lst$afreq, lst$alleles))
-        }
-      }
-      else {
-        readFreqDatabase(path, sep = "\t")
-      }
-    }, error = errModal)
-  })
-
-  selectedDB = reactive({ .debug("selectedDB")
-    if(loading())
-      return(NULL)
-
-    switch(dbChoice(),
-      builtin = switch(req(input$builtinDB),
-        "norSTR: Africa" = norSTR::africaDB,
-        "norSTR: Europe" = norSTR::europeDB,
-        "norSTR: Norway" = norSTR::norwayDB,
-        "NorwegianFrequencies (legacy)" = forrel::NorwegianFrequencies,
-        NULL
-      ),
-      custom = customDB(),
-      original = appData()$db, # NULL ok
-      NULL
-    )
-  })
-
-  output$database_famname = renderText({
-    req(appData()$db)
-    src = unique.default(c(dataServerAM$sources(), dataServerPM$sources()))
-    src = src[nzchar(src)]
-    if(length(src)) basename(src[1]) else "(unknown filename)"
-  })
-
-  mutParams = reactive({ .debug("mutParams")
-    if(loading())
-      return(NULL)
-
-    choice = mutChoice() %||% "none"
-
-    switch(choice,
-      none = NULL,
-      standard = {
-        prm = list(model = settings$standardmodel,
-                   rate = list(female = input$mutrateF, male = input$mutrateM))
-        if(prm$model == "stepwise") {
-          prm$rate2 = 1e-6
-          prm$range = 0.1
-        }
-        prm
-      },
-      original = appData()$mutparams # NULL ok
-    )
-  })
-
-  observedAlleles = reactive({ .debug("observedAlleles")
-    amatAM = alleleMatAM()
-    amatPM = alleleMatPM()
-
-    # Missing alleles
-    miss = c("", ".", "-", "0", NA)
-
-    am = pm = NULL
-
-    if(!is.null(amatAM)) {
-      am = lapply(seq_len(ncol(amatAM)/2), function(k)
-        unique.default(as.character(amatAM[, (2*k-1):(2*k)]) |> .mysetdiff(miss)))
-      names(am) = markersAM()
-    }
-
-    if(!is.null(amatPM)) {
-      pm = lapply(seq_len(ncol(amatPM)/2), function(k)
-        unique.default(as.character(amatPM[, (2*k-1):(2*k)]) |> .mysetdiff(miss)))
-      names(pm) = markersPM()
-    }
-
-    allmarkers = unique.default(c(names(am), names(pm))) |> .setnames()
-    lapply(allmarkers, function(m) sort.default(unique.default(c(am[[m]], pm[[m]]))))
-  })
-
-  DBext = reactive({  .debug("DBext")
-    db = selectedDB()
-    if(is.null(db))
-      return(NULL)
-
-    obs = observedAlleles()
-    if(!length(obs))
-      return(db)
-
-    dbnms = names(db)
-    midx = match(normaliseName(names(obs)), normaliseName(dbnms), nomatch = 0L)
-    allmiss = vector("list", length(obs))
-    names(allmiss) = names(obs)
-
-    for(i in seq_along(obs)) {
-      j = midx[i]
-      if(j == 0L)
-        next
-
-      miss = .mysetdiff(obs[[i]], names(db[[j]]))
-      if(length(miss)) {
-        dbname = dbnms[j]
-        db[[dbname]] = .addAlleles(db[[j]], miss)
-        allmiss[[i]] = miss
-      }
-    }
-
-    attr(db, "added") = allmiss
-    db
-  })
-
-  observeEvent(DBext(), { .debug("DBext observer")
-    db = DBext()
-    n = sum(lengths(attr(db, "added")))
-    if(n > 0)
-      showNotification(sprintf("Added %d missing alleles to database", n))
-  }, ignoreInit = TRUE)
-
-  locusAttrs = reactive({ .debug("locusAttrs")
-    if(loading())
-      return(NULL)
-
-    db2locattrs(DBext(), mutParams())
-  })
 
   # Derived DVI objects ----------------------------------------------------
 
@@ -557,13 +357,13 @@ server = function(input, output, session) {
 
     a = alleleMatAM()
     peddata = pedigrees()
-    loci = locusAttrs()
+    loci = database$locusAttrs()
 
     if(!length(peddata))
       return(NULL)
 
-    # Retain untyped pedigrees when all AM samples are deleted
-    if(is.null(a))
+    # Retain untyped pedigrees when no AM genotypes remain
+    if(!length(a))
       return(tryCatch(setMarkers(lapply(peddata, `[[`, "ped"),
                                  locusAttributes = loci), error = showErr))
 
@@ -585,9 +385,10 @@ server = function(input, output, session) {
     }
 
     peds = lapply(peddata, `[[`, "ped")
+    a[a == "."] = NA_character_
 
     tryCatch(
-      setMarkersDiviana(peds, alleleMatrix = a, loci = loci[idx]),
+      pedtools::setMarkersFromMatrix(peds, alleleMatrix = a, loci = loci[idx]),
       error = function(e) {
         showErr(e)
         NULL
@@ -600,10 +401,17 @@ server = function(input, output, session) {
       return(NULL)
 
     a = alleleMatPM()
-    loci = locusAttrs()
+    loci = database$locusAttrs()
 
-    if(is.null(a) || is.null(loci))
+    if(is.null(a))
       return(NULL)
+
+    s = pedtools::singletons(rownames(a), sex = sexPM()) |> .setnames(rownames(a))
+    if(!ncol(a)) {
+      pm = setMarkers(s, locusAttributes = loci)
+      return(pm[!names(pm) %in% identifications()$Sample])
+    }
+    if(!length(loci)) return(NULL)
 
     idx = match(normaliseName(markersPM()), normaliseName(names(loci)), nomatch = 0L)
     if(any(idx == 0L)) {
@@ -614,9 +422,8 @@ server = function(input, output, session) {
       a = a[, rep(keep, each = 2L), drop = FALSE]
       idx = idx[keep]
     }
-    s = pedtools::singletons(rownames(a), sex = sexPM()) |> .setnames(rownames(a))
-
-    pm = tryCatch(setMarkersDiviana(s, alleleMatrix = a, loci = loci[idx]),
+    a[a == "."] = NA_character_
+    pm = tryCatch(pedtools::setMarkersFromMatrix(s, alleleMatrix = a, loci = loci[idx]),
                   error = showErr)
     pm[!names(pm) %in% identifications()$Sample]
   })
@@ -644,7 +451,7 @@ server = function(input, output, session) {
                    identifications = identifications)
 
   mergedPm = mergePmServer("mergePM", trigger = dataServerPM$merge, dvi = currentDviData,
-                           reset = reactive(input$resetall))
+                           checkDatabase = database$check, reset = reactive(input$resetall))
 
   observeEvent(mergedPm(), {
     z = req(mergedPm())
@@ -659,66 +466,6 @@ server = function(input, output, session) {
     src = c(dataServerAM$sources(), dataServerPM$sources())
     if(!all(src == "Example"))
       isolate(updateSelectInput(session, "example", selected = ""))
-  })
-
-  observe({
-    dat = appData()
-    toggleState(
-      selector = "input[name='muttype'][value='original']",
-      condition = !is.null(dat) && isTRUE(dat$hasMut)
-    )
-  })
-
-  # Database: Marker summary table ----------------------------------------
-
-  output$markersummary = DT::renderDT({ .debug("render marker table")
-    loc = locusAttrs()
-    if(is.null(loc))
-      return(NULL)
-    mtab = markerSummaryDiviana(loc, dvi = currentDviData())
-    formatDatabaseTable(mtab)
-  })
-
-  observeEvent(input$chartButton, { .debug("freq chart")
-    i = req(input$markersummary_rows_selected)
-    loc = req(locusAttrs()[[i]])
-    mname = loc$name
-    freqs = .setnames(loc$afreq, loc$alleles)
-
-    output$freqPlot = renderPlot(plotFreqs(freqs, mname))
-    output$freqTable = DT::renderDT(formatFreqTable(freqs))
-
-    showModal(modalDialog(
-      title = paste("Allele frequencies:", mname),
-      size = "l",
-      easyClose = TRUE,
-      tags$div(
-        style = "display:flex;align-items:flex-start;gap:15px;margin-right:20px",
-        tags$div(style = "flex:3;min-width:0", plotOutput("freqPlot", height = 350)),
-        tags$div(style = "flex:1;min-width:0", DT::DTOutput("freqTable", width = "100%"))
-      )
-    ))
-  })
-
-  observeEvent(input$mutMatrixButton, { .debug("mutation matrix button")
-    i = req(input$markersummary_rows_selected)
-    loc = req(locusAttrs()[[i]])
-    mutmod = req(loc$mutmod)
-    malemat = mutmod$male |> as.matrix() |> formatMatrix() |> gt::fmt_auto()
-    femalemat = mutmod$female |> as.matrix() |> formatMatrix() |> gt::fmt_auto()
-
-    output$mutmatrix = gt::render_gt({
-      switch(req(input$mutsex), Female = femalemat, Male = malemat)
-    }, height = 400)
-
-    showModal(modalDialog(
-      title = paste("Mutation matrix:", loc$name),
-      size = "l",
-      radioButtons("mutsex", NULL, choices = c("Female", "Male"), selected = "Female",
-                   inline = TRUE),
-      gt::gt_output("mutmatrix"),
-      easyClose = TRUE
-    ))
   })
 
   # Pedigrees -----------------------------------------------------------
@@ -940,20 +687,15 @@ server = function(input, output, session) {
   execOnResize = TRUE, res = 72, height = 440)
 
   output$dvisummary = renderInfoBox({ .debug("update summary info box")
-    s = NULL
-    col = "warning"
-    if(!length(mainAM()))
-      s = c(s, "No AM data loaded")
-    if(!length(mainPM()))
-      s = c(s, "No PM data loaded")
-    if(!length(mainMissing()))
-      s = c(s, "No missing persons indicated")
+    missingData = c(!length(mainAM()), !length(mainPM()), !length(mainMissing()))
+    s = c("No AM data loaded", "No PM data loaded", "No missing persons indicated")[missingData]
+    hasDB = database$ready()
+    col = if(any(missingData) || !hasDB) "warning" else "success"
 
-    if(is.null(s)) {
+    if(!length(s)) {
       dvi = currentDviData()
       s = capture.output(print(dvi))[-1]
       s[1:4] = sub(":.*", "", s[1:4]) |> trimws("left")
-      col = "success"
     }
 
     bs4InfoBox(
@@ -961,11 +703,13 @@ server = function(input, output, session) {
       width = 12,
       elevation = 1,
       color = col,
-      value = HTML(paste0(s, collapse = "<br>")),
+      value = tagList(
+        div(class = if(any(missingData)) "text-danger", HTML(paste0(s, collapse = "<br>"))),
+        div(class = if(!hasDB) "text-danger", "Frequency database: ", database$label())
+      ),
       icon = shiny::icon("info")
     )
   })
-
 
   # Overview plot -----------------------------------------------------------
 
@@ -1071,15 +815,18 @@ server = function(input, output, session) {
     server = FALSE)
 
   observeEvent(input$amKappaCalc, { .debug("AM kappa calculate")
+    if(!database$check()) return()
     kappa$am = CPnoplot(req(mainAM()), acrossComps = input$acrossComps) })
 
   observeEvent(input$pmKappaCalc, { .debug("PM kappa calculate")
+    if(!database$check()) return()
     pm = req(mainPM())
     req(choose(length(pm), 2) <= 5000)
     kappa$pm = CPnoplot(pm)
   })
 
   observeEvent(input$ampmKappaCalc, { .debug("AM-PM kappa calculate")
+    if(!database$check()) return()
     am = req(mainAM())
     pm = req(mainPM())
     idMatr = pedtools:::fast.grid(list(typedMembers(am), typedMembers(pm))) |> req()
@@ -1112,6 +859,7 @@ server = function(input, output, session) {
   logMessage = reactiveVal("")
 
   observeEvent(input$solve, { .debug("solve")
+    if(!database$check()) return()
     dvi = currentDviData()
     req(length(dvi$am) > 0, (length(dvi$pm) > 0 && length(dvi$missing) > 0) ||
           NROW(dvi$identifications) > 0)
@@ -1308,15 +1056,10 @@ server = function(input, output, session) {
     dataServerPM$reset()
     appData(NULL)
     identifications(NULL)
-    dbChoice("builtin")
-    mutChoice("none")
+    database$reset()
     pedigrees(NULL)
     pedIssues(character())
     updateSelectInput(session, "example", selected = "")
-    updateRadioButtons(session, "dbtype", selected = "builtin")
-    updateRadioButtons(session, "muttype", selected = "none")
-    updateNumericInput(session, "mutrateF", value = 0.001)
-    updateNumericInput(session, "mutrateM", value = 0.002)
     updateNumericInput(session, "LRthresh", value = 10000)
     updateNumericInput(session, "pairLRmin", value = 0)
     updateCheckboxInput(session, "compactTabs", value = FALSE)
@@ -1325,7 +1068,7 @@ server = function(input, output, session) {
     updateNumericInput(session, "maxIncomp", value = 2)
     updateCheckboxInput(session, "ignoresex", value = FALSE)
     updateCheckboxInput(session, "acrossComps", value = FALSE)
-    # Settings dialog
+
     settings$hideUnimportantLabs = TRUE
     settings$useAliases = FALSE
     settings$computeLR0 = FALSE
@@ -1348,7 +1091,10 @@ server = function(input, output, session) {
   output$downloaddata = downloadHandler(
     filename = function() "dviData.rds",
     content = function(file) { .debug("download data")
-      dvi = currentDviData()
+      dvi = req(currentDviData())
+      if(!database$ready())
+        showNotification("No frequency database selected; saved data contain temporary equal frequencies",
+                         type = "warning", duration = 10)
       saveRDS(dvi, file)
     }
   )

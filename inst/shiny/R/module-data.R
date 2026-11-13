@@ -63,6 +63,12 @@ dataServer = function(id, assignedRefs = reactiveVal(),
 
         # if(id == "PM") dat = dat[order(dat$Sample), , drop = FALSE]
 
+        # Discard markers with no observed alleles
+        geno = setdiff(names(dat), c(".rowid", "Fam", "origFam", "Sample", "Alias", "AMEL", "Sex"))
+        a = splitGenotypes(dat[geno])
+        blank = .colSums(!a %in% c("", ".", "-", "0", "NA", NA), 2*nrow(dat), length(geno)) == 0
+        dat[geno[blank]] = NULL
+
         # Aliases
         al = dat$Alias
         empty = is.na(al)
@@ -112,7 +118,7 @@ dataServer = function(id, assignedRefs = reactiveVal(),
 
     output$mainTable = DT::renderDT({
       genoDT(mainTable$main, mode = "main", flavour = id, assigned = assignedRefs(),
-             muted = muted(), scrollY = "370px", identifications = identifications())
+             muted = muted(), scrollY = "380px", identifications = identifications())
     }, server = FALSE)
 
     # Show sample counts in the card header

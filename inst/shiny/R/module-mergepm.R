@@ -1,6 +1,7 @@
 # Merge PM module ----------------------------------------------------------
 
-mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropout = 0,
+mergePmServer = function(id, trigger, dvi, checkDatabase,
+                         defaultThreshold = 1e4, defaultDropout = 0,
                          defaultDropin = 0, defaultTypingError = 0, defaultIgnoreSex = FALSE,
                          defaultMethod = "combine", defaultNames = "combine",
                          reset = reactive(NULL))  {
@@ -132,6 +133,7 @@ mergePmServer = function(id, trigger, dvi, defaultThreshold = 1e4, defaultDropou
 
     # Identify groups once, always computing the combined profile
     observeEvent(input$analyse, {
+      if(!checkDatabase()) return()
       d = req(dvi())
       s = currentSettings()
       settings(s)
