@@ -79,7 +79,7 @@ pedigreeUI = function(id, famid = "F1", showAllRefs = FALSE) {
     # Pedigree plot
     column(width = 9, style = "flex:1;max-width:none;min-width:0",
            plotOutput(ns("plot"), click = ns("ped_click"), dblclick = ns("ped_dblclick"),
-                      width = "auto", height = "auto"),
+                      width = "auto", height = "420px"),
            div(
              style = "display:flex; align-items:center; justify-content:space-between; font-size:small;",
              p("Double-click symbols to edit names", style = "margin-top: 0; margin-bottom: 0"),
@@ -108,6 +108,8 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
     initialDat = list(ped = nuclearPed(father = ids[1], mother = ids[2], children = ids[3]),
                       famid = famid, miss = character(), refs = character(), refOrigName = character())
   }
+
+  initialDat$famid = famid
 
   moduleServer(id, function(input, output, session) {
     ns = session$ns
@@ -138,7 +140,13 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       mod = modalDialog(
         title = div(class = "aligned-row-wide", "Pedigree builder",
                     helpBtn("help-ped") |> wrap_tooltip("pedhelp", "left")),
-        uiOutput(ns("modalWidth")),
+
+        uiOutput(ns("modalWidth")) |>
+          tagAppendChild(tags$style(HTML("
+            @media (min-width: 576px) {
+              .pedmodal > .modal-dialog { max-width: 600px !important; }
+            }"))),
+
         pedigreeUI(id, famid, showAllRefs = isNew),
         footer = div(class = "aligned-row-wide",
           prettySwitch(ns("builderLarge"), "Large window", slim = TRUE, status = "primary"),
@@ -200,9 +208,13 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
 
     famidDeb = reactive(input$famid) |> debounce(200)
 
-    observeEvent(famidDeb(), { .debug2("edit family name")
-      updatePedData(famid = famidDeb(), clearSel = FALSE)
-    }) |> debounce(200)
+    observeEvent(famidDeb(), {
+      fam = trimws(famidDeb())
+      if(identical(fam, currData$famid))
+        return()
+      .debug2("edit family name")
+      updatePedData(famid = fam, clearSel = FALSE)
+    })
 
     observeEvent(input$child, { .debug2("add child")
       newped = tryCatch(
@@ -405,9 +417,11 @@ pedigreeServer = function(id, resultVar, initialDat = NULL, famid = "F1",
       miss = currData$miss
       refs = currData$refs
       labs = if(isTRUE(input$showall)) x$ID else c(miss, refs)
+      large = isolate(largeMode())
+
       dat = tryCatch(
-        plot(x, title = famid, margins = if(largeMode()) 1 else 2, labs = labs,
-             hatched = refs, cex = if(largeMode()) 1 else 1.2, cex.main = 1.5,
+        plot(x, title = famid, margins = if(large) 1 else 2, labs = labs,
+             hatched = refs, cex = if(large) 1 else 1.2, cex.main = 1.5,
              col = list(red = miss, blue = sel()),
              lwd = list(`1.2` = miss, `2` = sel()),
              carrier = miss, foldLabs = 10),

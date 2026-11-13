@@ -789,7 +789,7 @@ server = function(input, output, session) {
                plot.new()
                text(0.5, 0.5, paste(strwrap(msg, width = 60), collapse = "\n"), cex = 1.2)
              })
-  }, res = 96, height = function() if(overviewLarge()) 600 else 450, execOnResize = TRUE)
+  }, res = 96, execOnResize = TRUE)
 
 
   # Tab: Triangles ----------------------------------------------------------
