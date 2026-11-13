@@ -1,4 +1,4 @@
-# dev
+# diviana 0.6.0
 
 ## Imports
 
@@ -8,12 +8,13 @@
 * Fixed missing-person numbering and family-prefixed labels when adding AM data.
 * Allow complete DVI datasets without PM samples.
 
-## AM data and pedigrees
+## Data and pedigrees
 
 * A link icon (🔗) indicates that an AM sample is assigned to a pedigree.
 * Improved reference selection in the pedigree editor, prioritising unassigned references from the current family.
 * Extended relabelling options, including naming missing persons after families.
 * Added a `PM -> AM` button for manual identifications.
+* Added sample counts in frame headers.
 
 ## Aliases
 
@@ -24,9 +25,9 @@
 ## Other
 
 * Added AM/PM export to text and Excel.
-* Added sample and assignment counts to data card headers.
-* Improved automatic accordion behaviour for large datasets.
-* Use `startApp()` instead of `runApp()` in `launchApp()`.
+* Improved the resetting behaviour (the Reset button).
+* The AM and PM data frames can now be collapsed/opened by clicking anywhere in the header.
+* Use `startApp()` instead of `runApp()` in `launchApp()`. This frees up the R console while the app is running.
 
 
 # diviana 0.5.2
