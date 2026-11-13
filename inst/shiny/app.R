@@ -45,7 +45,7 @@ addResourcePath("icons", "www/static_icons")
 #---------------------------------------------
 
 
-DEVMODE = F
+DEVMODE = T
 
 DATASETS = c("example1", "example2", "exclusionExample", "fire", "grave", "heli", "icmp", "planecrash")
 
@@ -266,24 +266,20 @@ server = function(input, output, session) {
 
   pedigrees = reactiveVal(NULL)
   pedIssues = reactiveVal(character())
-  DB = reactiveVal(NULL) # list of freq vectors
   mainMissing = reactiveVal(NULL)
   identifications = reactiveVal(NULL)
 
   # Import data ------------------------------------------------------------
 
-  externalAM = reactiveVal(NULL)
-  externalPM = reactiveVal(NULL)
   currentModal = reactiveVal(NULL)
   assignedRefs = reactiveVal(NULL)
-  externalLoci = reactiveValues(db = NULL, mut = NULL, hasMut = FALSE) # `mut` becomes named list
 
-  dataServerAM = dataServer("AM", externalAM, assignedRefs, missingIDs = mainMissing,
+  dataServerAM = dataServer("AM", assignedRefs = assignedRefs, missingIDs = mainMissing,
                             existingFams = reactive(names(pedigrees())),
                             existingIDs = reactive(labels(lapply(pedigrees(), `[[`, "ped"))),
                             currentModal = currentModal, .debug = .debug,
                             identifications = identifications)
-  dataServerPM = dataServer("PM", externalPM, missingIDs = mainMissing,
+  dataServerPM = dataServer("PM", missingIDs = mainMissing,
                             muted = reactive(identifications()$Sample),
                             currentModal = currentModal, .debug = .debug)
 
@@ -367,13 +363,14 @@ server = function(input, output, session) {
 
   loadDvi = function(dvi, source = "Example", dat = normalizeLoadedDvi(dvi)) { .debug("loadDvi")
     loading(TRUE)
+    session$onFlushed(function() loading(FALSE), once = TRUE)
     pedIssues(pedIssueReasons(attr(dvi, "inspectAM")))
 
     appData(dat)
     identifications(dvi$identifications)
     pedigrees(dat$peds)
-    externalAM(dat$am)
-    externalPM(dat$pm)
+    dataServerAM$load(dat$am)
+    dataServerPM$load(dat$pm)
     dataServerAM$sourceValues$all = if(!is.null(dat$am)) source
     dataServerPM$sourceValues$all = if(!is.null(dat$pm)) source
 
@@ -384,10 +381,8 @@ server = function(input, output, session) {
     syncRadio("muttype", if(dat$hasMut) "original" else "none", ignoreMutInput)
 
     large = NROW(dat$am) > 0L && NROW(dat$pm) > 0L && NROW(dat$am) + NROW(dat$pm) > 22L
-    session$onFlushed(function() {
-      loading(FALSE)
-      session$sendCustomMessage("initDataAccordion", list(card = "AM", large = large))
-    }, once = TRUE)
+    session$onFlushed(function()
+      session$sendCustomMessage("initDataAccordion", list(card = "AM", large = large)), once = TRUE)
   }
 
   # Complete DVI loading
@@ -554,7 +549,7 @@ server = function(input, output, session) {
 
     miss = unlist(lapply(pedigrees(), `[[`, "miss"), use.names = FALSE)
     mainMissing(miss)
-  })
+  }, ignoreNULL = FALSE)
 
   mainAM = reactive({ .debug("mainAM", loading())
     if(loading())
@@ -648,10 +643,6 @@ server = function(input, output, session) {
                    am = dataServerAM, pm = dataServerPM,
                    identifications = identifications)
 
-  observeEvent(currentDviData(), {
-    resetAnalysis(resetAnalysis() + 1)
-  })
-
   mergedPm = mergePmServer("mergePM", trigger = dataServerPM$merge, dvi = currentDviData,
                            reset = reactive(input$resetall))
 
@@ -661,7 +652,7 @@ server = function(input, output, session) {
     old = dataServerPM$main()
     pm$Alias = old$Alias[match(pm$Sample, old$Sample)]
     fixed = old[old$Sample %in% identifications()$Sample, , drop = FALSE]
-    externalPM(rbindSafe(pm, fixed))
+    dataServerPM$load(rbindSafe(pm, fixed))
   })
 
   observeEvent(c(dataServerAM$sources(), dataServerPM$sources()), { .debug("source changed")
@@ -1156,11 +1147,6 @@ server = function(input, output, session) {
     logMessage(res$log)
   })
 
-  observeEvent(currentDviData(), {  .debug("reset result tables")
-    solutionTable$AM = solutionTable$PM = NULL
-    solutionTable$LR = solutionTable$EX = solutionTable$JT = NULL
-  }, ignoreNULL = FALSE)
-
   output$amcentric = gt::render_gt({  .debug("render result AM")
     formatResultTable(req(solutionTable$AM), title = "AM-centered result table",
                       settings$useAliases, aliasPM = aliasPM(),
@@ -1191,6 +1177,10 @@ server = function(input, output, session) {
     dvi = currentDviData()
     m = req(solutionTable$EX) |>
       completeMatrix(names(dvi$pm), dvi$missing)
+    if(isTRUE(input$compactTabs)) {
+      hasResult = !is.na(m)
+      m = m[rowSums(hasResult) > 0, colSums(hasResult) > 0, drop = FALSE]
+    }
     formatExclusionMatrix(m, title = "Pairwise exclusion matrix",
                           input$maxIncomp, settings$useAliases, aliasPM = aliasPM())
   }, height = 600)
@@ -1307,48 +1297,38 @@ server = function(input, output, session) {
 
   # Reset -------------------------------------------------------------------
 
-  resetAnalysis = reactiveVal(0)
-
   observeEvent(input$resetall, {
     .debug("reset all")
-    session$sendCustomMessage("clearOutputs", c(
-      "amcentric", "pmcentric", "lrmatrix", "exmatrix", "jointtabs", "solvelog",
-      "solutionplot", "pedplot", "dvisummary", "AM-mainTableUI", "PM-mainTableUI",
-      "AM-infofield", "PM-infofield", "AM-sampleInfo", "PM-sampleInfo", "reviewControl")
-    )
-    externalAM("reset")
-    externalPM("reset")
+    dataServerAM$reset()
+    dataServerPM$reset()
     appData(NULL)
     identifications(NULL)
     dbChoice("builtin")
     mutChoice("none")
-    externalLoci$db = externalLoci$mut = NULL
-    externalLoci$hasMut = FALSE
     pedigrees(NULL)
     pedIssues(character())
-    mainMissing(NULL)
-    DB(NULL)
-    updateSelectInput(session, "example", choices = c("Load example" = "", DATASETS), selected = "")
+    updateSelectInput(session, "example", selected = "")
     updateRadioButtons(session, "dbtype", selected = "builtin")
     updateRadioButtons(session, "muttype", selected = "none")
     updateNumericInput(session, "mutrateF", value = 0.001)
     updateNumericInput(session, "mutrateM", value = 0.002)
     updateNumericInput(session, "LRthresh", value = 10000)
+    updateNumericInput(session, "pairLRmin", value = 0)
+    updateCheckboxInput(session, "compactTabs", value = FALSE)
     updateCheckboxInput(session, "strictUndisputed", value = FALSE)
     updateCheckboxInput(session, "skipJoint", value = FALSE)
     updateNumericInput(session, "maxIncomp", value = 2)
     updateCheckboxInput(session, "ignoresex", value = FALSE)
     updateCheckboxInput(session, "acrossComps", value = FALSE)
-    resetAnalysis(resetAnalysis() + 1)
     # Settings dialog
     settings$hideUnimportantLabs = TRUE
-    settings$useAliases = TRUE
+    settings$useAliases = FALSE
     settings$computeLR0 = FALSE
     settings$standardmodel = "equal"
     settings$maxAssign = 1e4
   })
 
-  observeEvent(resetAnalysis(), { .debug("reset results")
+  observeEvent(list(currentDviData(), input$resetall), { .debug("reset results")
     kappa$am = kappa$pm = kappa$ampm = NULL
     solutionTable$AM = solutionTable$PM = solutionTable$LR = solutionTable$EX = solutionTable$JT = NULL
     logMessage(NULL)

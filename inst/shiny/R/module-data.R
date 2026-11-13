@@ -37,7 +37,7 @@ dataUI = function(id, title = paste(id, "data")) {
   )
 }
 
-dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = reactiveVal(),
+dataServer = function(id, assignedRefs = reactiveVal(),
                       missingIDs = reactiveVal(), existingFams = reactive(character()),
                       muted = reactive(character()), currentModal = NULL, .debug = NULL,
                       identifications = reactive(NULL), existingIDs = reactive(character())) {
@@ -94,22 +94,17 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
       z$value
     })
 
-    observeEvent(externalData(), { .debug2("set external", externalData())
-      ext = externalData()
+    loadData = function(dat) { .debug2("load", dat)
+      setData(standardiseGenoData(dat))
+      import$clear()
+    }
 
-      if(identical(ext, "reset")) {
-        mainTable$main = NULL
-        sources$all = sources$current = NULL
-        updateRadioButtons(session, "missingFmt", selected = "M")
-        import$clear(reset = TRUE)
-        isolate(externalData(NULL)) # TODO
-        return()
-      }
-      else {
-        setData(standardiseGenoData(ext))
-        import$clear()
-      }
-    }, ignoreInit = TRUE, ignoreNULL = FALSE)
+    resetData = function() { .debug2("reset")
+      setData(NULL)
+      sources$all = sources$current = NULL
+      updateRadioButtons(session, "missingFmt", selected = "M")
+      import$clear(reset = TRUE)
+    }
 
     output$mainTableUI = renderUI(
       if(!is.null(mainTable$main)) DT::DTOutput(ns("mainTable")) else NULL
@@ -326,6 +321,8 @@ dataServer = function(id, externalData = reactiveVal(NULL), assignedRefs = react
     # Return reactive variables to main app
     list(main = reactive(mainTable$main),
          set = setData,
+         load = loadData,
+         reset = resetData,
          idEdits = reactive(idEdits()),
          merge = reactive(input$mergeButton),
          pairing = reactive(input$pairingButton),
