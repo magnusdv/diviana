@@ -274,7 +274,9 @@ registerDatabase = function(input, output, session, am, pm, settings, loading, d
     ))
   })
 
-  list(locusAttrs = locusAttrs, ready = ready, label = label, check = checkDatabase,
+  list(locusAttrs = locusAttrs, markers = reactive(names(selectedDB())),
+       nAdded = reactive(sum(lengths(attr(DBext(), "added")))),
+       ready = ready, label = label, check = checkDatabase,
        load = loadDatabase, reset = resetDatabase)
 }
 

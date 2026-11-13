@@ -44,7 +44,7 @@ addResourcePath("icons", "www/static_icons")
 #---------------------------------------------
 
 
-DEVMODE = T
+DEVMODE = F
 
 DATASETS = c("example1", "example2", "exclusionExample", "fire", "grave", "heli", "icmp", "planecrash")
 
@@ -687,28 +687,10 @@ server = function(input, output, session) {
   execOnResize = TRUE, res = 72, height = 440)
 
   output$dvisummary = renderInfoBox({ .debug("update summary info box")
-    missingData = c(!length(mainAM()), !length(mainPM()), !length(mainMissing()))
-    s = c("No AM data loaded", "No PM data loaded", "No missing persons indicated")[missingData]
-    hasDB = database$ready()
-    col = if(any(missingData) || !hasDB) "warning" else "success"
-
-    if(!length(s)) {
-      dvi = currentDviData()
-      s = capture.output(print(dvi))[-1]
-      s[1:4] = sub(":.*", "", s[1:4]) |> trimws("left")
-    }
-
-    bs4InfoBox(
-      title = NULL,
-      width = 12,
-      elevation = 1,
-      color = col,
-      value = tagList(
-        div(class = if(any(missingData)) "text-danger", HTML(paste0(s, collapse = "<br>"))),
-        div(class = if(!hasDB) "text-danger", "Frequency database: ", database$label())
-      ),
-      icon = shiny::icon("info")
-    )
+    dviSummary(am = dataServerAM$main(), pm = dataServerPM$main(),
+               peds = pedigrees(), amAlleles = alleleMatAM(),
+               dbMarkers = database$markers(), dbLabel = database$label(),
+               nAdded = database$nAdded())
   })
 
   # Overview plot -----------------------------------------------------------

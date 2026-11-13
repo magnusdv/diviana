@@ -267,8 +267,8 @@ registerImport = function(id, input, output, session, mainTable, setData, source
       setData(rbindSafe(z$keep, z$df))
       sources$all = if(z$action == "replace" && !NROW(z$keep)) z$source else
         unique.default(c(sources$all, z$source))
-      if(z$create)
-        importedAM(list(result = z$build, action = z$action))
+      if(id == "AM" && (z$create || z$action == "replace"))
+        importedAM(list(result = if(z$create) z$build, action = z$action))
       pendingImport(NULL)
       importEvent(isolate(importEvent()) + 1L)
       removeModal()
@@ -359,7 +359,7 @@ registerImport = function(id, input, output, session, mainTable, setData, source
                action = input$action, source = sources$current,
                selected = previewRows())
       replacing = z$action == "replace" && (NROW(old) ||
-        (id == "AM" && create && length(existingFams())))
+        (id == "AM" && length(existingFams())))
 
       if(!replacing) {
         commitImport(z)
@@ -372,7 +372,7 @@ registerImport = function(id, input, output, session, mainTable, setData, source
       pendingImport(z)
 
       msg = switch(id,
-        AM = sprintf("Replace all existing AM samples%s?", if(create) " and pedigrees" else ""),
+        AM = "Replace all existing AM samples and pedigrees?",
         PM = "Replace all existing PM samples?"
       )
       showModal(confirmModal(msg, ns("replaceBack"), ns("replaceConfirm")))
