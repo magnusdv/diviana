@@ -180,8 +180,10 @@ ui = bs4Dash::bs4DashPage(
 
       # Report table: AM and PM tabs --------------------------------------------
       column(5, class = "col-xl-6",
-         bs4TabCard(title = div("Identifications", style = "padding-right:10px;"),
-                    label = div(style = "margin-top: 5px",
+         bs4TabCard(title = div("Results", style = "padding-right:10px;"),
+                    label = div(class = "aligned-row", style = "margin-top:5px;gap:10px",
+                                checkboxInput("resultAliases", "Aliases", FALSE, width = "auto") |>
+                                  wrap_tooltip("usealias"),
                                 checkboxInput("compactTabs", "Compact", FALSE, width = "auto") |>
                                   wrap_tooltip("compactTabs")),
                     width = NULL, type = "tabs", side = "right",
@@ -1052,9 +1054,16 @@ server = function(input, output, session) {
 
   observeEvent(input$hideUnimportantLabs, {settings$hideUnimportantLabs = input$hideUnimportantLabs})
   observeEvent(input$useAliases, {settings$useAliases = input$useAliases})
+  observeEvent(input$resultAliases, {settings$useAliases = input$resultAliases})
   observeEvent(input$computeLR0, {settings$computeLR0 = input$computeLR0})
   observeEvent(input$maxAssign, {settings$maxAssign = input$maxAssign})
   observeEvent(input$standardmodel, {settings$standardmodel = input$standardmodel})
+
+  # Keep both alias controls in sync with the global display setting
+  observeEvent(settings$useAliases, {
+    updateCheckboxInput(session, "resultAliases", value = settings$useAliases)
+    updateAwesomeCheckbox(session, "useAliases", value = settings$useAliases)
+  })
 
   # Reset -------------------------------------------------------------------
 

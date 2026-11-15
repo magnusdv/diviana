@@ -1,6 +1,6 @@
 
 TT = list(
-  usealias = "Use aliases in plots/tables",
+  usealias = "Use aliases in plots and tables",
   resetall = "Reset all",
   settings = "Open settings window",
   downloaddata = "Download R/dviData",
@@ -28,7 +28,7 @@ TT = list(
   mutradio_standard = "Apply a common model to all markers (see Settings)",
   mutradio_original = "Use mutation models from the original input (if available)",
   pairLRmin = "Minimum pairing LR to consider in analysis",
-  compactTabs = "Hide entries with 'No match' or 'Excluded'",
+  compactTabs = "Show compact tables",
   mergePmLR = "Pairwise LR between informative samples",
   strictUndisp = "For undisputed matches, require all competing LRs < 1",
   skipJoint = "Skip joint analysis in complex families"
