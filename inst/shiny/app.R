@@ -124,7 +124,6 @@ ui = bs4Dash::bs4DashPage(
                 actionButton("editped", label = tagList(icon("edit"), "Edit")) |> wrap_tooltip("editped"),
                 actionButton("delped", label = tagList(icon("trash-can"), "Delete") ) |> wrap_tooltip("delped")
               ),
-              actionButton("relabelPeds", tagList(icon("tags"), "Relabel")),
               actionBttn("plotdviButton", "Overview", style = "jelly", size = "s", color = "success") |>
                 wrap_tooltip("dviplot")
             )

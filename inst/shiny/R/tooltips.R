@@ -10,6 +10,7 @@ TT = list(
   newped = "Add new pedigree",
   editped = "Edit this pedigree",
   delped = "Delete this pedigree",
+  relabelPeds = "Relabel families and missing persons",
   solve = "Run complete DVI pipeline",
   LRthresh = "LR threshold for conclusive evidence",
   LRthresh2 = "LR threshold for probable evidence",

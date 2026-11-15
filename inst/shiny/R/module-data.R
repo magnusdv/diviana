@@ -25,14 +25,21 @@ dataUI = function(id, title = paste(id, "data")) {
                  style = "font-size:0.9rem;margin-right:10px;white-space:nowrap"),
     uiOutput(ns("mainTableUI")),
     uiOutput(ns("infofield")),
-    footer = div(class = "btn-group",
-      actionButton(ns("importButton"), label = tagList(myIcon("file-arrow-up", align = "-0.1em"), "Import")),
-      actionButton(ns("editButton"), label = tagList(myIcon("edit", align = "-0.1em"), "Edit")),
-      actionButton(ns("aliasButton"), label = tagList(icon("user-pen", align = "-0.1em"), "Aliases")),
-      actionButton(ns("exportButton"), label = tagList(icon("file-export"), "Export")),
-      if(id == "PM") tagList(
-        actionButton(ns("mergeButton"), label = tagList(icon("object-group"), "Merge PM")),
-        actionButton(ns("pairingButton"), "PM \u2192 AM"))
+    footer = div(class = "d-flex flex-wrap", style = "gap:5px",
+      div(class = "btn-group",
+        actionButton(ns("importButton"), label = tagList(myIcon("file-arrow-up", align = "-0.1em"), "Import")),
+        actionButton(ns("editButton"), label = tagList(myIcon("edit", align = "-0.1em"), "Edit")),
+        actionButton(ns("aliasButton"), label = tagList(icon("user-pen", align = "-0.1em"), "Aliases")),
+        actionButton(ns("exportButton"), label = tagList(icon("file-export"), "Export"))),
+      div(class = "aligned-row", style = "gap:5px",
+        span(style = "border-left:1px solid #adb5bd;height:24px"),
+        div(class = "btn-group",
+          switch(id,
+            AM = actionButton(ns("relabelButton"), tagList(icon("tags"), "Relabel")) |>
+              wrap_tooltip("relabelPeds"),
+            PM = tagList(
+              actionButton(ns("mergeButton"), label = tagList(icon("object-group"), "Merge PM")),
+              actionButton(ns("pairingButton"), "PM \u2192 AM")))))
     )
   )
 }
@@ -335,6 +342,7 @@ dataServer = function(id, assignedRefs = reactiveVal(),
          load = loadData,
          reset = resetData,
          idEdits = reactive(idEdits()),
+         relabel = reactive(input$relabelButton),
          merge = reactive(input$mergeButton),
          pairing = reactive(input$pairingButton),
          sources = reactive(sources$all),

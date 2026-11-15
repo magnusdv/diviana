@@ -7,7 +7,7 @@ setupRelabel = function(input, output, session, pedigrees, pedIssues, mainMissin
                                format = "[FNAME]-M[MIDX_FAM]")
   pendingRelabel = reactiveVal(NULL)
 
-  observeEvent(input$relabelPeds, {
+  observeEvent(amData$relabel(), {
     req(length(pedigrees()) > 0)
     pendingRelabel(NULL)
     showModal(relabelPedigreesDialog(defaultRelabelOptions))
