@@ -245,19 +245,29 @@ formatLRmatrix = function(m, title = NULL, LRthresh = 1e4, usealias = FALSE,
   tbl
 }
 
-formatJointTab = function(x, vics, miss, title = NULL, usealias = FALSE, aliasPM = NULL, maxrows = 100) {
+formatJointTab = function(x, vics, miss, title = NULL, usealias = FALSE, aliasPM = NULL,
+                          maxrows = 100, columns = "PM") {
+  # Keep assignment columns first, followed by likelihoods
+  hidden = if(identical(columns, "Missing")) vics else miss
+  x = x[, !colnames(x) %in% hidden, drop = FALSE]
+  x = x[, order(!colnames(x) %in% c(vics, miss)), drop = FALSE]
   clnms = colnames(x)
   collabs = clnms
   vcol = clnms %in% vics
   mcol = clnms %in% miss
-  if(usealias && !is.null(aliasPM))
-    collabs[vcol] = aliasPM[clnms[vcol]]
 
   nr = nrow(x)
   nc = ncol(x)
   if(nr > maxrows) {
     x = x[1:maxrows, , drop = FALSE]
     nr = maxrows
+  }
+  if(usealias && !is.null(aliasPM)) {
+    collabs[vcol] = aliasPM[clnms[vcol]]
+    x[mcol] = lapply(x[mcol], \(z) {
+      a = match(z, names(aliasPM), nomatch = 0L)
+      replace(z, a > 0L, aliasPM[a])
+    })
   }
   wraptxt = if(any(nchar(collabs) > 7)) NULL else "nowrap"
 
@@ -269,10 +279,9 @@ formatJointTab = function(x, vics, miss, title = NULL, usealias = FALSE, aliasPM
       table.align = "left",
       data_row.padding = if(nr > 15) px(1) else px(2),
       table.font.size = if(nc > 15) "90%" else "95%",
+      container.padding.y = px(0),
       container.overflow.x = TRUE,
-      container.overflow.y = TRUE,
-      #container.width = pct(100),
-      #table.width = pct(100),
+      container.overflow.y = TRUE
     ) |>
     tab_style(
       style = cell_text(weight = "bold", whitespace = wraptxt),
@@ -281,12 +290,8 @@ formatJointTab = function(x, vics, miss, title = NULL, usealias = FALSE, aliasPM
     fmt_number(columns = starts_with("loglik"), decimals = 2) |>
     fmt_scientific(columns = starts_with("LR"), decimals = 2, exp_style = "e") |>
     tab_style(
-      style = cell_fill(color = "#E6E6FA"),
-      locations = cells_column_labels(which(mcol))
-    ) |>
-    tab_style(
-      style = cell_fill(color = "#FFE5B4"),
-      locations = cells_column_labels(which(vcol))
+      style = cell_fill(color = if(identical(columns, "Missing")) "#E6E6FA" else "#FFE5B4"),
+      locations = cells_column_labels(which(vcol | mcol))
     ) |>
     cols_align(align = "center") |>
     tooltipHeader(list(

@@ -933,17 +933,32 @@ server = function(input, output, session) {
 
     tabs = lapply(seq_along(JT), \(i) {
       id = paste0("joint-", i)
-      local({
-        ii = i
-        gttab = formatJointTab(JT[[ii]], vics = names(dvi$pm), miss = dvi$missing,
-                               title = sprintf("Joint likelihood of %d assignments", nrow(JT[[ii]])),
-                               usealias = settings$useAliases, aliasPM = aliasPM())
-        output[[id]] = gt::render_gt(gttab)
-      })
-      tabPanel(labs[i], div(style = "height: 560px; overflow: auto", gt::gt_output(id)))
+
+      # Redraw the table without rebuilding its controls
+      output[[id]] = gt::render_gt({
+        formatJointTab(JT[[i]], vics = names(dvi$pm), miss = dvi$missing,
+                       usealias = settings$useAliases, aliasPM = aliasPM(),
+                       columns = input$jointColumns)
+      }, height = 530)
+
+      tabPanel(labs[i],
+        div(style = "margin-bottom:8px",
+            em(sprintf("Joint likelihood of %d assignments", nrow(JT[[i]])))),
+        gt::gt_output(id))
     })
 
-    do.call(tabsetPanel, tabs)
+    # Place the shared selector beside the family tabs
+    controls = tags$li(class = "ml-auto d-flex align-items-center",
+      div(style = "font-size:90%;white-space:nowrap",
+          inlineRadioButtons("jointColumns", "Columns", choices = c("PM", "Missing"),
+                             selected = "PM", width = "auto")))
+    tabset = do.call(tabsetPanel, tabs)
+    tabset$children[[1]] = tagAppendChild(tabset$children[[1]], controls)
+    tagList(tags$style(HTML("
+      #jointColumns .shiny-options-group {display:flex;gap:10px}
+      #jointColumns .radio-inline {display:inline-flex;align-items:center;margin:0;padding:0;gap:4px}
+      #jointColumns input {position:static;margin:0}
+    ")), tabset)
   })
 
   output$solvelog = renderText({ .debug("render result log")
