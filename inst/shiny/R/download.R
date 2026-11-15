@@ -7,19 +7,12 @@ downloadTables = function(results, filename) {
   results$PM$LR  = safeFormat(results$PM$LR)
   results$PM$GLR = safeFormat(results$PM$GLR)
 
-  nvic = nrow(results$LR)
-
   results$LR[] = safeFormat(results$LR)
 
-  # TODO: fix to handle > 1 joint families
-  if(length(JT <- results$JT)) {
-    JT = JT[[1]]
-    if(nrow(JT) > 1e3)
-      JT = JT[1:1e3, , drop = FALSE]
-    results$JT = JT
-  }
-
-  #names(results) = c("resultsAM", "resultsPM", "LR matrix", "Exclusions", "Joint")
+  # Export each joint family on a separate sheet
+  joint = lapply(results$JT, \(x) head(x, 1000))
+  names(joint) = sprintf("Joint %d", seq_along(joint))
+  results = c(results[c("AM", "PM", "LR", "EX")], joint)
 
   nLR = ncol(results$LR)
   nEX = ncol(results$EX)
@@ -28,17 +21,16 @@ downloadTables = function(results, filename) {
   hsc = openxlsx::createStyle(textDecoration = "bold", halign = "center")
 
   wb = openxlsx::buildWorkbook(results, headerStyle = hs,
-                               rowNames = list(FALSE, FALSE, TRUE, TRUE, FALSE))
+                               rowNames = c(FALSE, FALSE, TRUE, TRUE, rep(FALSE, length(joint))))
 
-  openxlsx::setColWidths(wb, 1, cols = 1:ncol(results[[1]]), widths = "auto")
-  openxlsx::setColWidths(wb, 2, cols = 1:ncol(results[[2]]), widths = "auto")
-  openxlsx::setColWidths(wb, 3, cols = 1:(nLR + 1), widths = 12)
-  openxlsx::setColWidths(wb, 4, cols = 1:(nEX + 1), widths = 6)
+  openxlsx::setColWidths(wb, 1, cols = seq_len(ncol(results$AM)), widths = "auto")
+  openxlsx::setColWidths(wb, 2, cols = seq_len(ncol(results$PM)), widths = "auto")
+  openxlsx::setColWidths(wb, 3, cols = seq_len(nLR + 1), widths = 12)
+  openxlsx::setColWidths(wb, 4, cols = seq_len(nEX + 1), widths = 6)
 
   # Center matrix headers
-  for(j in 3:4) {
-    openxlsx::addStyle(wb, j, cols = seq_len(nLR + 1), rows = 1, style = hsc, stack = TRUE)
-  }
+  openxlsx::addStyle(wb, 3, cols = seq_len(nLR + 1), rows = 1, style = hsc, stack = TRUE)
+  openxlsx::addStyle(wb, 4, cols = seq_len(nEX + 1), rows = 1, style = hsc, stack = TRUE)
 
   openxlsx::saveWorkbook(wb, file = filename, overwrite = TRUE)
   invisible(wb)
