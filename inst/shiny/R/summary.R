@@ -87,6 +87,6 @@ dviSummary = function(am, pm, peds, amAlleles, dbMarkers, dbLabel, nAdded = 0L) 
       if(nAdded) tagList(sep, warn(count(nAdded, "added allele"))))
   )
 
-  bs4Dash::bs4InfoBox(title = NULL, width = 12, elevation = 1, color = "info",
+  bs4Dash::bs4InfoBox(title = NULL, width = 12, elevation = 1, color = "warning",
                      value = content, icon = shiny::icon("info"))
 }

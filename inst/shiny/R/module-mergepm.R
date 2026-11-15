@@ -204,7 +204,7 @@ mergePmServer = function(id, trigger, dvi, checkDatabase,
 
         tags$tr(
           tags$td(paste(g, collapse = ", ")),
-          tags$td(nms[gn]),
+          tags$td(nms[gn], style = "overflow-wrap:anywhere;"),
           tags$td(lr),
           tags$td(if(length(probs))
                     span(paste(probs, collapse = ", "), class = "text-danger") else ""),

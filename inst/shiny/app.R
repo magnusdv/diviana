@@ -964,7 +964,7 @@ server = function(input, output, session) {
     # Place the shared selector beside the family tabs
     controls = tags$li(class = "ml-auto d-flex align-items-center",
       div(style = "font-size:90%;white-space:nowrap",
-          inlineRadioButtons("jointColumns", "Columns", choices = c("PM", "Missing"),
+          inlineRadioButtons("jointColumns", "View", choices = c("PM", "Missing"),
                              selected = "PM", width = "auto")))
     tabset = do.call(tabsetPanel, tabs)
     tabset$children[[1]] = tagAppendChild(tabset$children[[1]], controls)
