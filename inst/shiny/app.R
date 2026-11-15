@@ -990,7 +990,7 @@ server = function(input, output, session) {
         tables$LR = tables$LR |> completeMatrix(names(dvi$pm), dvi$missing)
         tables$EX = tables$EX |> completeMatrix(names(dvi$pm), dvi$missing)
       }
-      downloadTables(tables, file)
+      downloadTables(tables, file, log = logMessage()[-1])
     },
     contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )
