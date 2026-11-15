@@ -4,3 +4,4 @@
 ^README\.Rmd$
 ^Rprof.out$
 ^inst/shiny/rsconnect$
+^cran-comments\.md$
