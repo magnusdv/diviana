@@ -3,15 +3,16 @@
 ## Imports
 
 * Redesigned AM/PM import dialogs.
+* The default is now to 'Add' samples rather than to 'Replace all'.
 * Added confirmation before replacing complete DVI datasets.
-* AM text import now includes an option to prepend family name to sample IDs.
-* Fixed missing-person numbering and family-prefixed labels when adding AM data.
-* Allow complete DVI datasets without PM samples.
+* AM text import includes an option to prepend family name to sample IDs.
+* Customisable missing-person names when importing Familias files.
+* Allow Familias files without PM samples.
 
 ## Data and pedigrees
 
 * A link icon (🔗) indicates that an AM sample is assigned to a pedigree.
-* Improved reference selection in the pedigree editor, prioritising unassigned references from the current family.
+* Improved reference selection in the pedigree editor, prioritising unassigned samples from the current family.
 * Extended relabelling options, including naming missing persons after families.
 * Added a `PM -> AM` button for manual identifications.
 * Added sample counts in frame headers.
@@ -21,13 +22,15 @@
 * Added a "Do not use aliases" option, which is now the default.
 * Improved alias generation, text extraction and preview ordering.
 * Allow duplicate AM aliases, but not PM aliases.
+* Added a `Alias` checkbutton in the Result window.
 
 ## Other
 
 * Added AM/PM export to text and Excel.
-* Improved the resetting behaviour (the Reset button).
 * The AM and PM data frames can now be collapsed/opened by clicking anywhere in the header.
 * Use `startApp()` instead of `runApp()` in `launchApp()`. This frees up the R console while the app is running.
+* Added confirmation dialogs several places, when the user is about to change the data irreversibly.
+* Fixed several bugs related with the Reset button.
 
 
 # diviana 0.5.2
