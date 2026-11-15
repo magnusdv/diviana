@@ -68,7 +68,8 @@ dviSummary = function(am, pm, peds, amAlleles, dbMarkers, dbLabel, nAdded = 0L) 
 
   content = div(style = "font-weight:normal;line-height:1.25",
     line("AM", if(nAM) tagList(
-      count(nAM, "sample"), if(unassigned) tagList(sep, warn(assignment)),
+      count(nAM, "sample"), if(unassigned) tagList(sep, warn(assignment)) else
+        if(nAM == 1L) " (assigned to pedigree)" else " (all assigned to pedigrees)",
       if(untyped) tagList(sep, warn(paste(untyped, "untyped")))) else
         warn("No samples loaded", hasData)),
     line("Pedigrees", if(nFam) tagList(

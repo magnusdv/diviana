@@ -25,13 +25,13 @@ dataUI = function(id, title = paste(id, "data")) {
                  style = "font-size:0.9rem;margin-right:10px;white-space:nowrap"),
     uiOutput(ns("mainTableUI")),
     uiOutput(ns("infofield")),
-    footer = div(class = "d-flex flex-wrap", style = "gap:5px",
+    footer = div(class = "d-flex flex-wrap", style = "gap:10px",
       div(class = "btn-group",
         actionButton(ns("importButton"), label = tagList(myIcon("file-arrow-up", align = "-0.1em"), "Import")),
         actionButton(ns("editButton"), label = tagList(myIcon("edit", align = "-0.1em"), "Edit")),
         actionButton(ns("aliasButton"), label = tagList(icon("user-pen", align = "-0.1em"), "Aliases")),
         actionButton(ns("exportButton"), label = tagList(icon("file-export"), "Export"))),
-      div(class = "aligned-row", style = "gap:5px",
+      div(class = "aligned-row", style = "gap:10px",
         span(style = "border-left:1px solid #adb5bd;height:24px"),
         div(class = "btn-group",
           switch(id,
@@ -138,11 +138,7 @@ dataServer = function(id, assignedRefs = reactiveVal(),
       if(is.null(dat))
         return("No data loaded")
       n = nrow(dat)
-      count = sprintf("%d sample%s", n, if(n == 1L) "" else "s")
-      if(id == "AM")
-        count = sprintf("%s · %d assigned", count,
-                        sum(dat$Sample %in% names(assignedRefs())))
-      count
+      sprintf("%d %s sample%s", n, id, if(n == 1L) "" else "s")
     })
 
     # Show data sources below the table
