@@ -3,5 +3,4 @@
 ^notes-private$
 ^README\.Rmd$
 ^Rprof.out$
-^\.positai$
-^\.claude$
+^inst/shiny/rsconnect$

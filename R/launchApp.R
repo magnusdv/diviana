@@ -1,8 +1,8 @@
 #' Launch DIVIANA
 #'
-#' This launches the DIVIANA app.
+#' Launches DIVIANA in the default browser while keeping the R console available.
 #'
-#' @return No return value, called for side effects.
+#' @return Invisibly, a Shiny app handle. Use its `stop()` method to stop the app.
 #'
 #' @examples
 #'

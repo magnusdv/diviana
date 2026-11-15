@@ -7,10 +7,10 @@
 launchApp()
 }
 \value{
-No return value, called for side effects.
+Invisibly, a Shiny app handle. Use its \code{stop()} method to stop the app.
 }
 \description{
-This launches the DIVIANA app.
+Launches DIVIANA in the default browser while keeping the R console available.
 }
 \examples{
 

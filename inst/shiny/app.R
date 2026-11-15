@@ -11,7 +11,6 @@ suppressMessages(suppressPackageStartupMessages({
   library(forrel)
   library(diviana)
   library(dvir)
-  library(verbalisr)
   library(plotly)
   library(openxlsx)
 }))
@@ -89,7 +88,6 @@ ui = bs4Dash::bs4DashPage(
   # Main panel
   bs4DashBody(
     includeCSS("www/custom.css"),
-    tags$head(includeHTML("www/GA.html")),
     tags$head(tags$script(src = "scripts.js")),
 
     useShinyjs(),

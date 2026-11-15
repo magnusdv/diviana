@@ -85,7 +85,7 @@ updateDiviana = function(pkgs = NULL, method = c("pak", "remotes")) {
     cran = vapply(Filter(function(p) !p$dev, selected), `[[`, "", "pkg")
     gh = vapply(Filter(function(p) p$dev, selected), `[[`, "", "pkg")
     if(method == "pak") {
-      pkgs = c(cran, paste0("magnusdv/", gh, "?reinstall"))
+      pkgs = c(cran, sprintf("magnusdv/%s?reinstall", gh))
       pak::pkg_install(pkgs, upgrade = TRUE, ask = FALSE)
     }
     else {
