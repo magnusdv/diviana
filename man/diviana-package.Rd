@@ -6,7 +6,7 @@
 \alias{diviana-package}
 \title{diviana: Shiny App for Disaster Victim Identification}
 \description{
-A 'shiny' application for disaster victim identification.
+A 'shiny' application for DNA-based disaster victim identification and missing person cases, including families with multiple missing persons. Supports flexible data import, including 'Familias' files, automatic pedigree creation from relationship tags, and interactive pedigree editing. Analyses include pairwise likelihood ratios, merging of post-mortem samples, exclusions, and joint (global) identification, based on methods described by Vigeland and Egeland (2021) \doi{10.1038/s41598-021-93071-5} and Egeland and Vigeland (2025) \doi{10.1016/j.fsigen.2025.103270}. Part of the 'pedsuite' collection of packages for pedigree analysis.
 }
 \seealso{
 Useful links:
