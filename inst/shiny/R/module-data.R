@@ -50,6 +50,7 @@ dataServer = function(id, assignedRefs = reactiveVal(),
 
     # Main reactives
     mainTable = reactiveValues(main = NULL)
+    analysisData = reactiveVal(NULL)
     sources = reactiveValues(current = NULL, all = NULL)
 
     # Commit the complete table, including muted PM samples.
@@ -86,6 +87,9 @@ dataServer = function(id, assignedRefs = reactiveVal(),
       }
       else dat = NULL
       mainTable$main = dat
+
+      # Alias changes only affect display
+      analysisData(if(is.null(dat)) NULL else dat[names(dat) != "Alias"])
     }
 
     # Register module for text import
@@ -326,6 +330,7 @@ dataServer = function(id, assignedRefs = reactiveVal(),
 
     # Return reactive variables to main app
     list(main = reactive(mainTable$main),
+         analysis = analysisData,
          set = setData,
          load = loadData,
          reset = resetData,

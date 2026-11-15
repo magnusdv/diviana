@@ -261,16 +261,30 @@ server = function(input, output, session) {
   observeEvent(dataServerAM$imported(), showImported("AM"), ignoreInit = TRUE)
   observeEvent(dataServerPM$imported(), showImported("PM"), ignoreInit = TRUE)
 
-  genoAM = reactive({ .debug("genoAM", dataServerAM$main())
-    g = dataServerAM$main(); g$.rowid = g$Fam = g$origFam = g$Sample = g$Alias = g$AMEL = g$Sex = NULL; g})
-  genoPM = reactive({ .debug("genoPM", dataServerPM$main())
-    g = dataServerPM$main(); g$.rowid = g$Fam = g$Sample = g$Alias = g$AMEL = g$Sex = NULL; g})
+  genoAM = reactive({
+    g = dataServerAM$analysis()
+    .debug("genoAM", g)
+    g$.rowid = g$Fam = g$origFam = g$Sample = g$AMEL = g$Sex = NULL
+    g
+  })
+  genoPM = reactive({
+    g = dataServerPM$analysis()
+    .debug("genoPM", g)
+    g$.rowid = g$Fam = g$Sample = g$AMEL = g$Sex = NULL
+    g
+  })
 
   markersAM = reactive(names(genoAM()))
   markersPM = reactive(names(genoPM()))
 
-  sexAM = reactive({g = dataServerAM$main(); .setnames(match(g$Sex, c("M", "F"), 0L), rownames(g))})
-  sexPM = reactive({g = dataServerPM$main(); .setnames(match(g$Sex, c("M", "F"), 0L), rownames(g))})
+  sexAM = reactive({
+    g = dataServerAM$analysis()
+    .setnames(match(g$Sex, c("M", "F"), 0L), rownames(g))
+  })
+  sexPM = reactive({
+    g = dataServerPM$analysis()
+    .setnames(match(g$Sex, c("M", "F"), 0L), rownames(g))
+  })
 
   aliasAM = reactive({g = dataServerAM$main(); .setnames(g$Alias, rownames(g))})
   aliasPM = reactive({g = dataServerPM$main(); .setnames(g$Alias, rownames(g))})
